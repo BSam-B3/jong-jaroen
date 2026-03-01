@@ -1,482 +1,473 @@
 'use client';
-
 import { useEffect, useState, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
-import { createNotification } from '@/lib/useNotifications';
 
-const GP_RATE = 0.03;
-
-interface JobDetail {
+interface Job {
   id: string;
   title: string;
   description: string;
+  category: string;
+  budget: number;
   status: string;
-  base_price: number;
-  fee_amount: number;
-  location_from: string;
-  location_to: string;
-  submit_photo_url: string | null;
-  payment_slip_url: string | null;
-  payment_status: string | null;
-  created_at: string;
   customer_id: string;
   freelancer_id: string | null;
-  customer: { full_name: string; phone: string } | null;
-  freelancer: { full_name: string; phone: string; avg_rating: number } | null;
+  payment_proof_url: string | null;
+  rating: number | null;
+  review_text: string | null;
+  created_at: string;
+  lat: number | null;
+  lng: number | null;
+  location_name: string | null;
 }
 
-const STATUS_LABEL: Record<string, { label: string; color: string; emoji: string }> = {
-  pending: { label: 'รอดำเนินการ', color: 'bg-orange-100 text-orange-700', emoji: '⏳' },
-  in_progress: { label: 'กำลังดำเนินการ', color: 'bg-blue-100 text-blue-700', emoji: '🔄' },
-  completed: { label: 'เสร็จสิ้น', color: 'bg-green-100 text-green-700', emoji: '✅' },
-  cancelled: { label: 'ยกเลิก', color: 'bg-red-100 text-red-700', emoji: '❌' },
-};
+interface Profile {
+  id: string;
+  full_name: string;
+  avg_rating: number;
+  total_jobs: number;
+  is_verified: boolean;
+  kyc_status: string;
+  phone: string;
+}
 
-const PAYMENT_STATUS_LABEL: Record<string, { label: string; color: string; emoji: string }> = {
-  unpaid: { label: 'ยังไม่ชำระ', color: 'bg-red-100 text-red-700', emoji: '💳' },
-  pending_confirm: { label: 'รอยืนยันการชำระ', color: 'bg-yellow-100 text-yellow-700', emoji: '⏳' },
-  paid: { label: 'ชำระแล้ว', color: 'bg-green-100 text-green-700', emoji: '✅' },
+const STATUS_LABEL: Record<string, { label: string; color: string; bg: string; emoji: string }> = {
+  pending:     { label: 'รอรับงาน',      color: 'text-yellow-700', bg: 'bg-yellow-100', emoji: '⏳' },
+  accepted:    { label: 'รับงานแล้ว',    color: 'text-blue-700',   bg: 'bg-blue-100',   emoji: '✅' },
+  in_progress: { label: 'กำลังดำเนินการ', color: 'text-purple-700', bg: 'bg-purple-100', emoji: '🔨' },
+  paid:        { label: 'โอนเงินแล้ว',   color: 'text-indigo-700', bg: 'bg-indigo-100', emoji: '💸' },
+  completed:   { label: 'เสร็จสิ้น',     color: 'text-green-700',  bg: 'bg-green-100',  emoji: '🎉' },
+  cancelled:   { label: 'ยกเลิก',        color: 'text-red-700',    bg: 'bg-red-100',    emoji: '❌' },
 };
 
 export default function JobDetailPage() {
   const router = useRouter();
   const params = useParams();
   const jobId = params?.id as string;
-  const slipInputRef = useRef<HTMLInputElement>(null);
 
-  const [job, setJob] = useState<JobDetail | null>(null);
+  const [job, setJob] = useState<Job | null>(null);
+  const [customer, setCustomer] = useState<Profile | null>(null);
+  const [freelancer, setFreelancer] = useState<Profile | null>(null);
+  const [userId, setUserId] = useState('');
   const [loading, setLoading] = useState(true);
-  const [currentUserId, setCurrentUserId] = useState('');
-  const [currentUserRole, setCurrentUserRole] = useState('');
-  const [uploadingSlip, setUploadingSlip] = useState(false);
-  const [slipPreview, setSlipPreview] = useState<string | null>(null);
-  const [updating, setUpdating] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [rating, setRating] = useState(0);
+  const [reviewText, setReviewText] = useState('');
+  const [showRating, setShowRating] = useState(false);
+  const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
-  const [successMsg, setSuccessMsg] = useState('');
+  const slipRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const loadJob = async () => {
+    const load = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push('/auth/login'); return; }
+      setUserId(user.id);
 
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single();
-
-      setCurrentUserId(user.id);
-      setCurrentUserRole(profile?.role || '');
-
-      const { data: jobData, error: jobErr } = await supabase
+      const { data: jobData } = await supabase
         .from('jobs')
-        .select(`
-          *,
-          customer:profiles!jobs_customer_id_fkey(full_name, phone),
-          freelancer:profiles!jobs_freelancer_id_fkey(full_name, phone, avg_rating)
-        `)
+        .select('*')
         .eq('id', jobId)
         .single();
 
-      if (jobErr || !jobData) {
-        setError('ไม่พบข้อมูลงาน');
-        setLoading(false);
-        return;
-      }
+      if (!jobData) { router.push('/dashboard'); return; }
+      setJob(jobData as Job);
 
-      // Security: only customer or assigned freelancer can view
-      if (jobData.customer_id !== user.id && jobData.freelancer_id !== user.id) {
-        router.push(profile?.role === 'customer' ? '/dashboard/customer' : '/dashboard/freelancer');
-        return;
-      }
+      // Load profiles
+      const [custResp, freResp] = await Promise.all([
+        supabase.from('profiles').select('id,full_name,avg_rating,total_jobs,is_verified,kyc_status,phone').eq('id', jobData.customer_id).single(),
+        jobData.freelancer_id
+          ? supabase.from('profiles').select('id,full_name,avg_rating,total_jobs,is_verified,kyc_status,phone').eq('id', jobData.freelancer_id).single()
+          : Promise.resolve({ data: null }),
+      ]);
 
-      setJob(jobData as JobDetail);
+      if (custResp.data) setCustomer(custResp.data as Profile);
+      if (freResp.data) setFreelancer(freResp.data as Profile);
       setLoading(false);
     };
-    if (jobId) loadJob();
+    load();
   }, [jobId, router]);
 
-  const handleSlipChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const showMsg = (m: string) => { setMsg(m); setTimeout(() => setMsg(''), 4000); };
+  const showErr = (e: string) => { setError(e); setTimeout(() => setError(''), 4000); };
 
-    if (file.size > 5 * 1024 * 1024) {
-      setError('ไฟล์สลิปต้องไม่เกิน 5MB');
-      return;
+  // Award coupon when job completed
+  const tryAwardCoupon = async (customerId: string, freelancerId: string) => {
+    try {
+      // Get updated totals after job completion
+      const [custProfile, freProfile] = await Promise.all([
+        supabase.from('profiles').select('spending_total').eq('id', customerId).single(),
+        supabase.from('profiles').select('earning_total').eq('id', freelancerId).single(),
+      ]);
+      
+      // Customer milestone: 3000 THB spending
+      if (custProfile.data && custProfile.data.spending_total >= 3000) {
+        await supabase.rpc('award_coupon_if_eligible', { p_user_id: customerId });
+      }
+      // Freelancer milestone: 5000 THB earning
+      if (freProfile.data && freProfile.data.earning_total >= 5000) {
+        await supabase.rpc('award_coupon_if_eligible', { p_user_id: freelancerId });
+      }
+    } catch (e) {
+      console.warn('Coupon award skipped:', e);
     }
+  };
 
-    const reader = new FileReader();
-    reader.onload = (ev) => setSlipPreview(ev.target?.result as string);
-    reader.readAsDataURL(file);
-
-    setUploadingSlip(true);
+  const updateStatus = async (newStatus: string) => {
+    if (!job) return;
+    setActionLoading(true);
     setError('');
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `slips/${jobId}-${Date.now()}.${fileExt}`;
-      const { error: uploadError } = await supabase.storage
-        .from('job-images')
-        .upload(fileName, file, { upsert: true });
-      if (uploadError) throw uploadError;
+      const updates: Record<string, unknown> = { status: newStatus };
+      
+      // When completing: update totals + send notification + award coupon
+      if (newStatus === 'completed' && job.freelancer_id) {
+        // Update spending/earning totals
+        await Promise.all([
+          supabase.rpc('increment_spending', { p_user_id: job.customer_id, p_amount: job.budget }),
+          supabase.rpc('increment_earning', { p_user_id: job.freelancer_id, p_amount: job.budget }),
+        ]).catch(() => null); // non-blocking
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('job-images')
-        .getPublicUrl(fileName);
+        // Insert notifications
+        await supabase.from('notifications').insert([
+          {
+            user_id: job.customer_id,
+            title: '🎉 งานเสร็จสมบูรณ์!',
+            body: job.title + ' เสร็จแล้ว กรุณาให้คะแนนรีวิว',
+            type: 'job_completed',
+            job_id: job.id,
+          },
+          {
+            user_id: job.freelancer_id,
+            title: '✅ งานได้รับการยืนยัน',
+            body: 'ลูกค้ายืนยันว่า ' + job.title + ' เสร็จสมบูรณ์',
+            type: 'job_completed',
+            job_id: job.id,
+          },
+        ]).catch(() => null);
 
-      // Update job with slip URL and set payment_status to pending_confirm
-      const { error: updateError } = await supabase
-        .from('jobs')
-        .update({
-          payment_slip_url: publicUrl,
-          payment_status: 'pending_confirm',
-        })
-        .eq('id', jobId);
-
-      if (updateError) throw updateError;
-
-      // Notify freelancer about payment slip
-      if (job?.freelancer_id) {
-        await createNotification({
-          userId: job.freelancer_id,
-          type: 'payment',
-          title: '💰 ลูกค้าอัปโหลดสลิปการชำระแล้ว',
-          body: `งาน "${job.title}" รอยืนยันการชำระ ฿${((job.base_price || 0) + (job.fee_amount || 0)).toLocaleString()}`,
-          data: { job_id: jobId, payment_slip_url: publicUrl },
-        });
+        // Try to award coupons
+        await tryAwardCoupon(job.customer_id, job.freelancer_id);
       }
 
-      setJob(prev => prev ? {
-        ...prev,
-        payment_slip_url: publicUrl,
-        payment_status: 'pending_confirm',
-      } : null);
-      setSuccessMsg('✅ อัปโหลดสลิปสำเร็จ! กำลังรอยืนยันจากช่าง');
-      setTimeout(() => setSuccessMsg(''), 5000);
+      const { error: updateErr } = await supabase
+        .from('jobs')
+        .update(updates)
+        .eq('id', job.id);
+
+      if (updateErr) throw updateErr;
+      setJob(prev => prev ? { ...prev, status: newStatus } : null);
+      showMsg(newStatus === 'completed' ? '🎉 ยืนยันงานเสร็จสิ้นแล้ว! ตรวจสอบคูปองที่ /coupons' : '✅ อัปเดตสถานะแล้ว');
+      if (newStatus === 'completed') setShowRating(true);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Upload สลิปไม่สำเร็จ');
-      setSlipPreview(null);
+      showErr(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด');
     } finally {
-      setUploadingSlip(false);
+      setActionLoading(false);
     }
   };
 
-  const handleConfirmPayment = async () => {
-    if (!job) return;
-    setUpdating(true);
-    setError('');
+  const uploadSlip = async (file: File) => {
+    if (!job || !userId) return;
+    if (file.size > 5 * 1024 * 1024) { showErr('ไฟล์ต้องไม่เกิน 5MB'); return; }
+    setUploading(true);
     try {
-      const { error: updateError } = await supabase
-        .from('jobs')
-        .update({
-          payment_status: 'paid',
-          status: 'in_progress',
-        })
-        .eq('id', jobId);
-
-      if (updateError) throw updateError;
-
-      // Notify customer that payment confirmed
-      await createNotification({
-        userId: job.customer_id,
-        type: 'payment',
-        title: '✅ การชำระเงินได้รับการยืนยันแล้ว',
-        body: `งาน "${job.title}" ช่างยืนยันรับเงินแล้ว กำลังดำเนินงาน`,
-        data: { job_id: jobId },
-      });
-
-      setJob(prev => prev ? { ...prev, payment_status: 'paid', status: 'in_progress' } : null);
-      setSuccessMsg('✅ ยืนยันการชำระเงินสำเร็จ! งานเริ่มดำเนินการแล้ว');
-      setTimeout(() => setSuccessMsg(''), 5000);
+      const ext = file.name.split('.').pop();
+      const path = 'slips/' + job.id + '-' + Date.now() + '.' + ext;
+      const { error: upErr } = await supabase.storage.from('job-images').upload(path, file, { upsert: true });
+      if (upErr) throw upErr;
+      const { data: { publicUrl } } = supabase.storage.from('job-images').getPublicUrl(path);
+      const { error: updateErr } = await supabase.from('jobs').update({ payment_proof_url: publicUrl, status: 'paid' }).eq('id', job.id);
+      if (updateErr) throw updateErr;
+      setJob(prev => prev ? { ...prev, payment_proof_url: publicUrl, status: 'paid' } : null);
+      showMsg('📤 อัปโหลดสลิปสำเร็จ! สถานะ: โอนเงินแล้ว');
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'ยืนยันการชำระไม่สำเร็จ');
+      showErr(err instanceof Error ? err.message : 'Upload ไม่สำเร็จ');
     } finally {
-      setUpdating(false);
+      setUploading(false);
     }
   };
 
-  const handleMarkComplete = async () => {
-    if (!job) return;
-    setUpdating(true);
-    setError('');
+  const submitRating = async () => {
+    if (!job || rating === 0) { showErr('กรุณาเลือกคะแนน 1-5 ดาว'); return; }
+    setActionLoading(true);
     try {
-      const { error: updateError } = await supabase
+      const { error: rateErr } = await supabase
         .from('jobs')
-        .update({ status: 'completed' })
-        .eq('id', jobId);
+        .update({ rating, review_text: reviewText.trim() || null })
+        .eq('id', job.id);
+      if (rateErr) throw rateErr;
 
-      if (updateError) throw updateError;
-
-      // Notify freelancer job completed
+      // Update freelancer avg_rating
       if (job.freelancer_id) {
-        await createNotification({
-          userId: job.freelancer_id,
-          type: 'job_completed',
-          title: '🎉 งานเสร็จสิ้นแล้ว!',
-          body: `ลูกค้ายืนยันว่างาน "${job.title}" เสร็จสิ้นแล้ว`,
-          data: { job_id: jobId },
-        });
+        const { data: allJobs } = await supabase
+          .from('jobs')
+          .select('rating')
+          .eq('freelancer_id', job.freelancer_id)
+          .not('rating', 'is', null);
+        if (allJobs && allJobs.length > 0) {
+          const avgRating = allJobs.reduce((s, j) => s + (j.rating || 0), 0) / allJobs.length;
+          await supabase.from('profiles').update({ avg_rating: Math.round(avgRating * 10) / 10, total_jobs: allJobs.length }).eq('id', job.freelancer_id);
+        }
       }
 
-      setJob(prev => prev ? { ...prev, status: 'completed' } : null);
-      setSuccessMsg('🎉 ยืนยันงานเสร็จสิ้นแล้ว!');
-      setTimeout(() => setSuccessMsg(''), 5000);
+      setJob(prev => prev ? { ...prev, rating, review_text: reviewText } : null);
+      setShowRating(false);
+      showMsg('⭐ ให้คะแนนสำเร็จ ขอบคุณ!');
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'อัปเดตสถานะไม่สำเร็จ');
+      showErr(err instanceof Error ? err.message : 'ให้คะแนนไม่สำเร็จ');
     } finally {
-      setUpdating(false);
+      setActionLoading(false);
     }
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-4xl mb-4 animate-bounce">📋</div>
-          <p className="text-green-700 font-medium">กำลังโหลดข้อมูลงาน...</p>
-        </div>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center"><div className="text-4xl animate-bounce mb-2">🔨</div><p className="text-gray-500 text-sm">กำลังโหลด...</p></div>
       </div>
     );
   }
 
-  if (!job) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-4xl mb-4">❌</div>
-          <p className="text-gray-600 font-medium">{error || 'ไม่พบข้อมูลงาน'}</p>
-          <button onClick={() => router.back()} className="mt-4 text-green-600 hover:underline text-sm">← กลับ</button>
-        </div>
-      </div>
-    );
-  }
+  if (!job) return null;
 
-  const total = (job.base_price || 0) + (job.fee_amount || 0);
-  const isCustomer = currentUserId === job.customer_id;
-  const isFreelancer = currentUserId === job.freelancer_id;
-  const statusInfo = STATUS_LABEL[job.status] || STATUS_LABEL['pending'];
-  const paymentStatusInfo = PAYMENT_STATUS_LABEL[job.payment_status || 'unpaid'] || PAYMENT_STATUS_LABEL['unpaid'];
-  const backHref = isCustomer ? '/dashboard/customer' : '/dashboard/freelancer';
+  const isCustomer = userId === job.customer_id;
+  const isFreelancer = userId === job.freelancer_id;
+  const statusInfo = STATUS_LABEL[job.status] || { label: job.status, color: 'text-gray-600', bg: 'bg-gray-100', emoji: '•' };
+  const canChat = (isCustomer || isFreelancer) && job.status !== 'cancelled' && job.status !== 'pending';
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100">
+    <div className="min-h-screen bg-gray-50 pb-24">
       {/* Header */}
       <header className="bg-white shadow-sm sticky top-0 z-10">
         <div className="max-w-xl mx-auto px-4 py-3 flex items-center gap-3">
-          <Link href={backHref} className="text-gray-400 hover:text-gray-600 transition-colors">
-            ← กลับ
-          </Link>
-          <div className="flex-1">
-            <h1 className="text-lg font-bold text-green-700 leading-none truncate">{job.title}</h1>
-            <p className="text-xs text-gray-400">จงเจริญ - รายละเอียดงาน</p>
-          </div>
-          <span className={`text-xs px-2 py-1 rounded-full font-medium ${statusInfo.color}`}>
-            {statusInfo.emoji} {statusInfo.label}
-          </span>
+          <button onClick={() => router.back()} className="text-gray-400 hover:text-gray-600">← กลับ</button>
+          <h1 className="text-base font-bold text-gray-800 flex-1 truncate">{job.title}</h1>
+          {canChat && (
+            <Link
+              href={'/jobs/' + job.id + '/chat'}
+              className="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors"
+            >
+              💬 แชท
+            </Link>
+          )}
         </div>
       </header>
 
-      <main className="max-w-xl mx-auto px-4 py-6 space-y-4">
+      <main className="max-w-xl mx-auto px-4 py-5 space-y-4">
         {/* Messages */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 text-sm">⚠️ {error}</div>
-        )}
-        {successMsg && (
-          <div className="bg-green-50 border border-green-200 text-green-700 rounded-xl p-3 text-sm font-medium">{successMsg}</div>
-        )}
+        {msg && <div className="bg-green-50 border border-green-200 text-green-700 rounded-2xl p-3 text-sm font-medium">{msg}</div>}
+        {error && <div className="bg-red-50 border border-red-200 text-red-700 rounded-2xl p-3 text-sm">⚠️ {error}</div>}
 
-        {/* Job Summary Card */}
+        {/* Status Card */}
         <div className="bg-white rounded-2xl p-5 shadow-sm">
-          <h2 className="text-base font-bold text-gray-800 mb-3">📋 รายละเอียดงาน</h2>
-          <div className="space-y-2">
+          <div className="flex items-start justify-between mb-4">
             <div>
-              <p className="text-xs text-gray-500">ชื่องาน</p>
-              <p className="text-sm font-semibold text-gray-800">{job.title}</p>
-            </div>
-            {job.description && (
-              <div>
-                <p className="text-xs text-gray-500">รายละเอียด</p>
-                <p className="text-sm text-gray-700">{job.description}</p>
+              <div className={'inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-medium mb-2 ' + statusInfo.bg + ' ' + statusInfo.color}>
+                {statusInfo.emoji} {statusInfo.label}
               </div>
-            )}
-            {job.location_from && (
-              <div>
-                <p className="text-xs text-gray-500">📍 สถานที่</p>
-                <p className="text-sm text-gray-700">{job.location_from}{job.location_to ? ` → ${job.location_to}` : ''}</p>
-              </div>
-            )}
-            <div>
-              <p className="text-xs text-gray-500">วันที่สร้าง</p>
-              <p className="text-sm text-gray-700">{new Date(job.created_at).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+              <h2 className="text-lg font-bold text-gray-800">{job.title}</h2>
+              <p className="text-xs text-gray-400 mt-0.5">📁 {job.category}</p>
             </div>
-          </div>
-        </div>
-
-        {/* People Card */}
-        <div className="bg-white rounded-2xl p-5 shadow-sm">
-          <h2 className="text-base font-bold text-gray-800 mb-3">👥 ผู้เกี่ยวข้อง</h2>
-          <div className="space-y-3">
-            <div className="flex items-center gap-3 p-3 bg-green-50 rounded-xl">
-              <div className="w-10 h-10 bg-green-200 rounded-full flex items-center justify-center text-xl">🏠</div>
-              <div>
-                <p className="text-xs text-gray-500">ผู้ว่าจ้าง</p>
-                <p className="text-sm font-semibold text-gray-800">{job.customer?.full_name || 'ลูกค้า'}</p>
-                {job.customer?.phone && <p className="text-xs text-gray-500">📞 {job.customer.phone}</p>}
-              </div>
-              {isCustomer && <span className="ml-auto text-xs bg-green-200 text-green-700 px-2 py-0.5 rounded-full font-medium">คุณ</span>}
-            </div>
-            {job.freelancer && (
-              <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-xl">
-                <div className="w-10 h-10 bg-blue-200 rounded-full flex items-center justify-center text-xl">🔧</div>
-                <div>
-                  <p className="text-xs text-gray-500">ช่าง</p>
-                  <p className="text-sm font-semibold text-gray-800">{job.freelancer.full_name}</p>
-                  {job.freelancer.phone && <p className="text-xs text-gray-500">📞 {job.freelancer.phone}</p>}
-                  <p className="text-xs text-yellow-500">{'★'.repeat(Math.round(job.freelancer.avg_rating || 0))} {job.freelancer.avg_rating?.toFixed(1) || '0.0'}</p>
-                </div>
-                {isFreelancer && <span className="ml-auto text-xs bg-blue-200 text-blue-700 px-2 py-0.5 rounded-full font-medium">คุณ</span>}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Payment Card */}
-        <div className="bg-white rounded-2xl p-5 shadow-sm">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-base font-bold text-gray-800">💰 การชำระเงิน</h2>
-            <span className={`text-xs px-2 py-1 rounded-full font-medium ${paymentStatusInfo.color}`}>
-              {paymentStatusInfo.emoji} {paymentStatusInfo.label}
-            </span>
-          </div>
-
-          {/* Price Breakdown */}
-          <div className="bg-gray-50 rounded-xl p-4 space-y-2 mb-4">
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">ค่าจ้างช่าง</span>
-              <span className="text-sm font-medium">฿{(job.base_price || 0).toLocaleString()}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600 flex items-center gap-1">
-                ค่าบริการ
-                <span className="bg-amber-100 text-amber-700 text-xs px-1 rounded font-medium">3%</span>
-              </span>
-              <span className="text-sm font-medium text-orange-600">+฿{(job.fee_amount || 0).toLocaleString()}</span>
-            </div>
-            <div className="border-t border-gray-200 pt-2 flex justify-between items-center">
-              <span className="text-base font-bold text-gray-800">ยอดรวม</span>
-              <span className="text-2xl font-bold text-green-600">฿{total.toLocaleString()}</span>
+            <div className="text-right">
+              <p className="text-xl font-black text-green-600">฿{job.budget?.toLocaleString()}</p>
+              <p className="text-xs text-gray-400">งบประมาณ</p>
             </div>
           </div>
 
-          {/* Bank Transfer Info */}
-          {isCustomer && job.payment_status !== 'paid' && (
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
-              <h3 className="text-sm font-bold text-blue-800 mb-2">🏦 ข้อมูลการโอนเงิน</h3>
-              <div className="space-y-1 text-sm">
-                <p className="text-gray-700"><span className="text-gray-500">ธนาคาร:</span> กสิกรไทย (KBANK)</p>
-                <p className="text-gray-700"><span className="text-gray-500">เลขบัญชี:</span> <span className="font-mono font-bold">XXX-X-XXXXX-X</span></p>
-                <p className="text-gray-700"><span className="text-gray-500">ชื่อบัญชี:</span> บริษัท PandVHappiness</p>
-                <p className="text-xl font-bold text-green-600 text-center mt-2">฿{total.toLocaleString()}</p>
-              </div>
-              <p className="text-xs text-blue-600 mt-2 text-center">
-                💡 กรุณาโอนเงินแล้วอัปโหลดสลิปด้านล่าง
-              </p>
+          {job.description && (
+            <div className="bg-gray-50 rounded-xl p-3 mb-3">
+              <p className="text-sm text-gray-600">{job.description}</p>
             </div>
           )}
 
-          {/* Submit Photo Preview */}
-          {job.submit_photo_url && (
-            <div className="mb-4">
-              <p className="text-sm font-medium text-gray-700 mb-2">📸 รูปหน้างาน</p>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={job.submit_photo_url} alt="Job photo" className="w-full rounded-xl max-h-48 object-cover" />
-            </div>
-          )}
-
-          {/* Slip Upload - Customer Only, when not paid */}
-          {isCustomer && (job.payment_status === 'unpaid' || job.payment_status === null) && (
-            <div>
-              <p className="text-sm font-bold text-gray-700 mb-2">📄 อัปโหลดสลิปการโอนเงิน</p>
-              <div
-                onClick={() => slipInputRef.current?.click()}
-                className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-colors ${
-                  slipPreview ? 'border-green-300 bg-green-50' : 'border-gray-200 hover:border-green-300 hover:bg-green-50'
-                }`}
+          {/* Location */}
+          {(job.lat && job.lng) && (
+            <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 mb-3">
+              <p className="text-xs text-blue-700 font-medium mb-1">📍 ตำแหน่งงาน</p>
+              {job.location_name && <p className="text-sm text-blue-800">{job.location_name}</p>}
+              <a
+                href={'https://www.google.com/maps?q=' + job.lat + ',' + job.lng}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-blue-600 underline mt-1 inline-block"
               >
-                {uploadingSlip ? (
-                  <div className="py-4">
-                    <div className="text-2xl mb-2 animate-spin inline-block">⏳</div>
-                    <p className="text-sm text-gray-500">กำลังอัปโหลด...</p>
-                  </div>
-                ) : slipPreview ? (
-                  <div>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={slipPreview} alt="Slip preview" className="max-h-40 mx-auto rounded-lg object-cover mb-2" />
-                    <p className="text-xs text-green-600 font-medium">✅ คลิกเพื่อเปลี่ยนสลิป</p>
-                  </div>
-                ) : (
-                  <div className="py-4">
-                    <div className="text-3xl mb-2">🧾</div>
-                    <p className="text-sm text-gray-500">แตะเพื่ออัปโหลดสลิป</p>
-                    <p className="text-xs text-gray-400 mt-1">JPG, PNG ไม่เกิน 5MB</p>
-                  </div>
-                )}
+                🗺️ เปิดใน Google Maps →
+              </a>
+            </div>
+          )}
+
+          <p className="text-xs text-gray-400">สร้างเมื่อ {new Date(job.created_at).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+        </div>
+
+        {/* Profiles */}
+        <div className="grid grid-cols-2 gap-3">
+          {customer && (
+            <div className="bg-white rounded-2xl p-4 shadow-sm">
+              <p className="text-xs text-gray-400 mb-1">👤 ลูกค้า</p>
+              <p className="font-bold text-sm text-gray-800">{customer.full_name}</p>
+              {customer.phone && <p className="text-xs text-gray-500 mt-0.5">📞 {customer.phone}</p>}
+            </div>
+          )}
+          {freelancer && (
+            <div className="bg-white rounded-2xl p-4 shadow-sm">
+              <p className="text-xs text-gray-400 mb-1">🔨 ช่าง</p>
+              <div className="flex items-center gap-1">
+                <p className="font-bold text-sm text-gray-800">{freelancer.full_name}</p>
+                {freelancer.kyc_status === 'approved' && <span className="text-xs text-blue-600">✓</span>}
               </div>
-              <input
-                ref={slipInputRef} type="file"
-                accept="image/jpeg,image/png,image/webp"
-                onChange={handleSlipChange} className="hidden"
-              />
-            </div>
-          )}
-
-          {/* Show uploaded slip */}
-          {job.payment_slip_url && (
-            <div className="mt-3">
-              <p className="text-sm font-medium text-gray-700 mb-2">🧾 สลิปที่อัปโหลด</p>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={job.payment_slip_url} alt="Payment slip" className="w-full rounded-xl max-h-48 object-cover border border-gray-200" />
-            </div>
-          )}
-
-          {/* Freelancer: Confirm Payment */}
-          {isFreelancer && job.payment_status === 'pending_confirm' && (
-            <button
-              onClick={handleConfirmPayment}
-              disabled={updating}
-              className="mt-4 w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-bold py-3 rounded-xl transition-colors"
-            >
-              {updating ? '⏳ กำลังยืนยัน...' : '✅ ยืนยันรับเงินแล้ว'}
-            </button>
-          )}
-
-          {/* Payment confirmed display */}
-          {job.payment_status === 'paid' && (
-            <div className="mt-3 bg-green-50 border border-green-200 rounded-xl p-3 text-center">
-              <p className="text-green-700 font-bold">✅ ชำระเงินเรียบร้อยแล้ว</p>
-              <p className="text-xs text-green-500 mt-1">฿{total.toLocaleString()} — งานกำลังดำเนินการ</p>
+              <p className="text-xs text-gray-500 mt-0.5">⭐ {freelancer.avg_rating?.toFixed(1)} · {freelancer.total_jobs} งาน</p>
             </div>
           )}
         </div>
 
-        {/* Customer: Mark complete button */}
-        {isCustomer && job.status === 'in_progress' && (
+        {/* Payment Slip */}
+        {job.payment_proof_url && (
           <div className="bg-white rounded-2xl p-5 shadow-sm">
-            <h2 className="text-base font-bold text-gray-800 mb-2">🎉 ยืนยันงานเสร็จสิ้น</h2>
-            <p className="text-sm text-gray-500 mb-3">เมื่อช่างทำงานเสร็จแล้ว กดยืนยันเพื่อปิดงาน</p>
-            <button
-              onClick={handleMarkComplete}
-              disabled={updating}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white font-bold py-3 rounded-xl transition-colors"
+            <h3 className="text-sm font-bold text-gray-800 mb-3">💸 หลักฐานการโอนเงิน</h3>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={job.payment_proof_url} alt="Payment slip" className="w-full max-h-60 object-contain rounded-xl border border-gray-100" />
+          </div>
+        )}
+
+        {/* Upload Slip (customer, in_progress only) */}
+        {isCustomer && job.status === 'in_progress' && !job.payment_proof_url && (
+          <div className="bg-white rounded-2xl p-5 shadow-sm">
+            <h3 className="text-sm font-bold text-gray-800 mb-3">💸 อัปโหลดสลิปการโอนเงิน</h3>
+            <div
+              onClick={() => slipRef.current?.click()}
+              className="border-2 border-dashed border-gray-200 hover:border-blue-300 rounded-xl p-5 text-center cursor-pointer transition-colors"
             >
-              {updating ? '⏳ กำลังอัปเดต...' : '🎉 ยืนยันงานเสร็จสิ้น'}
+              {uploading ? (
+                <div><div className="text-2xl animate-spin inline-block">⏳</div><p className="text-xs text-gray-500 mt-1">กำลังอัปโหลด...</p></div>
+              ) : (
+                <div><div className="text-3xl mb-1">📎</div><p className="text-sm text-gray-500">แตะเพื่ออัปโหลดสลิป</p><p className="text-xs text-gray-400 mt-1">PNG, JPG ไม่เกิน 5MB</p></div>
+              )}
+            </div>
+            <input ref={slipRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) uploadSlip(f); }} />
+          </div>
+        )}
+
+        {/* Rating Section - show after completed */}
+        {job.status === 'completed' && isCustomer && !job.rating && showRating && (
+          <div className="bg-white rounded-2xl p-5 shadow-sm">
+            <h3 className="text-sm font-bold text-gray-800 mb-3">⭐ ให้คะแนนช่าง</h3>
+            <div className="flex gap-2 justify-center mb-3">
+              {[1,2,3,4,5].map(s => (
+                <button key={s} onClick={() => setRating(s)} className={'text-3xl transition-transform ' + (s <= rating ? 'scale-110' : 'opacity-30 hover:opacity-60')}>
+                  ⭐
+                </button>
+              ))}
+            </div>
+            <textarea
+              value={reviewText}
+              onChange={e => setReviewText(e.target.value)}
+              placeholder="รีวิวเพิ่มเติม (ไม่บังคับ)..."
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
+              rows={3}
+            />
+            <button
+              onClick={submitRating}
+              disabled={actionLoading || rating === 0}
+              className="w-full mt-3 bg-yellow-500 hover:bg-yellow-600 disabled:bg-gray-200 text-white font-bold py-2.5 rounded-xl text-sm transition-colors"
+            >
+              {actionLoading ? '⏳...' : '⭐ ส่งคะแนน'}
             </button>
           </div>
         )}
 
-        <div className="pb-6" />
+        {/* Existing rating */}
+        {job.rating && (
+          <div className="bg-white rounded-2xl p-4 shadow-sm">
+            <p className="text-xs text-gray-400 mb-1">⭐ คะแนนที่ให้</p>
+            <div className="flex gap-1">
+              {[1,2,3,4,5].map(s => (
+                <span key={s} className={s <= job.rating! ? 'text-yellow-400' : 'text-gray-200'}>⭐</span>
+              ))}
+              <span className="text-sm font-bold text-gray-700 ml-1">{job.rating}/5</span>
+            </div>
+            {job.review_text && <p className="text-sm text-gray-600 mt-1 italic">"{job.review_text}"</p>}
+          </div>
+        )}
+
+        {/* Action Buttons */}
+        <div className="space-y-3">
+          {/* Freelancer: Accept job */}
+          {isFreelancer && job.status === 'pending' && (
+            <button
+              onClick={() => updateStatus('accepted')}
+              disabled={actionLoading}
+              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white font-bold py-3 rounded-xl text-sm transition-colors"
+            >
+              {actionLoading ? '⏳...' : '✅ รับงานนี้'}
+            </button>
+          )}
+
+          {/* Freelancer: Start work */}
+          {isFreelancer && job.status === 'accepted' && (
+            <button
+              onClick={() => updateStatus('in_progress')}
+              disabled={actionLoading}
+              className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-gray-300 text-white font-bold py-3 rounded-xl text-sm transition-colors"
+            >
+              {actionLoading ? '⏳...' : '🔨 เริ่มทำงาน'}
+            </button>
+          )}
+
+          {/* Customer: Confirm complete after paid */}
+          {isCustomer && (job.status === 'paid' || job.status === 'in_progress') && (
+            <button
+              onClick={() => updateStatus('completed')}
+              disabled={actionLoading}
+              className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-bold py-3 rounded-xl text-sm transition-colors"
+            >
+              {actionLoading ? '⏳...' : '🎉 ยืนยันงานเสร็จสิ้น'}
+            </button>
+          )}
+
+          {/* Chat Button (visible to both parties) */}
+          {canChat && (
+            <Link
+              href={'/jobs/' + job.id + '/chat'}
+              className="flex items-center justify-center gap-2 w-full bg-green-50 border-2 border-green-200 hover:bg-green-100 text-green-700 font-bold py-3 rounded-xl text-sm transition-colors"
+            >
+              💬 เปิดห้องแชท
+            </Link>
+          )}
+
+          {/* Cancel */}
+          {(isCustomer || isFreelancer) && ['pending', 'accepted'].includes(job.status) && (
+            <button
+              onClick={() => { if (window.confirm('ยืนยันการยกเลิกงานนี้?')) updateStatus('cancelled'); }}
+              disabled={actionLoading}
+              className="w-full bg-red-50 border border-red-200 hover:bg-red-100 text-red-600 font-medium py-2.5 rounded-xl text-sm transition-colors"
+            >
+              ❌ ยกเลิกงาน
+            </button>
+          )}
+        </div>
+
+        {/* Coupon hint when completed */}
+        {job.status === 'completed' && (
+          <div className="bg-gradient-to-r from-red-50 to-yellow-50 border border-yellow-200 rounded-2xl p-4">
+            <p className="text-sm font-bold text-yellow-800 mb-1">🎁 ตรวจสอบคูปองจงเจริญ!</p>
+            <p className="text-xs text-yellow-700">ถ้าสะสมยอดครบ (จ้างงาน ฿3,000 / รับงาน ฿5,000) คุณอาจได้รับคูปองโชคดี</p>
+            <Link href="/coupons" className="inline-block mt-2 text-xs text-yellow-700 font-bold underline">
+              ดูคูปองของฉัน →
+            </Link>
+          </div>
+        )}
       </main>
+
+      {/* Bottom nav */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 flex justify-around py-2 z-50">
+        <Link href="/" className="flex flex-col items-center text-gray-400 text-xs gap-0.5"><span>🏠</span>หน้าหลัก</Link>
+        <Link href="/services" className="flex flex-col items-center text-gray-400 text-xs gap-0.5"><span>🔍</span>ค้นหา</Link>
+        <Link href="/dashboard" className="flex flex-col items-center text-gray-400 text-xs gap-0.5"><span>📋</span>งานของฉัน</Link>
+        <Link href="/coupons" className="flex flex-col items-center text-gray-400 text-xs gap-0.5"><span>🎁</span>คูปอง</Link>
+        <Link href="/profile" className="flex flex-col items-center text-gray-400 text-xs gap-0.5"><span>👤</span>โปรไฟล์</Link>
+      </nav>
     </div>
   );
-}
+  }
