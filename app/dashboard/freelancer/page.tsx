@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
+import { NotificationBell } from '@/app/components/NotificationBell';
 
 interface Profile {
   id: string;
@@ -61,10 +62,7 @@ function StarRating({ rating }: { rating: number }) {
   return (
     <div className="flex gap-0.5">
       {[1, 2, 3, 4, 5].map((star) => (
-        <span
-          key={star}
-          className={`text-lg ${star <= Math.round(rating) ? 'text-yellow-400' : 'text-gray-200'}`}
-        >
+        <span key={star} className={`text-lg ${star <= Math.round(rating) ? 'text-yellow-400' : 'text-gray-200'}`}>
           ★
         </span>
       ))}
@@ -78,11 +76,16 @@ export default function FreelancerDashboard() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [userId, setUserId] = useState<string>('');
 
   useEffect(() => {
     const loadData = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push('/auth/login'); return; }
+      if (!user) {
+        router.push('/auth/login');
+        return;
+      }
+      setUserId(user.id);
 
       const { data: profileData } = await supabase
         .from('profiles')
@@ -94,7 +97,6 @@ export default function FreelancerDashboard() {
         router.push('/dashboard/customer');
         return;
       }
-
       setProfile(profileData);
 
       const { data: jobsData } = await supabase
@@ -146,13 +148,16 @@ export default function FreelancerDashboard() {
               <p className="text-xs text-gray-400">ผู้รับจ้าง Dashboard</p>
             </div>
           </div>
-          <button
-            onClick={handleLogout}
-            disabled={loggingOut}
-            className="flex items-center gap-1 bg-red-50 hover:bg-red-100 text-red-600 text-sm font-medium px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
-          >
-            {loggingOut ? '...' : '🚪 ออกจากระบบ'}
-          </button>
+          <div className="flex items-center gap-2">
+            {userId && <NotificationBell userId={userId} />}
+            <button
+              onClick={handleLogout}
+              disabled={loggingOut}
+              className="flex items-center gap-1 bg-red-50 hover:bg-red-100 text-red-600 text-sm font-medium px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+            >
+              {loggingOut ? '...' : '🚪 ออกจากระบบ'}
+            </button>
+          </div>
         </div>
       </header>
 
@@ -171,14 +176,11 @@ export default function FreelancerDashboard() {
               </div>
             )}
           </div>
-
-          {/* Rating display */}
           <div className="mt-3 flex items-center gap-2">
             <StarRating rating={currentRating} />
             <span className="text-white font-bold">{currentRating.toFixed(1)}</span>
             <span className="text-blue-200 text-sm">/ 5.0</span>
           </div>
-
           <div className="mt-3 grid grid-cols-3 gap-2">
             <div className="bg-white/20 rounded-xl px-2 py-2 text-center">
               <div className="text-xl font-bold">{profile?.total_jobs || 0}</div>
@@ -198,41 +200,10 @@ export default function FreelancerDashboard() {
         {/* Progress Section */}
         <div className="bg-white rounded-2xl p-5 shadow-sm">
           <h3 className="text-base font-bold text-gray-800 mb-4">📊 Progress ของคุณ</h3>
-
-          <ProgressBar
-            label="รายได้สะสม"
-            value={profile?.earning_total || 0}
-            max={earningGoal}
-            unit=" ฿"
-            color="bg-blue-500"
-            emoji="💰"
-          />
-          <ProgressBar
-            label="งานที่รับสะสม"
-            value={profile?.total_jobs || 0}
-            max={jobGoal}
-            unit=" งาน"
-            color="bg-indigo-500"
-            emoji="📋"
-          />
-          <ProgressBar
-            label="คะแนนรีวิว"
-            value={currentRating}
-            max={ratingGoal}
-            unit=" ดาว"
-            color="bg-yellow-400"
-            emoji="⭐"
-          />
-          <ProgressBar
-            label="ตั๋วลอตเตอรี่เดือนนี้"
-            value={profile?.lottery_count_this_month || 0}
-            max={5}
-            unit=" ใบ"
-            color="bg-purple-500"
-            emoji="🎟️"
-          />
-
-          {/* Milestone hints */}
+          <ProgressBar label="รายได้สะสม" value={profile?.earning_total || 0} max={earningGoal} unit=" ฿" color="bg-blue-500" emoji="💰" />
+          <ProgressBar label="งานที่รับสะสม" value={profile?.total_jobs || 0} max={jobGoal} unit=" งาน" color="bg-indigo-500" emoji="📋" />
+          <ProgressBar label="คะแนนรีวิว" value={currentRating} max={ratingGoal} unit=" ดาว" color="bg-yellow-400" emoji="⭐" />
+          <ProgressBar label="ตั๋วลอตเตอรี่เดือนนี้" value={profile?.lottery_count_this_month || 0} max={5} unit=" ใบ" color="bg-purple-500" emoji="🎟️" />
           <div className="mt-3 space-y-2">
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
               <p className="text-xs text-blue-700 font-medium">
@@ -273,7 +244,6 @@ export default function FreelancerDashboard() {
               จัดการบริการ
             </Link>
           </div>
-
           {jobs.length === 0 ? (
             <div className="text-center py-8">
               <div className="text-4xl mb-2">🔍</div>
@@ -288,7 +258,11 @@ export default function FreelancerDashboard() {
           ) : (
             <div className="space-y-3">
               {jobs.map((job) => (
-                <div key={job.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                <Link
+                  key={job.id}
+                  href={`/jobs/${job.id}`}
+                  className="flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
+                >
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-800 truncate">{job.title || 'งานที่ไม่มีชื่อ'}</p>
                     <p className="text-xs text-gray-400">{new Date(job.created_at).toLocaleDateString('th-TH')}</p>
@@ -296,16 +270,14 @@ export default function FreelancerDashboard() {
                   <div className="flex items-center gap-2 ml-2">
                     <span className="text-sm font-medium text-gray-700">฿{(job.base_price || 0).toLocaleString()}</span>
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                      job.status === 'completed'
-                        ? 'bg-green-100 text-green-700'
-                        : job.status === 'pending'
-                        ? 'bg-orange-100 text-orange-700'
-                        : 'bg-blue-100 text-blue-700'
+                      job.status === 'completed' ? 'bg-green-100 text-green-700' :
+                      job.status === 'pending' ? 'bg-orange-100 text-orange-700' :
+                      'bg-blue-100 text-blue-700'
                     }`}>
                       {job.status === 'completed' ? '✅' : job.status === 'pending' ? '⏳' : '🔄'}
                     </span>
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           )}
