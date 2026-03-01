@@ -12,9 +12,19 @@ interface MapPinPickerProps {
 const DEFAULT_LAT = 12.5297;
 const DEFAULT_LNG = 101.6225;
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type GMaps = any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type GMapInstance = any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type GMarker = any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type GGeocoder = any;
+
 declare global {
   interface Window {
-    google: typeof google;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    google: any;
     initGoogleMap: () => void;
   }
 }
@@ -26,14 +36,14 @@ export function MapPinPicker({
   className = '',
 }: MapPinPickerProps) {
   const mapRef = useRef<HTMLDivElement>(null);
-  const [map, setMap] = useState<google.maps.Map | null>(null);
-  const [marker, setMarker] = useState<google.maps.Marker | null>(null);
+  const [map, setMap] = useState<GMapInstance | null>(null);
+  const [marker, setMarker] = useState<GMarker | null>(null);
   const [selectedLat, setSelectedLat] = useState<number | null>(null);
   const [selectedLng, setSelectedLng] = useState<number | null>(null);
   const [address, setAddress] = useState('');
   const [loading, setLoading] = useState(false);
   const [mapLoaded, setMapLoaded] = useState(false);
-  const geocoderRef = useRef<google.maps.Geocoder | null>(null);
+  const geocoderRef = useRef<GGeocoder | null>(null);
 
   // Load Google Maps script
   useEffect(() => {
@@ -61,49 +71,6 @@ export function MapPinPicker({
     }
   }, []);
 
-  // Init map after script loads
-  useEffect(() => {
-    if (!mapLoaded || !mapRef.current || map) return;
-
-    const gMap = new window.google.maps.Map(mapRef.current, {
-      center: { lat: defaultLat, lng: defaultLng },
-      zoom: 14,
-      mapTypeControl: false,
-      streetViewControl: false,
-      fullscreenControl: false,
-      gestureHandling: 'cooperative',
-    });
-
-    const gMarker = new window.google.maps.Marker({
-      position: { lat: defaultLat, lng: defaultLng },
-      map: gMap,
-      draggable: true,
-      title: 'ลากเพื่อย้ายตำแหน่ง',
-      animation: window.google.maps.Animation.DROP,
-    });
-
-    geocoderRef.current = new window.google.maps.Geocoder();
-
-    // Click to move marker
-    gMap.addListener('click', (e: google.maps.MapMouseEvent) => {
-      if (e.latLng) {
-        gMarker.setPosition(e.latLng);
-        handleLocationChange(e.latLng.lat(), e.latLng.lng());
-      }
-    });
-
-    // Drag marker
-    gMarker.addListener('dragend', (e: google.maps.MapMouseEvent) => {
-      if (e.latLng) {
-        handleLocationChange(e.latLng.lat(), e.latLng.lng());
-      }
-    });
-
-    setMap(gMap);
-    setMarker(gMarker);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapLoaded]);
-
   const handleLocationChange = useCallback((lat: number, lng: number) => {
     setSelectedLat(lat);
     setSelectedLng(lng);
@@ -112,7 +79,8 @@ export function MapPinPicker({
     if (geocoderRef.current) {
       geocoderRef.current.geocode(
         { location: { lat, lng } },
-        (results, status) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (results: any, status: string) => {
           setLoading(false);
           if (status === 'OK' && results && results[0]) {
             const addr = results[0].formatted_address
@@ -130,6 +98,52 @@ export function MapPinPicker({
       );
     }
   }, [onLocationSelect]);
+
+  // Init map after script loads
+  useEffect(() => {
+    if (!mapLoaded || !mapRef.current || map) return;
+
+    const G: GMaps = window.google.maps;
+
+    const gMap: GMapInstance = new G.Map(mapRef.current, {
+      center: { lat: defaultLat, lng: defaultLng },
+      zoom: 14,
+      mapTypeControl: false,
+      streetViewControl: false,
+      fullscreenControl: false,
+      gestureHandling: 'cooperative',
+    });
+
+    const gMarker: GMarker = new G.Marker({
+      position: { lat: defaultLat, lng: defaultLng },
+      map: gMap,
+      draggable: true,
+      title: 'ลากเพื่อย้ายตำแหน่ง',
+      animation: G.Animation.DROP,
+    });
+
+    geocoderRef.current = new G.Geocoder();
+
+    // Click to move marker
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    gMap.addListener('click', (e: any) => {
+      if (e.latLng) {
+        gMarker.setPosition(e.latLng);
+        handleLocationChange(e.latLng.lat(), e.latLng.lng());
+      }
+    });
+
+    // Drag marker
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    gMarker.addListener('dragend', (e: any) => {
+      if (e.latLng) {
+        handleLocationChange(e.latLng.lat(), e.latLng.lng());
+      }
+    });
+
+    setMap(gMap);
+    setMarker(gMarker);
+  }, [mapLoaded, map, defaultLat, defaultLng, handleLocationChange]);
 
   // Use current GPS location
   const useMyLocation = () => {
@@ -165,7 +179,6 @@ export function MapPinPicker({
 
   return (
     <div className={`space-y-3 ${className}`}>
-      {/* Map Container */}
       <div className="relative rounded-2xl overflow-hidden border border-gray-200 shadow-sm">
         <div ref={mapRef} style={{ height: '280px', width: '100%' }}>
           {!mapLoaded && (
@@ -177,8 +190,6 @@ export function MapPinPicker({
             </div>
           )}
         </div>
-
-        {/* My Location Button */}
         <button
           onClick={useMyLocation}
           className="absolute bottom-3 right-3 bg-white shadow-md rounded-xl px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50 transition-colors flex items-center gap-1.5"
@@ -188,7 +199,6 @@ export function MapPinPicker({
         </button>
       </div>
 
-      {/* Selected Location Info */}
       <div className="bg-gray-50 rounded-xl p-3">
         {loading ? (
           <p className="text-xs text-gray-400 animate-pulse">🔍 กำลังค้นหาที่อยู่...</p>
