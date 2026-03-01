@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
+import { createNotification } from '@/lib/useNotifications';
 
 const GP_RATE = 0.03; // 3% platform fee
 
@@ -18,9 +19,7 @@ interface Freelancer {
 function GPCalculator({ basePrice }: { basePrice: number }) {
   const fee = Math.ceil(basePrice * GP_RATE);
   const total = basePrice + fee;
-
   if (basePrice <= 0) return null;
-
   return (
     <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-4 mt-3">
       <h4 className="text-sm font-bold text-amber-800 mb-3 flex items-center gap-2">
@@ -54,13 +53,13 @@ export default function NewJobPage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [customerId, setCustomerId] = useState('');
+  const [customerName, setCustomerName] = useState('');
   const [freelancers, setFreelancers] = useState<Freelancer[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [error, setError] = useState('');
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -78,11 +77,14 @@ export default function NewJobPage() {
   useEffect(() => {
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push('/auth/login'); return; }
+      if (!user) {
+        router.push('/auth/login');
+        return;
+      }
 
       const { data: profile } = await supabase
         .from('profiles')
-        .select('role')
+        .select('role, full_name')
         .eq('id', user.id)
         .single();
 
@@ -92,6 +94,7 @@ export default function NewJobPage() {
       }
 
       setCustomerId(user.id);
+      setCustomerName(profile?.full_name || 'ลูกค้า');
 
       const { data: freelancerList } = await supabase
         .from('profiles')
@@ -113,28 +116,23 @@ export default function NewJobPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       setError('ไฟล์รูปต้องไม่เกิน 5MB');
       return;
     }
 
-    // Show preview
     const reader = new FileReader();
     reader.onload = (ev) => setPhotoPreview(ev.target?.result as string);
     reader.readAsDataURL(file);
 
-    // Upload to Supabase Storage
     setUploadingPhoto(true);
     setError('');
     try {
       const fileExt = file.name.split('.').pop();
       const fileName = `${customerId}/${Date.now()}.${fileExt}`;
-
       const { error: uploadError } = await supabase.storage
         .from('job-images')
         .upload(fileName, file, { upsert: true });
-
       if (uploadError) throw uploadError;
 
       const { data: { publicUrl } } = supabase.storage
@@ -160,7 +158,7 @@ export default function NewJobPage() {
 
     setSubmitting(true);
     try {
-      const { error: jobError } = await supabase.from('jobs').insert({
+      const { data: jobData, error: jobError } = await supabase.from('jobs').insert({
         customer_id: customerId,
         freelancer_id: formData.freelancer_id || null,
         title: formData.title.trim(),
@@ -171,9 +169,24 @@ export default function NewJobPage() {
         location_to: formData.location_to.trim(),
         submit_photo_url: formData.submit_photo_url || null,
         status: 'pending',
-      });
+      }).select('id').single();
 
       if (jobError) throw jobError;
+
+      // 🔔 Trigger notification to selected freelancer
+      if (formData.freelancer_id && jobData?.id) {
+        await createNotification({
+          userId: formData.freelancer_id,
+          type: 'new_job',
+          title: '📋 มีงานใหม่สำหรับคุณ!',
+          body: `${customerName} ต้องการจ้าง "${formData.title.trim()}" ราคา ฿${basePrice.toLocaleString()}`,
+          data: {
+            job_id: jobData.id,
+            customer_id: customerId,
+            base_price: basePrice,
+          },
+        });
+      }
 
       router.push('/dashboard/customer?success=job_created');
     } catch (err: unknown) {
@@ -217,7 +230,6 @@ export default function NewJobPage() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-
           {/* Job Title */}
           <div className="bg-white rounded-2xl p-5 shadow-sm">
             <h3 className="text-sm font-bold text-gray-700 mb-3">📝 รายละเอียดงาน</h3>
@@ -225,11 +237,7 @@ export default function NewJobPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-600 mb-1">ชื่องาน *</label>
                 <input
-                  type="text"
-                  name="title"
-                  value={formData.title}
-                  onChange={handleChange}
-                  required
+                  type="text" name="title" value={formData.title} onChange={handleChange} required
                   placeholder="เช่น ซ่อมท่อน้ำ, ทาสีบ้าน, ตัดหญ้า..."
                   className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-400 text-sm"
                 />
@@ -237,10 +245,7 @@ export default function NewJobPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-600 mb-1">รายละเอียดเพิ่มเติม</label>
                 <textarea
-                  name="description"
-                  value={formData.description}
-                  onChange={handleChange}
-                  rows={3}
+                  name="description" value={formData.description} onChange={handleChange} rows={3}
                   placeholder="อธิบายงานที่ต้องการ เช่น จำนวน, ขนาด, เวลา..."
                   className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-400 text-sm resize-none"
                 />
@@ -255,10 +260,7 @@ export default function NewJobPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-600 mb-1">สถานที่ทำงาน / จุดรับ</label>
                 <input
-                  type="text"
-                  name="location_from"
-                  value={formData.location_from}
-                  onChange={handleChange}
+                  type="text" name="location_from" value={formData.location_from} onChange={handleChange}
                   placeholder="เช่น บ้านเลขที่ 123 หมู่ 5 ปากน้ำประแส"
                   className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-400 text-sm"
                 />
@@ -266,10 +268,7 @@ export default function NewJobPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-600 mb-1">จุดส่ง (ถ้ามี)</label>
                 <input
-                  type="text"
-                  name="location_to"
-                  value={formData.location_to}
-                  onChange={handleChange}
+                  type="text" name="location_to" value={formData.location_to} onChange={handleChange}
                   placeholder="เช่น ตลาดปากน้ำประแส (สำหรับงานขนส่ง)"
                   className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-400 text-sm"
                 />
@@ -294,11 +293,8 @@ export default function NewJobPage() {
                     }`}
                   >
                     <input
-                      type="radio"
-                      name="freelancer_id"
-                      value={f.id}
-                      checked={formData.freelancer_id === f.id}
-                      onChange={handleChange}
+                      type="radio" name="freelancer_id" value={f.id}
+                      checked={formData.freelancer_id === f.id} onChange={handleChange}
                       className="sr-only"
                     />
                     <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-xl flex-shrink-0">
@@ -328,19 +324,12 @@ export default function NewJobPage() {
               <div className="relative">
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-medium">฿</span>
                 <input
-                  type="number"
-                  name="base_price"
-                  value={formData.base_price}
-                  onChange={handleChange}
-                  min="0"
-                  step="1"
-                  placeholder="0"
+                  type="number" name="base_price" value={formData.base_price} onChange={handleChange}
+                  min="0" step="1" placeholder="0"
                   className="w-full border border-gray-200 rounded-xl pl-8 pr-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-400 text-sm"
                 />
               </div>
             </div>
-
-            {/* GP Calculator */}
             <GPCalculator basePrice={basePrice} />
           </div>
 
@@ -348,13 +337,10 @@ export default function NewJobPage() {
           <div className="bg-white rounded-2xl p-5 shadow-sm">
             <h3 className="text-sm font-bold text-gray-700 mb-1">📸 รูปภาพหน้างาน</h3>
             <p className="text-xs text-gray-400 mb-3">อัปโหลดรูปสถานที่หรือรายละเอียดงาน (ไม่บังคับ, max 5MB)</p>
-
             <div
               onClick={() => fileInputRef.current?.click()}
               className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-colors ${
-                photoPreview
-                  ? 'border-green-300 bg-green-50'
-                  : 'border-gray-200 hover:border-green-300 hover:bg-green-50'
+                photoPreview ? 'border-green-300 bg-green-50' : 'border-gray-200 hover:border-green-300 hover:bg-green-50'
               }`}
             >
               {uploadingPhoto ? (
@@ -365,11 +351,7 @@ export default function NewJobPage() {
               ) : photoPreview ? (
                 <div>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={photoPreview}
-                    alt="Preview"
-                    className="max-h-40 mx-auto rounded-lg object-cover mb-2"
-                  />
+                  <img src={photoPreview} alt="Preview" className="max-h-40 mx-auto rounded-lg object-cover mb-2" />
                   <p className="text-xs text-green-600 font-medium">✅ อัปโหลดสำเร็จ — คลิกเพื่อเปลี่ยน</p>
                 </div>
               ) : (
@@ -381,11 +363,9 @@ export default function NewJobPage() {
               )}
             </div>
             <input
-              ref={fileInputRef}
-              type="file"
+              ref={fileInputRef} type="file"
               accept="image/jpeg,image/png,image/webp,image/gif"
-              onChange={handlePhotoChange}
-              className="hidden"
+              onChange={handlePhotoChange} className="hidden"
             />
           </div>
 
@@ -420,7 +400,6 @@ export default function NewJobPage() {
           >
             {submitting ? '⏳ กำลังสร้างงาน...' : `✅ ยืนยันจ้างงาน ฿${total.toLocaleString()}`}
           </button>
-
           <p className="text-xs text-center text-gray-400 pb-6">
             การยืนยันถือว่าคุณตกลงชำระ ฿{total.toLocaleString()} ให้แก่ช่างและแพลตฟอร์ม
           </p>
