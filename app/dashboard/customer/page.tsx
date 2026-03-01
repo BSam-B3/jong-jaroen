@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
+import { NotificationBell } from '@/app/components/NotificationBell';
 
 interface Profile {
   id: string;
@@ -62,11 +63,17 @@ export default function CustomerDashboard() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [userId, setUserId] = useState<string>('');
+  const [successMsg, setSuccessMsg] = useState('');
 
   useEffect(() => {
     const loadData = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push('/auth/login'); return; }
+      if (!user) {
+        router.push('/auth/login');
+        return;
+      }
+      setUserId(user.id);
 
       const { data: profileData } = await supabase
         .from('profiles')
@@ -78,7 +85,6 @@ export default function CustomerDashboard() {
         router.push('/dashboard/freelancer');
         return;
       }
-
       setProfile(profileData);
 
       const { data: jobsData } = await supabase
@@ -92,6 +98,13 @@ export default function CustomerDashboard() {
       setLoading(false);
     };
     loadData();
+
+    // Show success message from query params
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('success') === 'job_created') {
+      setSuccessMsg('✅ สร้างงานสำเร็จแล้ว! ช่างจะได้รับการแจ้งเตือน');
+      setTimeout(() => setSuccessMsg(''), 5000);
+    }
   }, [router]);
 
   const handleLogout = async () => {
@@ -129,17 +142,27 @@ export default function CustomerDashboard() {
               <p className="text-xs text-gray-400">ผู้ว่าจ้าง Dashboard</p>
             </div>
           </div>
-          <button
-            onClick={handleLogout}
-            disabled={loggingOut}
-            className="flex items-center gap-1 bg-red-50 hover:bg-red-100 text-red-600 text-sm font-medium px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
-          >
-            {loggingOut ? '...' : '🚪 ออกจากระบบ'}
-          </button>
+          <div className="flex items-center gap-2">
+            {userId && <NotificationBell userId={userId} />}
+            <button
+              onClick={handleLogout}
+              disabled={loggingOut}
+              className="flex items-center gap-1 bg-red-50 hover:bg-red-100 text-red-600 text-sm font-medium px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+            >
+              {loggingOut ? '...' : '🚪 ออกจากระบบ'}
+            </button>
+          </div>
         </div>
       </header>
 
       <main className="max-w-xl mx-auto px-4 py-6 space-y-5">
+        {/* Success Message */}
+        {successMsg && (
+          <div className="bg-green-50 border border-green-200 text-green-700 rounded-xl p-3 text-sm font-medium">
+            {successMsg}
+          </div>
+        )}
+
         {/* Welcome Card */}
         <div className="bg-gradient-to-r from-green-600 to-emerald-500 rounded-2xl p-5 text-white shadow-lg">
           <p className="text-green-100 text-sm">สวัสดีครับคุณ 👋</p>
@@ -164,32 +187,9 @@ export default function CustomerDashboard() {
         {/* Progress Section */}
         <div className="bg-white rounded-2xl p-5 shadow-sm">
           <h3 className="text-base font-bold text-gray-800 mb-4">📊 Progress ของคุณ</h3>
-
-          <ProgressBar
-            label="ยอดใช้จ่ายสะสม"
-            value={profile?.spending_total || 0}
-            max={spendingGoal}
-            unit=" ฿"
-            color="bg-green-500"
-            emoji="💸"
-          />
-          <ProgressBar
-            label="งานที่จ้างสะสม"
-            value={profile?.total_jobs || 0}
-            max={jobGoal}
-            unit=" งาน"
-            color="bg-blue-500"
-            emoji="📋"
-          />
-          <ProgressBar
-            label="ตั๋วลอตเตอรี่เดือนนี้"
-            value={profile?.lottery_count_this_month || 0}
-            max={lotteryGoal}
-            unit=" ใบ"
-            color="bg-yellow-500"
-            emoji="🎟️"
-          />
-
+          <ProgressBar label="ยอดใช้จ่ายสะสม" value={profile?.spending_total || 0} max={spendingGoal} unit=" ฿" color="bg-green-500" emoji="💸" />
+          <ProgressBar label="งานที่จ้างสะสม" value={profile?.total_jobs || 0} max={jobGoal} unit=" งาน" color="bg-blue-500" emoji="📋" />
+          <ProgressBar label="ตั๋วลอตเตอรี่เดือนนี้" value={profile?.lottery_count_this_month || 0} max={lotteryGoal} unit=" ใบ" color="bg-yellow-500" emoji="🎟️" />
           <div className="mt-3 bg-yellow-50 border border-yellow-200 rounded-xl p-3">
             <p className="text-xs text-yellow-700 font-medium">
               🎯 ใช้จ่ายครบ ฿{spendingGoal.toLocaleString()} รับตั๋วลอตเตอรี่ฟรี 1 ใบ!
@@ -220,7 +220,6 @@ export default function CustomerDashboard() {
               + จ้างงานใหม่
             </Link>
           </div>
-
           {jobs.length === 0 ? (
             <div className="text-center py-8">
               <div className="text-4xl mb-2">🔍</div>
@@ -235,7 +234,11 @@ export default function CustomerDashboard() {
           ) : (
             <div className="space-y-3">
               {jobs.map((job) => (
-                <div key={job.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                <Link
+                  key={job.id}
+                  href={`/jobs/${job.id}`}
+                  className="flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
+                >
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-800 truncate">{job.title || 'งานที่ไม่มีชื่อ'}</p>
                     <p className="text-xs text-gray-400">{new Date(job.created_at).toLocaleDateString('th-TH')}</p>
@@ -243,16 +246,14 @@ export default function CustomerDashboard() {
                   <div className="flex items-center gap-2 ml-2">
                     <span className="text-sm font-medium text-gray-700">฿{(job.base_price || 0).toLocaleString()}</span>
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                      job.status === 'completed'
-                        ? 'bg-green-100 text-green-700'
-                        : job.status === 'pending'
-                        ? 'bg-orange-100 text-orange-700'
-                        : 'bg-blue-100 text-blue-700'
+                      job.status === 'completed' ? 'bg-green-100 text-green-700' :
+                      job.status === 'pending' ? 'bg-orange-100 text-orange-700' :
+                      'bg-blue-100 text-blue-700'
                     }`}>
                       {job.status === 'completed' ? '✅' : job.status === 'pending' ? '⏳' : '🔄'}
                     </span>
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           )}
