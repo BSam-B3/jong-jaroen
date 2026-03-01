@@ -348,6 +348,7 @@ export default function UnifiedDashboard() {
         <Link href="/" className="flex flex-col items-center text-gray-400 text-xs gap-0.5"><span>🏠</span>หน้าหลัก</Link>
         <Link href="/services" className="flex flex-col items-center text-gray-400 text-xs gap-0.5"><span>🔍</span>ค้นหา</Link>
         <Link href="/dashboard" className="flex flex-col items-center text-blue-600 text-xs gap-0.5"><span>📋</span>งานของฉัน</Link>
+        <Link href="/coupons" className="flex flex-col items-center text-gray-400 text-xs gap-0.5"><span>🎁</span>คูปอง</Link>
         <Link href="/profile" className="flex flex-col items-center text-gray-400 text-xs gap-0.5"><span>👤</span>โปรไฟล์</Link>
       </nav>
     </div>
