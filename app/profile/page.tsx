@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
@@ -29,11 +29,10 @@ interface Profile {
   bank_name: string | null;
 }
 
-export default function ProfilePage() {
+function ProfileContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const activeTab = searchParams?.get('tab') || 'profile';
-
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -41,11 +40,9 @@ export default function ProfilePage() {
   const [successMsg, setSuccessMsg] = useState('');
   const [error, setError] = useState('');
   const [userId, setUserId] = useState('');
-
   const idCardRef = useRef<HTMLInputElement>(null);
   const selfieRef = useRef<HTMLInputElement>(null);
 
-  // Editable fields
   const [bio, setBio] = useState('');
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [phone, setPhone] = useState('');
@@ -60,7 +57,6 @@ export default function ProfilePage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push('/auth/login'); return; }
       setUserId(user.id);
-
       const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
       if (data) {
         setProfile(data as Profile);
@@ -85,8 +81,7 @@ export default function ProfilePage() {
   };
 
   const saveProfile = async () => {
-    setSaving(true);
-    setError('');
+    setSaving(true); setError('');
     try {
       const { error: updateError } = await supabase.from('profiles').update({
         bio: bio.trim() || null,
@@ -100,18 +95,14 @@ export default function ProfilePage() {
       setTimeout(() => setSuccessMsg(''), 3000);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'บันทึกไม่สำเร็จ');
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
   };
 
   const saveKYC = async () => {
     if (!bankAccount.trim()) { setError('กรุณาใส่เลขบัญชีธนาคาร'); return; }
     if (!idCardUrl) { setError('กรุณาอัปโหลดรูปบัตรประชาชน'); return; }
     if (!selfieUrl) { setError('กรุณาอัปโหลดรูปถ่ายคู่บัตร'); return; }
-
-    setSaving(true);
-    setError('');
+    setSaving(true); setError('');
     try {
       const { error: updateError } = await supabase.from('profiles').update({
         bank_account_number: bankAccount.trim(),
@@ -126,9 +117,7 @@ export default function ProfilePage() {
       setTimeout(() => setSuccessMsg(''), 5000);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'ส่ง KYC ไม่สำเร็จ');
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
   };
 
   const uploadFile = async (file: File, field: 'id_card' | 'selfie'): Promise<string | null> => {
@@ -144,9 +133,7 @@ export default function ProfilePage() {
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Upload ไม่สำเร็จ');
       return null;
-    } finally {
-      setUploading(null);
-    }
+    } finally { setUploading(null); }
   };
 
   if (loading) {
@@ -166,7 +153,6 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
-      {/* Header */}
       <header className="bg-white shadow-sm sticky top-0 z-10">
         <div className="max-w-xl mx-auto px-4 py-3 flex items-center gap-3">
           <Link href="/dashboard" className="text-gray-400 hover:text-gray-600">← กลับ</Link>
@@ -175,8 +161,6 @@ export default function ProfilePage() {
             <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-medium">✓ ยืนยันแล้ว</span>
           )}
         </div>
-
-        {/* Tabs */}
         <div className="max-w-xl mx-auto px-4 flex border-b border-gray-100">
           {[
             { key: 'profile', label: '📝 โปรไฟล์', href: '/profile' },
@@ -185,7 +169,7 @@ export default function ProfilePage() {
           ].map(tab => (
             <Link key={tab.key} href={tab.href}
               className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === tab.key || (tab.key === 'profile' && activeTab === 'profile')
+                activeTab === tab.key
                   ? 'border-blue-600 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
@@ -200,10 +184,8 @@ export default function ProfilePage() {
         {error && <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 text-sm">⚠️ {error}</div>}
         {successMsg && <div className="bg-green-50 border border-green-200 text-green-700 rounded-xl p-3 text-sm font-medium">{successMsg}</div>}
 
-        {/* ===== PROFILE TAB ===== */}
         {activeTab === 'profile' && (
           <>
-            {/* Profile Card */}
             <div className="bg-white rounded-2xl p-5 shadow-sm">
               <div className="flex items-center gap-4 mb-4">
                 <div className="w-16 h-16 bg-blue-900 rounded-full flex items-center justify-center text-white font-black text-2xl">
@@ -218,8 +200,6 @@ export default function ProfilePage() {
                   </div>
                 </div>
               </div>
-
-              {/* Skills display */}
               {(profile?.skills || []).length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mb-3">
                   {(profile?.skills || []).map((skill, i) => (
@@ -230,7 +210,6 @@ export default function ProfilePage() {
               {profile?.bio && <p className="text-sm text-gray-600 italic">"{profile.bio}"</p>}
             </div>
 
-            {/* Edit Profile */}
             <div className="bg-white rounded-2xl p-5 shadow-sm">
               <h3 className="text-sm font-bold text-gray-800 mb-3">✏️ แก้ไขโปรไฟล์</h3>
               <div className="space-y-3">
@@ -252,7 +231,6 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            {/* Skills Tags */}
             <div className="bg-white rounded-2xl p-5 shadow-sm">
               <h3 className="text-sm font-bold text-gray-800 mb-3">🏷️ ทักษะ / ความเชี่ยวชาญ</h3>
               <p className="text-xs text-gray-400 mb-3">เลือกทักษะที่คุณมี (แสดงบน Marketplace)</p>
@@ -273,14 +251,12 @@ export default function ProfilePage() {
             </div>
 
             <button onClick={saveProfile} disabled={saving}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white font-bold py-3 rounded-xl text-sm transition-colors"
-            >
+              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white font-bold py-3 rounded-xl text-sm transition-colors">
               {saving ? '⏳ กำลังบันทึก...' : '💾 บันทึกโปรไฟล์'}
             </button>
           </>
         )}
 
-        {/* ===== KYC TAB ===== */}
         {activeTab === 'kyc' && (
           <>
             <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
@@ -291,9 +267,8 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            {(profile?.kyc_status === 'none' || profile?.kyc_status === 'rejected') && (
+            {(profile?.kyc_status === 'none' || profile?.kyc_status === 'rejected' || !profile?.kyc_status) && (
               <div className="space-y-4">
-                {/* Bank Account */}
                 <div className="bg-white rounded-2xl p-5 shadow-sm">
                   <h3 className="text-sm font-bold text-gray-800 mb-3">🏦 บัญชีธนาคาร</h3>
                   <div className="space-y-3">
@@ -311,7 +286,6 @@ export default function ProfilePage() {
                   <p className="text-xs text-orange-600 mt-2">🔒 ข้อมูลนี้เห็นได้เฉพาะ Admin เท่านั้น</p>
                 </div>
 
-                {/* ID Card Upload */}
                 <div className="bg-white rounded-2xl p-5 shadow-sm">
                   <h3 className="text-sm font-bold text-gray-800 mb-3">🪪 รูปบัตรประชาชน *</h3>
                   <div onClick={() => idCardRef.current?.click()}
@@ -329,10 +303,12 @@ export default function ProfilePage() {
                     )}
                   </div>
                   <input ref={idCardRef} type="file" accept="image/*" className="hidden"
-                    onChange={async (e) => { const f = e.target.files?.[0]; if (f) { const url = await uploadFile(f, 'id_card'); if (url) setIdCardUrl(url); } }} />
+                    onChange={async (e) => {
+                      const f = e.target.files?.[0];
+                      if (f) { const url = await uploadFile(f, 'id_card'); if (url) setIdCardUrl(url); }
+                    }} />
                 </div>
 
-                {/* Selfie Upload */}
                 <div className="bg-white rounded-2xl p-5 shadow-sm">
                   <h3 className="text-sm font-bold text-gray-800 mb-1">🤳 รูปถ่ายคู่บัตร (Selfie with ID) *</h3>
                   <p className="text-xs text-gray-400 mb-3">ถ่ายรูปตัวเองพร้อมถือบัตรประชาชนให้เห็นชัด</p>
@@ -351,12 +327,14 @@ export default function ProfilePage() {
                     )}
                   </div>
                   <input ref={selfieRef} type="file" accept="image/*" className="hidden"
-                    onChange={async (e) => { const f = e.target.files?.[0]; if (f) { const url = await uploadFile(f, 'selfie'); if (url) setSelfieUrl(url); } }} />
+                    onChange={async (e) => {
+                      const f = e.target.files?.[0];
+                      if (f) { const url = await uploadFile(f, 'selfie'); if (url) setSelfieUrl(url); }
+                    }} />
                 </div>
 
                 <button onClick={saveKYC} disabled={saving || !!uploading}
-                  className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white font-bold py-3 rounded-xl text-sm transition-colors"
-                >
+                  className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white font-bold py-3 rounded-xl text-sm transition-colors">
                   {saving ? '⏳ กำลังส่ง...' : '📤 ส่งข้อมูล KYC เพื่อตรวจสอบ'}
                 </button>
               </div>
@@ -375,10 +353,8 @@ export default function ProfilePage() {
                 <div className="text-4xl mb-2">✅</div>
                 <p className="text-green-800 font-bold">ยืนยันตัวตนสำเร็จแล้ว!</p>
                 <p className="text-green-600 text-sm mt-1">คุณสามารถรับงานและรับเงินได้แล้ว</p>
-                <button
-                  onClick={() => router.push('/dashboard')}
-                  className="mt-3 bg-green-600 text-white text-sm px-5 py-2 rounded-xl font-medium"
-                >
+                <button onClick={() => router.push('/dashboard')}
+                  className="mt-3 bg-green-600 text-white text-sm px-5 py-2 rounded-xl font-medium">
                   ไปรับงานเลย →
                 </button>
               </div>
@@ -387,7 +363,6 @@ export default function ProfilePage() {
         )}
       </main>
 
-      {/* Bottom Nav */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 flex justify-around py-2 z-50">
         <Link href="/" className="flex flex-col items-center text-gray-400 text-xs gap-0.5"><span>🏠</span>หน้าหลัก</Link>
         <Link href="/services" className="flex flex-col items-center text-gray-400 text-xs gap-0.5"><span>🔍</span>ค้นหา</Link>
@@ -395,5 +370,17 @@ export default function ProfilePage() {
         <Link href="/profile" className="flex flex-col items-center text-blue-600 text-xs gap-0.5"><span>👤</span>โปรไฟล์</Link>
       </nav>
     </div>
+  );
+}
+
+export default function ProfilePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center"><div className="text-4xl animate-bounce mb-2">👤</div><p className="text-gray-500 text-sm">กำลังโหลด...</p></div>
+      </div>
+    }>
+      <ProfileContent />
+    </Suspense>
   );
 }
