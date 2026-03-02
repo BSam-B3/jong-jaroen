@@ -78,11 +78,11 @@ export default function HomePage() {
       {/* Hero */}
       <section className="bg-gradient-to-br from-blue-900 to-blue-700 text-white px-4 py-8 text-center">
         <h1 className="text-2xl font-black mb-1">Hire Local, Get Lucky!</h1>
-        <p className="text-blue-200 text-sm mb-4">จ้างช่างปากน้ำประแส ลุ้นหวย 6 หลักฟรี!</p>
+        <p className="text-blue-200 text-sm mb-4">จ้างช่างปากน้ำประแส รับคูปองจงเจริญฟรี!</p>
         <div className="bg-white/10 border border-yellow-400/40 rounded-2xl p-4 mx-auto max-w-xs">
-          <div className="text-yellow-400 text-xs font-semibold mb-1">🎰 เลขนำโชคงวดนี้</div>
-          <div className="text-4xl font-black text-yellow-300 tracking-widest my-2">??????</div>
-          <div className="text-blue-200 text-xs">จ้างงานทุกครั้ง = 1 สิทธิ์ลุ้น!</div>
+          <div className="text-yellow-400 text-xs font-semibold mb-1">🎟️ คูปองจงเจริญของคุณ</div>
+          <div className="text-4xl font-black text-yellow-300 tracking-widest my-2">JJ-????</div>
+          <div className="text-blue-200 text-xs">จ้างงานทุกครั้ง = รับคูปองทันที!</div>
         </div>
         <div className="mt-4 flex gap-3 justify-center">
           {!isLoggedIn && (
