@@ -320,8 +320,9 @@ function CouponsContent() {
     );
   }
 
-  // Unique periods from all coupons
-  const periods = [...new Set(allCoupons.map(c => c.draw_period))].sort((a,b) => b.localeCompare(a));
+  // แก้ไขตรงนี้แล้วค๊ะ! เปลี่ยนจาก [...new Set()] เป็น Array.from(new Set())
+  const periods = Array.from(new Set(allCoupons.map(c => c.draw_period))).sort((a,b) => b.localeCompare(a));
+  
   const filteredCoupons = filterPeriod === 'all' ? allCoupons : allCoupons.filter(c => c.draw_period === filterPeriod);
   const displayCoupons  = showAll ? filteredCoupons : filteredCoupons.slice(0, 3);
 
