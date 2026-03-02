@@ -179,7 +179,7 @@ export default function NewJobPage() {
         </div>
       </header>
 
-      <main className="max-w-xl mx-auto px-4 py-5">
+      <main className="max-w-xl mx-auto px-4 py-5 pb-24">
         {error && <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 mb-4 text-sm">⚠️ {error}</div>}
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -331,6 +331,25 @@ export default function NewJobPage() {
           </button>
           <p className="text-xs text-center text-gray-400 pb-4">การยืนยันถือว่าตกลงชำระ ฿{total.toLocaleString()}</p>
         </form>
+      
+      {/* Bottom Navigation */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around py-2 px-4 z-50">
+        <a href="/dashboard" className="flex flex-col items-center gap-0.5 text-gray-500 hover:text-blue-600 text-xs">
+          <span className="text-lg">🏠</span>หน้าหลัก
+        </a>
+        <a href="/jobs/new" className="flex flex-col items-center gap-0.5 text-blue-600 text-xs">
+          <span className="text-lg">💼</span>งาน
+        </a>
+        <a href="/services" className="flex flex-col items-center gap-0.5 text-gray-500 hover:text-blue-600 text-xs">
+          <span className="text-lg">🔧</span>บริการ
+        </a>
+        <a href="/coupons" className="flex flex-col items-center gap-0.5 text-gray-500 hover:text-blue-600 text-xs">
+          <span className="text-lg">🎁</span>อั่งเปา
+        </a>
+        <a href="/profile" className="flex flex-col items-center gap-0.5 text-gray-500 hover:text-blue-600 text-xs">
+          <span className="text-lg">👤</span>โปรไฟล์
+        </a>
+      </nav>
       </main>
     </div>
   );
