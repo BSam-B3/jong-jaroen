@@ -229,7 +229,7 @@ export default function UnifiedDashboard() {
             </div>
             <div className="bg-white/20 rounded-xl px-2 py-2 text-center">
               <div className="text-xl font-bold">{profile?.lottery_count_this_month || 0}</div>
-              <div className="text-xs opacity-80">ตั๋วลอตเตอรี่</div>
+              <div className="text-xs opacity-80">คูปองจงเจริญ</div>
             </div>
             <div className="bg-white/20 rounded-xl px-2 py-2 text-center">
               <div className="text-xl font-bold">
@@ -256,12 +256,12 @@ export default function UnifiedDashboard() {
               <MilestoneBar label="งานที่รับสำเร็จ" value={completedCount} max={20} unit=" งาน" color="bg-indigo-500" emoji="✅" />
             </>
           )}
-          <MilestoneBar label="ตั๋วลอตเตอรี่เดือนนี้" value={profile?.lottery_count_this_month || 0} max={5} unit=" ใบ" color="bg-yellow-400" emoji="🎟️" />
+          <MilestoneBar label="คูปองจงเจริญเดือนนี้" value={profile?.lottery_count_this_month || 0} max={5} unit=" ใบ" color="bg-yellow-400" emoji="🎟️" />
           <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-2.5 mt-2">
             <p className="text-xs text-yellow-700">
               🎯 {isCustomerMode
-                ? `จ้างงานครบ ฿3,000 รับตั๋วลอตเตอรี่ฟรี! เหลือ ฿${Math.max(0, 3000 - (profile?.spending_total || 0)).toLocaleString()}`
-                : `รับงานครบ ฿5,000 รับตั๋วลอตเตอรี่ฟรี! เหลือ ฿${Math.max(0, 5000 - (profile?.earning_total || 0)).toLocaleString()}`
+                ? `จ้างงานครบ ฿3,000 รับคูปองจงเจริญฟรี! เหลือ ฿${Math.max(0, 3000 - (profile?.spending_total || 0)).toLocaleString()}`
+                : `รับงานครบ ฿5,000 รับคูปองจงเจริญฟรี! เหลือ ฿${Math.max(0, 5000 - (profile?.earning_total || 0)).toLocaleString()}`
               }
             </p>
           </div>
