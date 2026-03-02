@@ -168,6 +168,9 @@ export default function HomePage() {
         <Link href={isLoggedIn ? '/dashboard' : '/auth/login'} className="flex flex-col items-center text-gray-400 text-xs gap-0.5">
           <span>📋</span>งานของฉัน
         </Link>
+        <Link href={isLoggedIn ? '/coupons' : '/auth/login'} className="flex flex-col items-center text-gray-400 text-xs gap-0.5">
+          <span>🎁</span>คูปอง
+        </Link>
         <Link href={isLoggedIn ? '/profile' : '/auth/login'} className="flex flex-col items-center text-gray-400 text-xs gap-0.5">
           <span>👤</span>โปรไฟล์
         </Link>
