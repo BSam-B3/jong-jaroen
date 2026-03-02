@@ -344,7 +344,7 @@ export default function NewJobPage() {
           <span className="text-lg">🔧</span>บริการ
         </a>
         <a href="/coupons" className="flex flex-col items-center gap-0.5 text-gray-500 hover:text-blue-600 text-xs">
-          <span className="text-lg">🎁</span>อั่งเปา
+          <span className="text-lg">🎁</span>คูปอง
         </a>
         <a href="/profile" className="flex flex-col items-center gap-0.5 text-gray-500 hover:text-blue-600 text-xs">
           <span className="text-lg">👤</span>โปรไฟล์
