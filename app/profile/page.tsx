@@ -349,6 +349,17 @@ function ProfileContent() {
               </div>
             )}
 
+            {!profile?.kyc_status && (
+              <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-xl">
+                <p className="text-sm text-orange-700 font-medium mb-2">🪪 ยังไม่ได้ยืนยันตัวตน</p>
+                <a
+                  href="/profile/kyc"
+                  className="block w-full text-center bg-orange-500 text-white py-2 rounded-xl text-sm font-semibold hover:bg-orange-600 transition"
+                >
+                  เริ่มยืนยันตัวตน (KYC)
+                </a>
+              </div>
+            )}
             {profile?.kyc_status === 'approved' && (
               <div className="bg-green-50 border border-green-200 rounded-2xl p-5 text-center">
                 <div className="text-4xl mb-2">✅</div>
