@@ -59,6 +59,12 @@ export default function KYCPage() {
   function handleIdCardChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        setError('รูปถ่ายบัตรประชาชนใหญ่เกินไป (5 MB) กรุณาถ่ายใหม่');
+        e.target.value = '';
+        return;
+      }
+      setError('');
       setIdCardFile(file);
       setIdCardPreview(URL.createObjectURL(file));
     }
@@ -67,6 +73,12 @@ export default function KYCPage() {
   function handleSelfieChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        setError('รูปเซลฟี่ใหญ่เกินไป (5 MB) กรุณาถ่ายใหม่');
+        e.target.value = '';
+        return;
+      }
+      setError('');
       setSelfieFile(file);
       setSelfiePreview(URL.createObjectURL(file));
     }
@@ -206,9 +218,11 @@ export default function KYCPage() {
               <label className="block font-semibold text-gray-700 mb-3">
                 🪪 รูปถ่ายบัตรประชาชน
               </label>
+              <p className="text-xs text-blue-600 bg-blue-50 rounded-lg px-3 py-2 mb-2">📸 กรุณา<strong>ถ่ายรูปสด</strong>เท่านั้น — ระบบจะเปิดกล้องโดยอัตโนมัติ</p>
               <input
                 type="file"
                 accept="image/*"
+                capture="environment"
                 onChange={handleIdCardChange}
                 className="w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
               />
@@ -224,10 +238,12 @@ export default function KYCPage() {
               <label className="block font-semibold text-gray-700 mb-3">
                 🤳 รูปเซลฟี่พร้อมบัตรประชาชน
               </label>
-              <p className="text-xs text-gray-500 mb-2">ถ่ายรูปตัวเองพร้อมถือบัตรประชาชนให้เห็นชัดเจน</p>
+              <p className="text-xs text-gray-500 mb-1">ถ่ายรูปตัวเองพร้อมถือบัตรประชาชนให้เห็นชัดเจน</p>
+              <p className="text-xs text-purple-600 bg-purple-50 rounded-lg px-3 py-2 mb-2">🤳 กรุณา<strong>ถ่ายเซลฟี่สด</strong>เท่านั้น — ใช้กล้องหน้าอัตโนมัติ</p>
               <input
                 type="file"
                 accept="image/*"
+                capture="user"
                 onChange={handleSelfieChange}
                 className="w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100"
               />
@@ -330,7 +346,7 @@ export default function KYCPage() {
           <span className="text-lg">🔧</span>บริการ
         </Link>
         <Link href="/coupons" className="flex flex-col items-center gap-0.5 text-gray-500 hover:text-blue-600 text-xs">
-          <span className="text-lg">🎁</span>อั่งเปา
+          <span className="text-lg">🧧</span>คูปอง
         </Link>
         <Link href="/profile" className="flex flex-col items-center gap-0.5 text-blue-600 text-xs">
           <span className="text-lg">👤</span>โปรไฟล์
