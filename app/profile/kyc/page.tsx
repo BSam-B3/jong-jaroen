@@ -120,33 +120,63 @@ export default function KYCPage() {
     blinkFrames.current = 0;
     wasOpen.current = true;
 
+    // บังคับ exact facingMode — ไม่ fallback ถ้าไม่มีกล้องที่ต้องการ
     const facingMode = step === 'selfie' ? 'user' : 'environment';
-    setInstruction(step === 'id_card' ? 'วางบัตรประชาชนให้อยู่ในกรอบ' : 'วางหน้าและบัตรในกรอบ');
+    setInstruction(step === 'id_card' ? 'วางบัตรประชาชนให้อยู่ในกรอบ' : 'วางหน้าในกรอบ');
 
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
-        audio: false,
-      });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
-      setCameraActive(true);
+    // ลำดับ constraints: ลอง exact ก่อน ถ้าไม่ได้ค่อย ideal (สำหรับกล้องเดี่ยว)
+    const constraintsList = [
+      { video: { facingMode: { exact: facingMode }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
+      { video: { facingMode: facingMode, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
+    ];
 
-      if (step === 'selfie' && faceApiLoaded) {
-        setInstruction('กระพริบตา 2 ครั้งเพื่อยืนยันตัวตน');
-        setStepStatus('blinking');
-        startBlinkDetection();
-      } else {
-        // ID card: ไม่ต้องกระพริบ ให้ถ่ายเองหลัง 2 วินาที
-        setInstruction('วางบัตรให้ชัดเจน กำลังถ่ายใน 2 วินาที...');
-        setTimeout(() => { if (!capturedRef.current) captureFrame(step); }, 2000);
+    let stream: MediaStream | null = null;
+    let lastErr: any = null;
+
+    for (const constraints of constraintsList) {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+        break; // สำเร็จ หยุด loop
+      } catch (err: any) {
+        lastErr = err;
+        // OverconstrainedError หรือ NotFoundError = ไม่มีกล้องนั้น ลอง constraints ถัดไป
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+          // user ปฏิเสธการใช้กล้อง — หยุดทันที ไม่ลอง fallback
+          break;
+        }
       }
-    } catch (err: any) {
-      setError('ไม่สามารถเข้าถึงกล้องได้ กรุณาอนุญาตการใช้งานกล้อง');
+    }
+
+    if (!stream) {
+      const errMsg = lastErr?.name === 'NotAllowedError' || lastErr?.name === 'PermissionDeniedError'
+        ? 'กรุณาอนุญาตให้แอปใช้กล้อง แล้วลองใหม่'
+        : step === 'id_card'
+          ? 'ไม่พบกล้องหลัง กรุณาใช้มือถือที่มีกล้องหลัง'
+          : 'ไม่พบกล้องหน้า กรุณาใช้มือถือที่มีกล้องหน้า';
+      setError(errMsg);
       setStepStatus('waiting');
+      return;
+    }
+
+    streamRef.current = stream;
+    if (videoRef.current) {
+      videoRef.current.srcObject = stream;
+      await videoRef.current.play();
+    }
+    setCameraActive(true);
+
+    if (step === 'selfie' && faceApiLoaded) {
+      setInstruction('กระพริบตา 2 ครั้งเพื่อยืนยันตัวตน');
+      setStepStatus('blinking');
+      startBlinkDetection();
+    } else if (step === 'selfie' && !faceApiLoaded) {
+      // fallback selfie: ถ้า face-api ยังโหลดไม่เสร็จ ให้กดเองได้
+      setInstruction('กระพริบตาหน้ากล้อง แล้วกดปุ่มถ่ายรูป');
+      setStepStatus('blinking');
+    } else {
+      // ID card: แสดงปุ่มให้กดถ่ายเอง (ไม่ auto) เพื่อให้จัดบัตรได้
+      setInstruction('จัดบัตรให้ชัดเจนในกรอบ แล้วกดปุ่มถ่ายรูป');
+      setStepStatus('scanning');
     }
   }
 
@@ -401,13 +431,18 @@ export default function KYCPage() {
 
         {cameraActive && cameraStep === step ? (
           <div className="space-y-2">
-            {!isSelfie && (
+            {(!isSelfie || !faceApiLoaded) && (
               <button
                 onClick={() => captureFrame(step)}
                 className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold text-sm hover:bg-blue-700 transition"
               >
                 📸 ถ่ายรูปเดี๋ยวนี้
               </button>
+            )}
+            {isSelfie && faceApiLoaded && (
+              <p className="text-center text-xs text-purple-600 font-medium py-1">
+                🔍 กระพริบตา {blinkCount}/{blinkNeeded} ครั้ง เพื่อถ่ายอัตโนมัติ
+              </p>
             )}
             <button
               onClick={stopCamera}
