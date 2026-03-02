@@ -166,6 +166,7 @@ function ProfileContent() {
             { key: 'profile', label: '📝 โปรไฟล์', href: '/profile' },
             { key: 'kyc', label: '🪪 KYC', href: '/profile?tab=kyc' },
             { key: 'certificate', label: '📄 ใบรับรอง', href: '/profile/certificate' },
+            { key: 'licenses', label: '📜 เอกสาร', href: '/profile/licenses' },
             { key: 'portfolio', label: '📋 Portfolio', href: '/profile/portfolio' },
           ].map(tab => (
             <Link key={tab.key} href={tab.href}
