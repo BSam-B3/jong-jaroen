@@ -7,10 +7,7 @@ import { supabase } from '@/lib/supabase';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-  });
+  const [formData, setFormData] = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -25,32 +22,25 @@ export default function LoginPage() {
 
     try {
       const { data, error: authError } = await supabase.auth.signInWithPassword({
-        email: formData.email,
+        email: formData.email.trim().toLowerCase(),
         password: formData.password,
       });
 
       if (authError) throw authError;
 
       if (data.user) {
-        // Fetch profile to get role and redirect accordingly
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', data.user.id)
-          .single();
-
-        if (profileError) throw profileError;
-
-        if (profile?.role === 'freelancer') {
-          router.push('/dashboard/freelancer');
-        } else {
-          router.push('/dashboard/customer');
-        }
+        // Unified Account — always go to /dashboard
+        router.push('/dashboard');
       }
     } catch (err: unknown) {
       if (err instanceof Error) {
-        if (err.message.includes('Invalid login credentials')) {
+        if (
+          err.message.includes('Invalid login credentials') ||
+          err.message.includes('invalid_credentials')
+        ) {
           setError('อีเมลหรือรหัสผ่านไม่ถูกต้อง');
+        } else if (err.message.includes('Email not confirmed')) {
+          setError('กรุณายืนยันอีเมลก่อนเข้าสู่ระบบ');
         } else {
           setError(err.message);
         }
@@ -63,18 +53,19 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-yellow-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl shadow-xl w-full max-w-md p-8">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-green-700">จงเจริญ</h1>
-          <p className="text-gray-500 mt-1">Jong Jaroen - ปากน้ำประแส</p>
-          <h2 className="text-xl font-semibold text-gray-800 mt-4">เข้าสู่ระบบ</h2>
+          <div className="text-5xl mb-3">🌟</div>
+          <h1 className="text-3xl font-bold text-gray-800">จงเจริญ</h1>
+          <p className="text-gray-500 mt-1 text-sm">ตลาดแรงงานชุมชนประแส</p>
+          <h2 className="text-xl font-semibold text-gray-700 mt-4">เข้าสู่ระบบ</h2>
         </div>
 
         {/* Error */}
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 mb-4 text-sm">
+          <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 mb-4 text-sm">
             {error}
           </div>
         )}
@@ -92,7 +83,7 @@ export default function LoginPage() {
               onChange={handleChange}
               required
               placeholder="example@email.com"
-              className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-400 text-sm"
+              className="w-full border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-transparent"
             />
           </div>
 
@@ -108,7 +99,7 @@ export default function LoginPage() {
               onChange={handleChange}
               required
               placeholder="รหัสผ่านของคุณ"
-              className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-green-400 text-sm"
+              className="w-full border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-transparent"
             />
           </div>
 
@@ -116,9 +107,9 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-green-600 hover:bg-green-700 disabled:bg-green-300 text-white font-semibold py-3 rounded-xl transition-colors"
+            className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-2xl text-lg transition-colors"
           >
-            {loading ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
+            {loading ? '⏳ กำลังเข้าสู่ระบบ...' : '🚀 เข้าสู่ระบบ'}
           </button>
         </form>
 
@@ -126,7 +117,7 @@ export default function LoginPage() {
         <div className="text-center mt-6 space-y-2">
           <p className="text-sm text-gray-500">
             ยังไม่มีบัญชี?{' '}
-            <Link href="/auth/signup" className="text-green-600 font-medium hover:underline">
+            <Link href="/auth/signup" className="text-orange-600 font-semibold hover:underline">
               สมัครสมาชิก
             </Link>
           </p>
@@ -137,13 +128,11 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* Role Info */}
-        <div className="mt-6 p-4 bg-gray-50 rounded-xl">
-          <p className="text-xs text-gray-500 text-center font-medium mb-2">ระบบจะนำคุณไปยังหน้าที่เหมาะสมอัตโนมัติ</p>
-          <div className="flex gap-4 justify-center text-xs text-gray-400">
-            <span>🏠 ผู้ว่าจ้าง → Dashboard Customer</span>
-            <span>🔧 ผู้รับจ้าง → Dashboard Freelancer</span>
-          </div>
+        {/* Unified account note */}
+        <div className="mt-6 p-4 bg-orange-50 rounded-2xl border border-orange-100">
+          <p className="text-xs text-orange-700 text-center">
+            🎯 <strong>บัญชีเดียว</strong> — ใช้ได้ทั้งเป็นลูกค้าและช่าง
+          </p>
         </div>
       </div>
     </div>
