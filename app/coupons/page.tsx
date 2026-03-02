@@ -148,7 +148,7 @@ function MilestoneProgress({ profile }: { profile: Profile }) {
 
       <div className="bg-red-50 border border-red-200 rounded-xl p-3">
         <p className="text-xs text-red-700 font-medium">
-          🧧 ระบบจะออกคูปองอั่งเปาให้คุณโดยอัตโนมัติเมื่อยอดถึงเป้า
+          🧧 ระบบจะออกคูปองจงเจริญให้คุณโดยอัตโนมัติเมื่อยอดถึงเป้า
           (1 ใบ / งวด / บัญชี)
         </p>
       </div>
@@ -220,7 +220,7 @@ function CouponsContent() {
           <Link href="/dashboard" className="text-red-200 hover:text-white text-sm">← กลับ</Link>
           <div className="flex-1 text-center">
             <h1 className="text-white font-black text-lg">🧧 คูปองจงเจริญ</h1>
-            <p className="text-red-200 text-xs">อั่งเปามงคล • ลุ้นโชค</p>
+            <p className="text-red-200 text-xs">คูปองมงคล • ร่วมลุ้นรางวัล</p>
           </div>
           <div className="text-right">
             <p className="text-yellow-300 text-xs font-bold">มี {activeCoupons.length} ใบ</p>
@@ -284,6 +284,7 @@ function CouponsContent() {
             <li>🎯 หมายเลข 6 หลักไม่ซ้ำกับผู้ใช้คนอื่นในงวดเดียวกัน</li>
             <li>⏰ คูปองหมดอายุสิ้นเดือน เวลา 16:00 น.</li>
             <li>🗂️ ดูประวัติได้สูงสุด 2 งวดล่าสุด</li>
+            <li>🏛️ หมายเลขโชคดีอิงจากรูปแบบสลากกินแบ่งรัฐบาล (6 หลัก)</li>
           </ul>
         </div>
       </main>
