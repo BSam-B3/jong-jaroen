@@ -114,7 +114,7 @@ export default function ServicesPage() {
   const dashboardLink = userRole === 'freelancer' ? '/dashboard/freelancer' : '/dashboard/customer';
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 pb-24">
       {/* Hero Header */}
       <div className="bg-gradient-to-br from-green-600 to-emerald-500 text-white">
         <div className="max-w-xl mx-auto px-4 pt-6 pb-8">
@@ -298,7 +298,26 @@ export default function ServicesPage() {
           >
             + จ้างงานใหม่
           </Link>
-        </div>
+  
+      {/* Bottom Navigation */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around py-2 px-4 z-50">
+        <a href="/dashboard" className="flex flex-col items-center gap-0.5 text-gray-500 hover:text-blue-600 text-xs">
+          <span className="text-lg">🏠</span>หน้าหลัก
+        </a>
+        <a href="/jobs/new" className="flex flex-col items-center gap-0.5 text-gray-500 hover:text-blue-600 text-xs">
+          <span className="text-lg">💼</span>งาน
+        </a>
+        <a href="/services" className="flex flex-col items-center gap-0.5 text-blue-600 text-xs">
+          <span className="text-lg">🔧</span>บริการ
+        </a>
+        <a href="/coupons" className="flex flex-col items-center gap-0.5 text-gray-500 hover:text-blue-600 text-xs">
+          <span className="text-lg">🎁</span>อั่งเปา
+        </a>
+        <a href="/profile" className="flex flex-col items-center gap-0.5 text-gray-500 hover:text-blue-600 text-xs">
+          <span className="text-lg">👤</span>โปรไฟล์
+        </a>
+      </nav>
+      </div>
       )}
     </div>
   );
