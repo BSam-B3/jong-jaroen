@@ -9,7 +9,6 @@ interface ServiceCategory {
   title: string;
   icon: string;
   bgColor: string;
-  iconColor: string;
 }
 
 interface Professional {
@@ -23,22 +22,22 @@ interface Professional {
   is_verified: boolean;
 }
 
-// ── New Muted Color Palette (Twilight Style) ────────────────────────
-const twilightColors = {
-  mutedOrange: '#E9C4A6', // ส้มฝุ่นอ่อน นุ่มนวล
-  indigoBlue: '#4F5D75',  // สีคราม สบายตา
-  softCream: '#FFF8F1',  // ขาวครีมนวล ลดแสงสะท้อน
-  deepIndigo: '#2D3A4F', // ครามเข้มสำหรับตัวอักษร
+// ── Golden Fortune Palette (ส้มทองพรีเมียมสไตล์ Fastwork) ──────────
+const goldenPalette = {
+  softGold: '#F8D397',     // ส้มทองอ่อน ไล่เฉดนุ่มนวล
+  auspiciousGold: '#D9A056', // ส้มทองเข้มมงคล
+  radiantGold: '#C89B3A',   // ทองอร่าม สำหรับจุดเน้น
+  creamyGold: '#FFF9F0',    // ขาวครีมนวลทอง พื้นหลังสบายตา
+  deepSlate: '#2D3A4F',    // เทาครามเข้ม สำหรับตัวอักษรให้ดูแพง
 };
 
-// ── Mock Data สำหรับหมวดหมู่ (สไตล์ Fastwork) ──────────────────────
 const categories: ServiceCategory[] = [
-  { id: 'electrician', title: 'ช่างไฟฟ้า', icon: '⚡', bgColor: 'bg-orange-100/50', iconColor: 'text-orange-600' },
-  { id: 'cleaning', title: 'แม่บ้าน', icon: '🧹', bgColor: 'bg-blue-100/50', iconColor: 'text-blue-600' },
-  { id: 'plumbing', title: 'ช่างประปา', icon: '💧', bgColor: 'bg-cyan-100/50', iconColor: 'text-cyan-600' },
-  { id: 'mechanic', title: 'ช่างยนต์', icon: '🛠️', bgColor: 'bg-slate-100/50', iconColor: 'text-slate-600' },
-  { id: 'construction', title: 'ก่อสร้าง', icon: '🏗️', bgColor: 'bg-amber-100/50', iconColor: 'text-amber-700' },
-  { id: 'massage', title: 'นวดแผนไทย', icon: '💆', bgColor: 'bg-teal-100/50', iconColor: 'text-teal-700' },
+  { id: 'electrician', title: 'ช่างไฟฟ้า', icon: '⚡', bgColor: 'bg-orange-50' },
+  { id: 'cleaning', title: 'แม่บ้าน', icon: '🧹', bgColor: 'bg-amber-50' },
+  { id: 'plumbing', title: 'ช่างประปา', icon: '💧', bgColor: 'bg-yellow-50' },
+  { id: 'mechanic', title: 'ช่างยนต์', icon: '🛠️', bgColor: 'bg-stone-50' },
+  { id: 'construction', title: 'ก่อสร้าง', icon: '🏗️', bgColor: 'bg-orange-50' },
+  { id: 'massage', title: 'นวดแผนไทย', icon: '💆', bgColor: 'bg-yellow-50' },
 ];
 
 export default function HomePage() {
@@ -47,22 +46,20 @@ export default function HomePage() {
 
   useEffect(() => {
     const fetchPros = async () => {
-      // ดึงข้อมูลช่างที่ยืนยันตัวตนแล้ว (KYC) มาโชว์หน้าแรก
       const { data } = await supabase
         .from('profiles')
         .select('id, full_name, avatar_url, mode, rating, review_count')
-        .eq('mode', 'provider') // เลือกเฉพาะคนรับงาน
+        .eq('mode', 'provider')
         .limit(4);
       
       if (data) {
-        // จำลองข้อมูลราคาและสถานะ Verified
         const mappedData = data.map(item => ({
           ...item,
-          service_type: 'ผู้เชี่ยวชาญ',
+          service_type: 'ผู้เชี่ยวชาญระดับโปร',
           starting_price: 350,
           is_verified: true,
-          rating: 4.9,
-          review_count: 28
+          rating: 5.0,
+          review_count: 15
         }));
         setProfessionals(mappedData as any);
       }
@@ -72,88 +69,93 @@ export default function HomePage() {
   }, []);
 
   return (
-    // ปรับพื้นหลังหลักให้เป็นขาวครีมนวล สบายตา
-    <div className="min-h-screen pb-24" style={{ backgroundColor: twilightColors.softCream, color: twilightColors.deepIndigo }}>
+    <div className="min-h-screen pb-24" style={{ backgroundColor: goldenPalette.creamyGold }}>
       
-      {/* ── Hero Section: New Smooth Twilight Gradient ── */}
-      <section className="pt-12 pb-20 px-4 rounded-b-[40px] shadow-lg border-b border-indigo-100/30"
-        style={{ background: `linear-gradient(160deg, ${twilightColors.mutedOrange} 0%, ${twilightColors.indigoBlue} 100%)` }}>
+      {/* ── Hero Section: Golden Fortune Gradient ── */}
+      <section className="pt-16 pb-24 px-4 rounded-b-[50px] shadow-2xl relative overflow-hidden"
+        style={{ background: `linear-gradient(135deg, ${goldenPalette.softGold} 0%, ${goldenPalette.auspiciousGold} 100%)` }}>
         
-        <div className="max-w-xl mx-auto text-center space-y-6">
-          <div className="space-y-2">
-            <h1 className="text-white text-3xl font-black drop-shadow-sm tracking-tight">
+        {/* ตกแต่งพื้นหลังให้ดูมีมิติแบบเว็บสมัยใหม่ */}
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-20 -mt-20 blur-3xl" />
+        
+        <div className="max-w-xl mx-auto text-center relative z-10 space-y-8">
+          <div className="space-y-3">
+            <h1 className="text-white text-4xl font-black tracking-tighter drop-shadow-lg">
               จงเจริญ
             </h1>
-            <p className="text-white/80 text-sm font-medium">
-              Hire Local, Get Lucky! แหล่งรวมผู้เชี่ยวชาญใกล้ตัวคุณ
+            <p className="text-white/90 text-sm font-bold tracking-wide uppercase">
+              Professional Experts • Near You
             </p>
           </div>
 
-          {/* Search Bar สไตล์ Fastwork ปรับสีให้เข้าธีม */}
-          <div className="relative max-w-md mx-auto">
+          {/* Search Bar สไตล์ Fastwork ที่บีสามต้องการ */}
+          <div className="relative max-w-md mx-auto group">
             <input 
               type="text" 
-              placeholder="ค้นหาบริการที่ต้องการ..." 
-              className="w-full py-4 px-6 rounded-2xl shadow-xl focus:outline-none text-gray-800 placeholder:text-gray-400"
-              style={{ backgroundColor: 'white' }}
+              placeholder="ค้นหาบริการหรือผู้ช่วยที่คุณต้องการ..." 
+              className="w-full py-5 px-8 rounded-2xl shadow-2xl focus:outline-none text-gray-800 text-sm transition-all focus:ring-4 focus:ring-white/20"
             />
-            <button className="absolute right-2 top-2 text-white p-2 rounded-xl shadow-md transition-colors"
-               style={{ backgroundColor: twilightColors.indigoBlue }}>
+            <button className="absolute right-3 top-3 text-white p-2.5 rounded-xl shadow-lg hover:scale-105 transition-transform"
+              style={{ backgroundColor: goldenPalette.radiantGold }}>
               🔍
             </button>
           </div>
         </div>
       </section>
 
-      <main className="max-w-xl mx-auto px-4 -mt-10 space-y-8">
-        {/* ── Categories Grid ── */}
-        <section className="bg-white/70 backdrop-blur-sm rounded-3xl p-6 shadow-sm border border-indigo-50/50">
-          <div className="grid grid-cols-3 gap-x-4 gap-y-5">
+      <main className="max-w-xl mx-auto px-4 -mt-12 space-y-10 relative z-20">
+        
+        {/* ── Categories Section ── */}
+        <section className="bg-white/90 backdrop-blur-md rounded-[32px] p-8 shadow-xl border border-white/50">
+          <div className="grid grid-cols-3 gap-y-8 gap-x-4">
             {categories.map((cat) => (
-              <Link key={cat.id} href={`/services?cat=${cat.id}`} className="flex flex-col items-center gap-2 group">
-                <div className={`w-14 h-14 ${cat.bgColor} rounded-2xl flex items-center justify-center text-2xl shadow-inner group-hover:scale-110 transition-transform`}>
-                  <span className={cat.iconColor}>{cat.icon}</span>
+              <Link key={cat.id} href={`/services?cat=${cat.id}`} className="flex flex-col items-center gap-3 group">
+                <div className={`w-16 h-16 ${cat.bgColor} rounded-[22px] flex items-center justify-center text-3xl shadow-sm group-hover:bg-white group-hover:shadow-md transition-all group-hover:-translate-y-1 border border-transparent group-hover:border-amber-100`}>
+                  {cat.icon}
                 </div>
-                <span className="text-[11px] font-bold text-gray-700 group-hover:text-gray-900 transition-colors">{cat.title}</span>
+                <span className="text-[12px] font-black text-gray-700 group-hover:text-amber-600 transition-colors">{cat.title}</span>
               </Link>
             ))}
           </div>
         </section>
 
-        {/* ── Featured Professionals ── */}
-        <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-black text-gray-800 flex items-center gap-2">
-              <span className="w-1.5 h-5 bg-indigo-300 rounded-full"></span>
+        {/* ── Featured Pros Section ── */}
+        <section className="space-y-6">
+          <div className="flex items-center justify-between px-2">
+            <h2 className="text-xl font-black flex items-center gap-2" style={{ color: goldenPalette.deepSlate }}>
+              <span className="w-2 h-6 rounded-full" style={{ backgroundColor: goldenPalette.radiantGold }}></span>
               ผู้เชี่ยวชาญยอดนิยม
             </h2>
-            <Link href="/services" className="text-xs font-bold transition-colors" style={{ color: twilightColors.indigoBlue }}>ดูทั้งหมด →</Link>
+            <Link href="/services" className="text-xs font-black uppercase tracking-wider" style={{ color: goldenPalette.radiantGold }}>See All →</Link>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-5">
             {loading ? (
-              [1,2,3,4].map(i => <div key={i} className="h-48 bg-gray-100 animate-pulse rounded-3xl" />)
+              [1,2,3,4].map(i => <div key={i} className="h-56 bg-white/50 animate-pulse rounded-[32px]" />)
             ) : (
               professionals.map((pro) => (
-                <div key={pro.id} className="bg-white/80 rounded-3xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-                  <div className="aspect-square bg-gray-100 relative">
+                <div key={pro.id} className="bg-white rounded-[32px] overflow-hidden shadow-lg border border-white hover:shadow-2xl transition-all hover:-translate-y-1">
+                  <div className="aspect-[4/5] bg-gray-100 relative">
                     {pro.avatar_url ? (
                       <img src={pro.avatar_url} alt={pro.full_name} className="w-full h-full object-cover" />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-300 text-4xl">👤</div>
+                      <div className="w-full h-full flex items-center justify-center text-gray-300 text-5xl font-black">👤</div>
                     )}
                     {pro.is_verified && (
-                      <div className="absolute top-2 right-2 bg-blue-500 text-white p-1 rounded-full text-[10px] shadow-md">
+                      <div className="absolute top-3 right-3 text-white p-1.5 rounded-full text-[10px] shadow-lg backdrop-blur-md border border-white/20"
+                        style={{ backgroundColor: goldenPalette.radiantGold }}>
                         ✓
                       </div>
                     )}
                   </div>
-                  <div className="p-3 space-y-1">
-                    <p className="text-xs font-bold text-gray-800 truncate">{pro.full_name}</p>
-                    <p className="text-[10px] text-gray-500">{pro.service_type}</p>
-                    <div className="flex items-center justify-between pt-1 border-t border-gray-100">
-                      <span className="text-[11px] font-bold" style={{ color: twilightColors.indigoBlue }}>฿{pro.starting_price}+</span>
-                      <div className="flex items-center gap-0.5 text-[10px] text-amber-500 font-medium">
+                  <div className="p-4 space-y-2">
+                    <p className="text-sm font-black text-gray-800 truncate">{pro.full_name}</p>
+                    <div className="flex items-center justify-between items-end">
+                      <div className="space-y-0.5">
+                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">Starting at</p>
+                        <p className="text-sm font-black" style={{ color: goldenPalette.radiantGold }}>฿{pro.starting_price}</p>
+                      </div>
+                      <div className="flex items-center gap-1 text-[11px] font-black text-amber-500">
                         ⭐ {pro.rating}
                       </div>
                     </div>
@@ -164,35 +166,42 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* ── Step Guide - ปรับเป็นโทนเย็น ── */}
-        <section className="bg-indigo-50/50 rounded-3xl p-6 border border-indigo-100">
-          <h3 className="text-sm font-black text-gray-900 mb-4">ขั้นตอนง่ายๆ ในการจ้างงาน</h3>
-          <div className="space-y-4">
-            {[
-              { t: 'ค้นหาผู้เชี่ยวชาญ', d: 'เลือกช่างที่ถูกใจจากรีวิวและการยืนยันตัวตน' },
-              { t: 'คุยรายละเอียด & จ่ายเงิน', d: 'ตกลงงานและชำระเงินผ่านระบบอั่งเปาที่ปลอดภัย' },
-              { t: 'รับงาน & สะสมคูปอง', d: 'เมื่องานเสร็จ รับยอดสะสมเพื่อลุ้นรางวัลจงเจริญ' }
-            ].map((s, i) => (
-              <div key={i} className="flex gap-4">
-                <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
-                    style={{ backgroundColor: twilightColors.indigoBlue }}>{i+1}</div>
-                <div>
-                  <p className="text-xs font-bold text-gray-900">{s.t}</p>
-                  <p className="text-[10px] text-gray-600/90">{s.d}</p>
-                </div>
-              </div>
-            ))}
-          </div>
+        {/* ── Global Vision Banner ── */}
+        <section className="rounded-[32px] p-8 text-center space-y-4 border border-white shadow-inner"
+          style={{ background: `linear-gradient(135deg, ${goldenPalette.creamyGold} 0%, #FFF 100%)` }}>
+          <h3 className="text-lg font-black" style={{ color: goldenPalette.deepSlate }}>ร่วมเป็นส่วนหนึ่งของสังคมจงเจริญ</h3>
+          <p className="text-xs text-gray-500 font-medium leading-relaxed">
+            ไม่ว่าคุณจะอยู่ที่ไหน เราพร้อมเชื่อมต่อคุณกับผู้เชี่ยวชาญที่ดีที่สุด <br/>เพื่อสร้างโอกาสและความสำเร็จให้ทุกคน
+          </p>
+          <button className="px-8 py-3 rounded-2xl text-white text-xs font-black shadow-xl hover:opacity-90 transition-opacity"
+            style={{ backgroundColor: goldenPalette.radiantGold }}>
+            สมัครสมาชิกเลย
+          </button>
         </section>
       </main>
 
-      {/* Bottom Nav สไตล์เดิมแต่ปรับสีให้เข้ากับธีมใหม่ Twilight */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t border-gray-100 flex justify-around py-3 z-50 pb-safe">
-        <Link href="/" className="flex flex-col items-center text-[10px] gap-1 font-bold" style={{ color: twilightColors.indigoBlue }}><span className="text-lg">🏠</span>หน้าหลัก</Link>
-        <Link href="/services" className="flex flex-col items-center text-gray-400 text-[10px] gap-1 hover:text-indigo-400 transition-colors"><span className="text-lg">🔍</span>ค้นหา</Link>
-        <Link href="/coupons" className="flex flex-col items-center text-gray-400 text-[10px] gap-1 hover:text-indigo-400 transition-colors"><span className="text-lg">🎟️</span>ผลรางวัล</Link>
-        <Link href="/dashboard" className="flex flex-col items-center text-gray-400 text-[10px] gap-1 hover:text-indigo-400 transition-colors"><span className="text-lg">📋</span>งาน</Link>
-        <Link href="/profile" className="flex flex-col items-center text-gray-400 text-[10px] gap-1 hover:text-indigo-400 transition-colors"><span className="text-lg">👤</span>โปรไฟล์</Link>
+      {/* Bottom Nav: Clean & High-end */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-lg border-t border-gray-100 flex justify-around py-4 z-50 pb-safe shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
+        <Link href="/" className="flex flex-col items-center gap-1 font-black transition-colors" style={{ color: goldenPalette.radiantGold }}>
+          <span className="text-xl">🏠</span>
+          <span className="text-[10px] uppercase tracking-tighter">Home</span>
+        </Link>
+        <Link href="/services" className="flex flex-col items-center gap-1 text-gray-300 font-black hover:text-amber-500 transition-colors">
+          <span className="text-xl">🔍</span>
+          <span className="text-[10px] uppercase tracking-tighter">Search</span>
+        </Link>
+        <Link href="/coupons" className="flex flex-col items-center gap-1 text-gray-300 font-black hover:text-amber-500 transition-colors">
+          <span className="text-xl">🎟️</span>
+          <span className="text-[10px] uppercase tracking-tighter">Rewards</span>
+        </Link>
+        <Link href="/dashboard" className="flex flex-col items-center gap-1 text-gray-300 font-black hover:text-amber-500 transition-colors">
+          <span className="text-xl">📋</span>
+          <span className="text-[10px] uppercase tracking-tighter">Jobs</span>
+        </Link>
+        <Link href="/profile" className="flex flex-col items-center gap-1 text-gray-300 font-black hover:text-amber-500 transition-colors">
+          <span className="text-xl">👤</span>
+          <span className="text-[10px] uppercase tracking-tighter">Profile</span>
+        </Link>
       </nav>
     </div>
   );
