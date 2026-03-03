@@ -22,7 +22,7 @@ interface Professional {
   is_verified: boolean;
 }
 
-// ── Soft Shopee Palette (ส้ม Shopee ที่ปรับให้นุ่มนวล ไม่แสบตา) ──
+// ── Soft Shopee Palette ─────────────────────────────────────────
 const themePalette = {
   primaryOrange: '#F05D40', // ส้มที่ลดความจัดจ้านลง สบายตาขึ้น
   lightOrange: '#FF8769',   // ส้มสว่างสำหรับไล่เฉดให้ดูฟุ้งๆ
@@ -42,6 +42,10 @@ const categories: ServiceCategory[] = [
 export default function HomePage() {
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // ── States สำหรับ AI Search Agent ──
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
 
   useEffect(() => {
     const fetchPros = async () => {
@@ -67,6 +71,22 @@ export default function HomePage() {
     fetchPros();
   }, []);
 
+  // ── ฟังก์ชันจำลองการค้นหา (ด่านคัดกรอง) ──
+  const handleSearch = () => {
+    // ป้องกันการค้นหาถ้าพิมพ์ไม่ถึง 3 ตัวอักษร
+    if (searchQuery.trim().length < 3) return; 
+
+    setIsSearching(true);
+    
+    // TODO: เชื่อมต่อ API Gemini + Supabase pgvector ที่นี่
+    console.log("AI กำลังวิเคราะห์คำว่า:", searchQuery);
+    
+    // จำลองเวลาโหลด 2 วินาที ป้องกันการกดซ้ำรัวๆ
+    setTimeout(() => {
+      setIsSearching(false);
+    }, 2000); 
+  };
+
   return (
     <div className="min-h-screen pb-24" style={{ backgroundColor: themePalette.bgGray }}>
       
@@ -76,7 +96,6 @@ export default function HomePage() {
         
         <div className="max-w-xl mx-auto text-center relative z-10 space-y-6">
           <div className="space-y-1">
-            {/* ตัวหนังสือมีมิติด้วย drop-shadow */}
             <h1 className="text-white text-4xl font-black tracking-tighter drop-shadow-md">
               จงเจริญ
             </h1>
@@ -85,18 +104,31 @@ export default function HomePage() {
             </p>
           </div>
 
-          {/* Search Bar สไตล์แอป Shopee */}
+          {/* 🌟 AI Search Agent Input (Shopee Style + Anti Spam) 🌟 */}
           <div className="relative max-w-md mx-auto">
+            <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+              <span className="text-lg animate-pulse">✨</span>
+            </div>
             <input 
               type="text" 
-              placeholder="ค้นหาช่าง หรือบริการที่คุณต้องการ..." 
-              className="w-full py-3.5 px-6 rounded-md shadow-inner focus:outline-none text-gray-800 text-sm border-2 border-transparent focus:border-[#F05D40]"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="บอก AI ว่าต้องการให้ช่วยอะไร..." 
+              className="w-full py-4 pl-12 pr-24 rounded-lg shadow-inner focus:outline-none text-gray-800 text-sm border-2 border-transparent focus:border-white bg-white/95 backdrop-blur-sm"
             />
-            <button className="absolute right-1.5 top-1.5 text-white px-4 py-2 rounded-md shadow-sm transition-opacity hover:opacity-90"
-               style={{ backgroundColor: themePalette.primaryOrange }}>
-              🔍
+            <button 
+              onClick={handleSearch}
+              disabled={searchQuery.trim().length < 3 || isSearching}
+              className={`absolute right-1.5 top-1.5 bottom-1.5 px-4 rounded-md text-white text-xs font-bold shadow-sm transition-all 
+                ${searchQuery.trim().length < 3 || isSearching ? 'bg-orange-300/50 cursor-not-allowed' : 'bg-[#F05D40] hover:bg-[#D95339] hover:scale-105'}`}
+            >
+              {isSearching ? '⏳...' : 'ค้นหา'}
             </button>
           </div>
+          {/* แจ้งเตือนเล็กๆ เมื่อพิมพ์ไม่ครบ */}
+          {searchQuery.length > 0 && searchQuery.length < 3 && (
+            <p className="text-white/80 text-[10px] mt-1 text-left pl-4">กรุณาพิมพ์อย่างน้อย 3 ตัวอักษร</p>
+          )}
         </div>
       </section>
 
@@ -122,7 +154,6 @@ export default function HomePage() {
             <h2 className="text-sm font-bold uppercase tracking-wider" style={{ color: themePalette.primaryOrange }}>
               ผู้เชี่ยวชาญยอดนิยม
             </h2>
-            {/* แก้ปัญหา Vercel Error ที่เกิดจากสัญลักษณ์ > ด้วยการใช้ {' >'} */}
             <Link href="/services" className="text-xs text-gray-400">ดูทั้งหมด {' >'}</Link>
           </div>
 
@@ -158,7 +189,7 @@ export default function HomePage() {
         </section>
       </main>
 
-      {/* 🛠️ Bottom Nav (Shopee Style) + ใส่ z-[100] แก้ปัญหาโดนบัง 🛠️ */}
+      {/* 🛠️ Bottom Nav (Shopee Style) + z-[100] 🛠️ */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 flex justify-around py-2 z-[100] shadow-[0_-5px_20px_rgba(0,0,0,0.05)] pb-safe">
         <Link href="/" className="flex flex-col items-center gap-0.5 font-bold" style={{ color: themePalette.primaryOrange }}>
           <span className="text-xl">🏠</span>
