@@ -76,7 +76,8 @@ export default function HomePage() {
         
         <div className="max-w-xl mx-auto text-center relative z-10 space-y-6">
           <div className="space-y-1">
-            <h1 className="text-white text-4xl font-black tracking-tighter drop-shadow-md">
+            {/* ตัวหนังสือ "จงเจริญ" มีมิติด้วย Drop Shadow */}
+            <h1 className="text-white text-4xl font-black tracking-tighter drop-shadow-lg">
               จงเจริญ
             </h1>
             <p className="text-white/90 text-sm font-bold">
@@ -121,7 +122,8 @@ export default function HomePage() {
             <h2 className="text-sm font-bold uppercase tracking-wider" style={{ color: shopeePalette.orange }}>
               ผู้เชี่ยวชาญยอดนิยม
             </h2>
-            <Link href="/services" className="text-xs text-gray-400">ดูทั้งหมด ></Link>
+            {/* แก้ไขสัญลักษณ์ > เป็น {' >'} เพื่อไม่ให้ Error ค๊ะ */}
+            <Link href="/services" className="text-xs text-gray-400">ดูทั้งหมด {' >'}</Link>
           </div>
 
           <div className="grid grid-cols-2 gap-2">
