@@ -9,7 +9,6 @@ interface ServiceCategory {
   title: string;
   icon: string;
   bgColor: string;
-  iconColor: string;
 }
 
 interface Professional {
@@ -23,23 +22,21 @@ interface Professional {
   is_verified: boolean;
 }
 
-// ── New Globa-Premium Palette (อิงตาม image_18.png และ image_3.png) ──────────
-const jaroenPalette = {
-  softGold: '#E9C4A6',    // ส้มทองอ่อน นุ่มนวล
-  indigoTwilight: '#4F5D75', // สีคราม สบายตา
-  cleanWhite: '#FFFFFF',    // สีขาวสะอาดตา สำหรับหน้า Login
-  mistyCream: '#FFFDF9',    // ขาวครีมนวล ลดแสงสะท้อน
-  deepIndigo: '#2D3A4F',    // เทาครามเข้ม สำหรับตัวอักษร
+// ── Soft Shopee Palette (ส้ม Shopee ที่ปรับให้นุ่มนวล ไม่แสบตา) ──
+const themePalette = {
+  primaryOrange: '#F05D40', // ส้มที่ลดความจัดจ้านลง สบายตาขึ้น
+  lightOrange: '#FF8769',   // ส้มสว่างสำหรับไล่เฉดให้ดูฟุ้งๆ
+  bgGray: '#F9FAFB',        // พื้นหลังเทาอมขาวสะอาดตา
+  textDark: '#1F2937',      // สีข้อความหลัก
 };
 
-// ── หมวดหมู่ (สไตล์ Fastwork) ──
 const categories: ServiceCategory[] = [
-  { id: 'electrician', title: 'ช่างไฟฟ้า', icon: '⚡', bgColor: 'bg-orange-100/50', iconColor: 'text-orange-600' },
-  { id: 'cleaning', title: 'แม่บ้าน', icon: '🧹', bgColor: 'bg-blue-100/50', iconColor: 'text-blue-600' },
-  { id: 'plumbing', title: 'ช่างประปา', icon: '💧', bgColor: 'bg-cyan-100/50', iconColor: 'text-cyan-600' },
-  { id: 'mechanic', title: 'ช่างยนต์', icon: '🛠️', bgColor: 'bg-slate-100/50', iconColor: 'text-slate-600' },
-  { id: 'construction', title: 'ก่อสร้าง', icon: '🏗️', bgColor: 'bg-amber-100/50', iconColor: 'text-amber-700' },
-  { id: 'massage', title: 'นวดแผนไทย', icon: '💆', bgColor: 'bg-teal-100/50', iconColor: 'text-teal-700' },
+  { id: 'electrician', title: 'ช่างไฟฟ้า', icon: '⚡', bgColor: 'bg-orange-50' },
+  { id: 'cleaning', title: 'แม่บ้าน', icon: '🧹', bgColor: 'bg-orange-50' },
+  { id: 'plumbing', title: 'ช่างประปา', icon: '💧', bgColor: 'bg-orange-50' },
+  { id: 'mechanic', title: 'ช่างยนต์', icon: '🛠️', bgColor: 'bg-orange-50' },
+  { id: 'construction', title: 'ก่อสร้าง', icon: '🏗️', bgColor: 'bg-orange-50' },
+  { id: 'massage', title: 'นวดแผนไทย', icon: '💆', bgColor: 'bg-orange-50' },
 ];
 
 export default function HomePage() {
@@ -48,22 +45,20 @@ export default function HomePage() {
 
   useEffect(() => {
     const fetchPros = async () => {
-      // ดึงข้อมูลช่างที่ยืนยันตัวตนแล้ว (KYC) มาโชว์หน้าแรก
       const { data } = await supabase
         .from('profiles')
         .select('id, full_name, avatar_url, mode, rating, review_count')
-        .eq('mode', 'provider') // เลือกเฉพาะคนรับงาน
+        .eq('mode', 'provider')
         .limit(4);
       
       if (data) {
-        // จำลองข้อมูลราคาและสถานะ Verified
         const mappedData = data.map(item => ({
           ...item,
           service_type: 'ผู้เชี่ยวชาญ',
           starting_price: 350,
           is_verified: true,
-          rating: 4.9,
-          review_count: 28
+          rating: 4.8,
+          review_count: 42
         }));
         setProfessionals(mappedData as any);
       }
@@ -73,95 +68,87 @@ export default function HomePage() {
   }, []);
 
   return (
-    // เปลี่ยนพื้นหลังหลักให้เป็นขาวครีมนวล สบายตา ลดแสงสะท้อน
-    <div className="min-h-screen pb-24" style={{ backgroundColor: jaroenPalette.mistyCream, color: jaroenPalette.deepIndigo }}>
+    <div className="min-h-screen pb-24" style={{ backgroundColor: themePalette.bgGray }}>
       
-      {/* ── Header: Globa-Premium Welcome Section ── */}
-      {/* ส่วนต้อนรับและ Login พื้นหลังสีขาวสะอาดตา เน้นตัวหนังสือชัด */}
-      <header className="bg-white pt-10 pb-16 px-6 rounded-b-[48px] shadow-sm border-b border-indigo-100/50">
-        <div className="max-w-xl mx-auto flex flex-col items-center text-center space-y-6">
-          
-          {/* 🌟 Globa-Premium Logo Text based 🌟 */}
-          {/* ออกแบบให้มีมิติ นูนอร่ามด้วยการไล่เฉดสีและ Drop Shadow */}
-          <div className="space-y-2">
-            <h1 className="text-5xl font-black tracking-tighter drop-shadow-[0_4px_4px_rgba(0,0,0,0.15)]"
-                style={{ 
-                  background: `linear-gradient(135deg, ${jaroenPalette.softGold} 0%, ${jaroenPalette.indigoTwilight} 100%)`,
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                }}>
+      {/* ── Hero Section: Soft Shopee Orange Gradient ── */}
+      <section className="pt-12 pb-20 px-4 shadow-sm relative overflow-hidden"
+        style={{ background: `linear-gradient(180deg, ${themePalette.primaryOrange} 0%, ${themePalette.lightOrange} 100%)` }}>
+        
+        <div className="max-w-xl mx-auto text-center relative z-10 space-y-6">
+          <div className="space-y-1">
+            {/* ตัวหนังสือมีมิติด้วย drop-shadow */}
+            <h1 className="text-white text-4xl font-black tracking-tighter drop-shadow-md">
               จงเจริญ
             </h1>
-            <p className="text-gray-500 text-xs font-medium uppercase tracking-widest">
-              Hire Local, Get Lucky! • ผู้เชี่ยวชาญใกล้คุณ
+            <p className="text-white/95 text-sm font-bold">
+              จงเจริญไปด้วยกัน • ผู้เชี่ยวชาญใกล้คุณ
             </p>
           </div>
 
-          {/* Welcome Text & Login Button */}
-          <div className="w-full max-w-sm space-y-3 bg-white border border-gray-100 p-6 rounded-3xl shadow-inner">
-            <p className="text-sm font-medium text-gray-700">ยินดีต้อนรับสู่สังคม "จงเจริญ"</p>
-            <p className="text-[11px] text-gray-400 -mt-1 leading-relaxed">ค้นหาช่างมืออาชีพใกล้ตัวคุณ หรือรับงานเพื่อสะสมยอดลุ้นอั่งเปามงคล</p>
-            <Link href="/auth/login" 
-              className="mt-2 block w-full py-3 px-6 rounded-2xl text-white text-xs font-bold transition-all shadow-md hover:scale-[1.02]"
-              style={{ backgroundColor: jaroenPalette.indigoTwilight }}>
-              🔧 เข้าสู่ระบบ / สมัครสมาชิก
-            </Link>
+          {/* Search Bar สไตล์แอป Shopee */}
+          <div className="relative max-w-md mx-auto">
+            <input 
+              type="text" 
+              placeholder="ค้นหาช่าง หรือบริการที่คุณต้องการ..." 
+              className="w-full py-3.5 px-6 rounded-md shadow-inner focus:outline-none text-gray-800 text-sm border-2 border-transparent focus:border-[#F05D40]"
+            />
+            <button className="absolute right-1.5 top-1.5 text-white px-4 py-2 rounded-md shadow-sm transition-opacity hover:opacity-90"
+               style={{ backgroundColor: themePalette.primaryOrange }}>
+              🔍
+            </button>
           </div>
-
         </div>
-      </header>
+      </section>
 
-      <main className="max-w-xl mx-auto px-4 -mt-10 space-y-10 relative z-20">
+      <main className="max-w-xl mx-auto px-2 space-y-4 -mt-6 relative z-20">
+        
         {/* ── Categories Grid ── */}
-        <section className="bg-white/95 backdrop-blur-sm rounded-[32px] p-8 shadow-xl border border-indigo-50/50">
-          <div className="grid grid-cols-3 gap-x-4 gap-y-5">
+        <section className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+          <div className="grid grid-cols-3 gap-y-6">
             {categories.map((cat) => (
               <Link key={cat.id} href={`/services?cat=${cat.id}`} className="flex flex-col items-center gap-2 group">
-                <div className={`w-14 h-14 ${cat.bgColor} rounded-2xl flex items-center justify-center text-2xl shadow-inner group-hover:scale-110 transition-transform`}>
-                  <span className={cat.iconColor}>{cat.icon}</span>
+                <div className="w-12 h-12 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
+                  {cat.icon}
                 </div>
-                <span className="text-[11px] font-bold text-gray-700 group-hover:text-gray-900 transition-colors">{cat.title}</span>
+                <span className="text-[11px] font-medium text-gray-700">{cat.title}</span>
               </Link>
             ))}
           </div>
         </section>
 
         {/* ── Featured Professionals ── */}
-        <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-black text-gray-800 flex items-center gap-2">
-              <span className="w-1.5 h-5 rounded-full" style={{ backgroundColor: jaroenPalette.softGold }}></span>
+        <section className="space-y-2">
+          <div className="flex items-center justify-between px-2 bg-white py-3 border-b border-gray-100 rounded-t-xl">
+            <h2 className="text-sm font-bold uppercase tracking-wider" style={{ color: themePalette.primaryOrange }}>
               ผู้เชี่ยวชาญยอดนิยม
             </h2>
-            <Link href="/services" className="text-xs font-bold transition-colors" style={{ color: jaroenPalette.indigoTwilight }}>ดูทั้งหมด {' >'}</Link>
+            {/* แก้ปัญหา Vercel Error ที่เกิดจากสัญลักษณ์ > ด้วยการใช้ {' >'} */}
+            <Link href="/services" className="text-xs text-gray-400">ดูทั้งหมด {' >'}</Link>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-2">
             {loading ? (
-              [1,2,3,4].map(i => <div key={i} className="h-48 bg-white/50 animate-pulse rounded-3xl" />)
+              [1,2,3,4].map(i => <div key={i} className="h-52 bg-white animate-pulse rounded-xl" />)
             ) : (
               professionals.map((pro) => (
-                <div key={pro.id} className="bg-white/80 rounded-3xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-                  <div className="aspect-square bg-gray-100 relative">
+                <div key={pro.id} className="bg-white shadow-sm hover:shadow-md transition-shadow border border-gray-100 hover:border-[#F05D40] rounded-xl overflow-hidden">
+                  <div className="aspect-square bg-gray-50 relative">
                     {pro.avatar_url ? (
                       <img src={pro.avatar_url} alt={pro.full_name} className="w-full h-full object-cover" />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-300 text-4xl">👤</div>
+                      <div className="w-full h-full flex items-center justify-center text-gray-200 text-5xl font-black">👤</div>
                     )}
                     {pro.is_verified && (
-                      <div className="absolute top-2 right-2 bg-blue-500 text-white p-1 rounded-full text-[10px] shadow-md">
-                        ✓
+                      <div className="absolute top-0 left-0 text-white px-2 py-1 text-[9px] font-bold rounded-br-lg" style={{ backgroundColor: themePalette.primaryOrange }}>
+                        Mall
                       </div>
                     )}
                   </div>
                   <div className="p-3 space-y-1">
-                    <p className="text-xs font-bold text-gray-800 truncate">{pro.full_name}</p>
-                    <p className="text-[10px] text-gray-500">{pro.service_type}</p>
-                    <div className="flex items-center justify-between pt-1 border-t border-gray-100">
-                      <span className="text-[11px] font-bold" style={{ color: jaroenPalette.indigoTwilight }}>฿{pro.starting_price}+</span>
-                      <div className="flex items-center gap-0.5 text-[10px] text-amber-500 font-medium">
-                        ⭐ {pro.rating}
-                      </div>
+                    <p className="text-[11px] text-gray-800 line-clamp-2 leading-snug font-medium">{pro.full_name}</p>
+                    <div className="flex items-center justify-between pt-2">
+                      <span className="text-sm font-bold" style={{ color: themePalette.primaryOrange }}>฿{pro.starting_price}</span>
+                      <span className="text-[9px] text-gray-400">⭐ {pro.rating}</span>
                     </div>
                   </div>
                 </div>
@@ -169,16 +156,30 @@ export default function HomePage() {
             )}
           </div>
         </section>
-
       </main>
 
-      {/* Bottom Nav: Clean & High-end withแก้ไขปัญหาเมนูถูกทับ z-[100] */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t border-gray-100 flex justify-around py-3 z-[100] pb-safe shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
-        <Link href="/" className="flex flex-col items-center gap-1 font-black transition-colors" style={{ color: jaroenPalette.indigoTwilight }}><span className="text-xl">🏠</span>Home</Link>
-        <Link href="/services" className="flex flex-col items-center gap-1 text-gray-400 text-[10px] transition-colors hover:text-indigo-400"><span className="text-xl">🔍</span>Search</Link>
-        <Link href="/coupons" className="flex flex-col items-center gap-1 text-gray-400 text-[10px] transition-colors hover:text-indigo-400"><span className="text-xl">🎟️</span>Rewards</Link>
-        <Link href="/dashboard" className="flex flex-col items-center gap-1 text-gray-400 text-[10px] transition-colors hover:text-indigo-400"><span className="text-lg leading-none">📋</span>Jobs</Link>
-        <Link href="/profile" className="flex flex-col items-center gap-1 text-gray-400 text-[10px] transition-colors hover:text-indigo-400"><span className="text-xl">👤</span>Profile</Link>
+      {/* 🛠️ Bottom Nav (Shopee Style) + ใส่ z-[100] แก้ปัญหาโดนบัง 🛠️ */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 flex justify-around py-2 z-[100] shadow-[0_-5px_20px_rgba(0,0,0,0.05)] pb-safe">
+        <Link href="/" className="flex flex-col items-center gap-0.5 font-bold" style={{ color: themePalette.primaryOrange }}>
+          <span className="text-xl">🏠</span>
+          <span className="text-[10px]">หน้าแรก</span>
+        </Link>
+        <Link href="/services" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-orange-400 transition-colors">
+          <span className="text-xl">🔍</span>
+          <span className="text-[10px]">ค้นหา</span>
+        </Link>
+        <Link href="/coupons" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-orange-400 transition-colors">
+          <span className="text-xl">🎟️</span>
+          <span className="text-[10px]">รางวัล</span>
+        </Link>
+        <Link href="/dashboard" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-orange-400 transition-colors">
+          <span className="text-xl">📋</span>
+          <span className="text-[10px]">งาน</span>
+        </Link>
+        <Link href="/profile" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-orange-400 transition-colors">
+          <span className="text-xl">👤</span>
+          <span className="text-[10px]">ฉัน</span>
+        </Link>
       </nav>
     </div>
   );
