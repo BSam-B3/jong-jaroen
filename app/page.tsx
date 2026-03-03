@@ -8,7 +8,7 @@ interface ServiceCategory {
   id: string;
   title: string;
   icon: string;
-  color: string;
+  bgColor: string;
 }
 
 interface Professional {
@@ -22,14 +22,21 @@ interface Professional {
   is_verified: boolean;
 }
 
-// ── Mock Data สำหรับหมวดหมู่ (สไตล์ Fastwork) ──────────────────────
+// ── Shopee Inspired Palette ──────────────────────────────────────
+const shopeePalette = {
+  orange: '#EE4D2D',      // สีส้ม Shopee ของแท้ค๊ะ
+  lightOrange: '#FF5722',  // ส้มสว่างสำหรับไล่เฉด
+  bgGray: '#F5F5F5',      // เทาอ่อนพื้นหลังสไตล์แอปขายของ
+  deepBlack: '#212121',   // ดำเข้มสำหรับตัวหนังสือ
+};
+
 const categories: ServiceCategory[] = [
-  { id: 'electrician', title: 'ช่างไฟฟ้า', icon: '⚡', color: 'bg-yellow-100' },
-  { id: 'cleaning', title: 'แม่บ้าน', icon: '🧹', color: 'bg-blue-100' },
-  { id: 'plumbing', title: 'ช่างประปา', icon: '💧', color: 'bg-cyan-100' },
-  { id: 'mechanic', title: 'ช่างยนต์', icon: '🛠️', color: 'bg-gray-100' },
-  { id: 'construction', title: 'ก่อสร้าง', icon: '🏗️', color: 'bg-orange-100' },
-  { id: 'massage', title: 'นวดแผนไทย', icon: '💆', color: 'bg-green-100' },
+  { id: 'electrician', title: 'ช่างไฟฟ้า', icon: '⚡', bgColor: 'bg-orange-50' },
+  { id: 'cleaning', title: 'แม่บ้าน', icon: '🧹', bgColor: 'bg-orange-50' },
+  { id: 'plumbing', title: 'ช่างประปา', icon: '💧', bgColor: 'bg-orange-50' },
+  { id: 'mechanic', title: 'ช่างยนต์', icon: '🛠️', bgColor: 'bg-orange-50' },
+  { id: 'construction', title: 'ก่อสร้าง', icon: '🏗️', bgColor: 'bg-orange-50' },
+  { id: 'massage', title: 'นวดแผนไทย', icon: '💆', bgColor: 'bg-orange-50' },
 ];
 
 export default function HomePage() {
@@ -38,22 +45,20 @@ export default function HomePage() {
 
   useEffect(() => {
     const fetchPros = async () => {
-      // ดึงข้อมูลช่างที่ยืนยันตัวตนแล้ว (KYC) มาโชว์หน้าแรก
       const { data } = await supabase
         .from('profiles')
         .select('id, full_name, avatar_url, mode, rating, review_count')
-        .eq('mode', 'provider') // เลือกเฉพาะคนรับงาน
+        .eq('mode', 'provider')
         .limit(4);
       
       if (data) {
-        // จำลองข้อมูลราคาและสถานะ Verified (ในอนาคตดึงจาก DB จริง)
         const mappedData = data.map(item => ({
           ...item,
-          service_type: 'ช่างมืออาชีพ',
+          service_type: 'ผู้เชี่ยวชาญ',
           starting_price: 350,
           is_verified: true,
-          rating: 5.0,
-          review_count: 12
+          rating: 4.8,
+          review_count: 42
         }));
         setProfessionals(mappedData as any);
       }
@@ -63,84 +68,85 @@ export default function HomePage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#FFFDF9] pb-24">
-      {/* ── Hero Section: Search & Welcome ── */}
-      <section className="bg-gradient-to-br from-[#F9A825] to-[#D4AF37] pt-12 pb-20 px-4 rounded-b-[40px] shadow-lg">
-        <div className="max-w-xl mx-auto text-center space-y-6">
-          <div className="space-y-2">
-            <h1 className="text-white text-3xl font-black drop-shadow-md">
+    <div className="min-h-screen pb-24" style={{ backgroundColor: shopeePalette.bgGray }}>
+      
+      {/* ── Hero Section: Shopee Orange Gradient ── */}
+      <section className="pt-12 pb-20 px-4 shadow-md relative overflow-hidden"
+        style={{ background: `linear-gradient(180deg, ${shopeePalette.orange} 0%, ${shopeePalette.lightOrange} 100%)` }}>
+        
+        <div className="max-w-xl mx-auto text-center relative z-10 space-y-6">
+          <div className="space-y-1">
+            <h1 className="text-white text-4xl font-black tracking-tighter drop-shadow-md">
               จงเจริญ
             </h1>
-            <p className="text-amber-100 text-sm font-medium">
-              Hire Local, Get Lucky! แหล่งรวมผู้เชี่ยวชาญใกล้ตัวคุณ
+            <p className="text-white/90 text-sm font-bold">
+              จงเจริญไปด้วยกัน • ผู้เชี่ยวชาญใกล้คุณ
             </p>
           </div>
 
-          {/* Search Bar สไตล์ Fastwork */}
+          {/* Search Bar สไตล์แอป Shopee */}
           <div className="relative max-w-md mx-auto">
             <input 
               type="text" 
-              placeholder="ค้นหาบริการที่ต้องการ..." 
-              className="w-full py-4 px-6 rounded-2xl shadow-xl focus:outline-none text-gray-800"
+              placeholder="ค้นหาช่าง หรือบริการที่คุณต้องการ..." 
+              className="w-full py-3.5 px-6 rounded-sm shadow-inner focus:outline-none text-gray-800 text-sm border-2 border-transparent focus:border-[#EE4D2D]"
             />
-            <button className="absolute right-2 top-2 bg-[#F9A825] text-white p-2 rounded-xl shadow-md">
+            <button className="absolute right-1 top-1 text-white px-4 py-2 rounded-sm shadow-md transition-opacity hover:opacity-90"
+               style={{ backgroundColor: shopeePalette.orange }}>
               🔍
             </button>
           </div>
         </div>
       </section>
 
-      <main className="max-w-xl mx-auto px-4 -mt-10 space-y-8">
+      <main className="max-w-xl mx-auto px-2 space-y-4 -mt-4">
+        
         {/* ── Categories Grid ── */}
-        <section className="bg-white rounded-3xl p-6 shadow-sm border border-amber-50">
-          <div className="grid grid-cols-3 gap-4">
+        <section className="bg-white rounded-sm p-4 shadow-sm">
+          <div className="grid grid-cols-3 gap-y-6">
             {categories.map((cat) => (
               <Link key={cat.id} href={`/services?cat=${cat.id}`} className="flex flex-col items-center gap-2 group">
-                <div className={`w-14 h-14 ${cat.color} rounded-2xl flex items-center justify-center text-2xl shadow-sm group-hover:scale-110 transition-transform`}>
+                <div className="w-12 h-12 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
                   {cat.icon}
                 </div>
-                <span className="text-[11px] font-bold text-gray-600">{cat.title}</span>
+                <span className="text-[11px] font-medium text-gray-700">{cat.title}</span>
               </Link>
             ))}
           </div>
         </section>
 
         {/* ── Featured Professionals ── */}
-        <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-black text-gray-800 flex items-center gap-2">
-              <span className="w-1.5 h-5 bg-[#F9A825] rounded-full"></span>
+        <section className="space-y-2">
+          <div className="flex items-center justify-between px-2 bg-white py-3 border-b border-gray-100">
+            <h2 className="text-sm font-bold uppercase tracking-wider" style={{ color: shopeePalette.orange }}>
               ผู้เชี่ยวชาญยอดนิยม
             </h2>
-            <Link href="/services" className="text-xs font-bold text-amber-600">ดูทั้งหมด →</Link>
+            <Link href="/services" className="text-xs text-gray-400">ดูทั้งหมด ></Link>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-2">
             {loading ? (
-              [1,2,3,4].map(i => <div key={i} className="h-48 bg-gray-100 animate-pulse rounded-3xl" />)
+              [1,2,3,4].map(i => <div key={i} className="h-52 bg-white animate-pulse" />)
             ) : (
               professionals.map((pro) => (
-                <div key={pro.id} className="bg-white rounded-3xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-                  <div className="aspect-square bg-gray-200 relative">
+                <div key={pro.id} className="bg-white shadow-sm hover:shadow-md transition-shadow border border-transparent hover:border-[#EE4D2D]">
+                  <div className="aspect-square bg-gray-50 relative">
                     {pro.avatar_url ? (
                       <img src={pro.avatar_url} alt={pro.full_name} className="w-full h-full object-cover" />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-400 text-4xl">👤</div>
+                      <div className="w-full h-full flex items-center justify-center text-gray-200 text-5xl font-black">👤</div>
                     )}
                     {pro.is_verified && (
-                      <div className="absolute top-2 right-2 bg-blue-500 text-white p-1 rounded-full text-[10px] shadow-md">
-                        ✓
+                      <div className="absolute top-0 left-0 bg-[#EE4D2D] text-white px-1.5 py-0.5 text-[9px] font-bold">
+                        Mall
                       </div>
                     )}
                   </div>
-                  <div className="p-3 space-y-1">
-                    <p className="text-xs font-bold text-gray-800 truncate">{pro.full_name}</p>
-                    <p className="text-[10px] text-gray-500">{pro.service_type}</p>
-                    <div className="flex items-center justify-between pt-1">
-                      <span className="text-[10px] font-bold text-[#F9A825]">฿{pro.starting_price}+</span>
-                      <div className="flex items-center gap-0.5 text-[10px] text-gray-400">
-                        <span>⭐</span> {pro.rating}
-                      </div>
+                  <div className="p-2 space-y-1">
+                    <p className="text-[11px] text-gray-800 line-clamp-2 leading-snug">{pro.full_name}</p>
+                    <div className="flex items-center justify-between pt-2">
+                      <span className="text-sm font-bold" style={{ color: shopeePalette.orange }}>฿{pro.starting_price}</span>
+                      <span className="text-[9px] text-gray-400">ขายแล้ว 1.2พัน</span>
                     </div>
                   </div>
                 </div>
@@ -148,35 +154,30 @@ export default function HomePage() {
             )}
           </div>
         </section>
-
-        {/* ── Step Guide ── */}
-        <section className="bg-amber-50 rounded-3xl p-6 border border-amber-100">
-          <h3 className="text-sm font-black text-amber-900 mb-4">ขั้นตอนง่ายๆ ในการจ้างงาน</h3>
-          <div className="space-y-4">
-            {[
-              { t: 'ค้นหาผู้เชี่ยวชาญ', d: 'เลือกช่างที่ถูกใจจากรีวิวและการยืนยันตัวตน' },
-              { t: 'คุยรายละเอียด & จ่ายเงิน', d: 'ตกลงงานและชำระเงินผ่านระบบอั่งเปาที่ปลอดภัย' },
-              { t: 'รับงาน & สะสมคูปอง', d: 'เมื่องานเสร็จ รับยอดสะสมเพื่อลุ้นรางวัลจงเจริญ' }
-            ].map((s, i) => (
-              <div key={i} className="flex gap-4">
-                <div className="w-6 h-6 bg-[#F9A825] rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0">{i+1}</div>
-                <div>
-                  <p className="text-xs font-bold text-amber-900">{s.t}</p>
-                  <p className="text-[10px] text-amber-700/70">{s.d}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
       </main>
 
-      {/* Bottom Nav สไตล์เดิมแต่ปรับสีให้เข้ากับธีมใหม่ */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 flex justify-around py-3 z-50 pb-safe">
-        <Link href="/" className="flex flex-col items-center text-[10px] gap-1 font-bold" style={{ color: '#F9A825' }}><span className="text-lg">🏠</span>หน้าหลัก</Link>
-        <Link href="/services" className="flex flex-col items-center text-gray-400 text-[10px] gap-1"><span className="text-lg">🔍</span>ค้นหา</Link>
-        <Link href="/coupons" className="flex flex-col items-center text-gray-400 text-[10px] gap-1"><span className="text-lg">🎟️</span>ผลรางวัล</Link>
-        <Link href="/dashboard" className="flex flex-col items-center text-gray-400 text-[10px] gap-1"><span className="text-lg">📋</span>งาน</Link>
-        <Link href="/profile" className="flex flex-col items-center text-gray-400 text-[10px] gap-1"><span className="text-lg">👤</span>โปรไฟล์</Link>
+      {/* Bottom Nav: Shopee Style */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 flex justify-around py-2 z-50 shadow-lg">
+        <Link href="/" className="flex flex-col items-center gap-0.5 font-bold" style={{ color: shopeePalette.orange }}>
+          <span className="text-xl">🏠</span>
+          <span className="text-[10px]">หน้าแรก</span>
+        </Link>
+        <Link href="/services" className="flex flex-col items-center gap-0.5 text-gray-400">
+          <span className="text-xl">🔍</span>
+          <span className="text-[10px]">ค้นหา</span>
+        </Link>
+        <Link href="/coupons" className="flex flex-col items-center gap-0.5 text-gray-400">
+          <span className="text-xl">🎟️</span>
+          <span className="text-[10px]">รางวัล</span>
+        </Link>
+        <Link href="/dashboard" className="flex flex-col items-center gap-0.5 text-gray-400">
+          <span className="text-xl">📋</span>
+          <span className="text-[10px]">งาน</span>
+        </Link>
+        <Link href="/profile" className="flex flex-col items-center gap-0.5 text-gray-400">
+          <span className="text-xl">👤</span>
+          <span className="text-[10px]">ฉัน</span>
+        </Link>
       </nav>
     </div>
   );
