@@ -24,10 +24,10 @@ interface Professional {
 
 // ── Soft Shopee Palette ─────────────────────────────────────────
 const themePalette = {
-  primaryOrange: '#F05D40', // ส้มที่ลดความจัดจ้านลง สบายตาขึ้น
-  lightOrange: '#FF8769',   // ส้มสว่างสำหรับไล่เฉดให้ดูฟุ้งๆ
-  bgGray: '#F9FAFB',        // พื้นหลังเทาอมขาวสะอาดตา
-  textDark: '#1F2937',      // สีข้อความหลัก
+  primaryOrange: '#F05D40', 
+  lightOrange: '#FF8769',   
+  bgGray: '#F9FAFB',        
+  textDark: '#1F2937',      
 };
 
 const categories: ServiceCategory[] = [
@@ -43,7 +43,6 @@ export default function HomePage() {
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // ── States สำหรับ AI Search Agent ──
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
 
@@ -71,17 +70,10 @@ export default function HomePage() {
     fetchPros();
   }, []);
 
-  // ── ฟังก์ชันจำลองการค้นหา (ด่านคัดกรอง) ──
   const handleSearch = () => {
-    // ป้องกันการค้นหาถ้าพิมพ์ไม่ถึง 3 ตัวอักษร
     if (searchQuery.trim().length < 3) return; 
-
     setIsSearching(true);
-    
-    // TODO: เชื่อมต่อ API Gemini + Supabase pgvector ที่นี่
     console.log("AI กำลังวิเคราะห์คำว่า:", searchQuery);
-    
-    // จำลองเวลาโหลด 2 วินาที ป้องกันการกดซ้ำรัวๆ
     setTimeout(() => {
       setIsSearching(false);
     }, 2000); 
@@ -95,16 +87,26 @@ export default function HomePage() {
         style={{ background: `linear-gradient(180deg, ${themePalette.primaryOrange} 0%, ${themePalette.lightOrange} 100%)` }}>
         
         <div className="max-w-xl mx-auto text-center relative z-10 space-y-6">
-          <div className="space-y-1">
-            <h1 className="text-white text-4xl font-black tracking-tighter drop-shadow-md">
-              จงเจริญ
-            </h1>
-            <p className="text-white/95 text-sm font-bold">
+          <div className="flex flex-col items-center justify-center space-y-3">
+            {/* 🌟 แสดงรูปโลโก้แทนตัวหนังสือ 🌟 */}
+            {/* เจมตั้งค่าให้ดึงรูป logo.png มาแสดงตรงนี้ค่ะ ปรับขนาดให้พอดีเด่นๆ เลย */}
+            <div className="bg-white/90 p-3 rounded-[24px] shadow-lg inline-block backdrop-blur-sm border border-white/50">
+               <img 
+                 src="/logo.png" 
+                 alt="จงเจริญ โลโก้" 
+                 className="h-20 w-auto object-contain drop-shadow-sm" 
+                 onError={(e) => {
+                   // เผื่อบีสามอัปโหลดไฟล์เป็น .jpg เจมทำตัวดักไว้ให้มันเปลี่ยนนามสกุลอัตโนมัติค่ะ
+                   e.currentTarget.src = "/logo.jpg";
+                 }}
+               />
+            </div>
+            <p className="text-white/95 text-sm font-bold tracking-wide">
               จงเจริญไปด้วยกัน • ผู้เชี่ยวชาญใกล้คุณ
             </p>
           </div>
 
-          {/* 🌟 AI Search Agent Input (Shopee Style + Anti Spam) 🌟 */}
+          {/* 🌟 AI Search Agent Input 🌟 */}
           <div className="relative max-w-md mx-auto">
             <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
               <span className="text-lg animate-pulse">✨</span>
@@ -125,10 +127,6 @@ export default function HomePage() {
               {isSearching ? '⏳...' : 'ค้นหา'}
             </button>
           </div>
-          {/* แจ้งเตือนเล็กๆ เมื่อพิมพ์ไม่ครบ */}
-          {searchQuery.length > 0 && searchQuery.length < 3 && (
-            <p className="text-white/80 text-[10px] mt-1 text-left pl-4">กรุณาพิมพ์อย่างน้อย 3 ตัวอักษร</p>
-          )}
         </div>
       </section>
 
