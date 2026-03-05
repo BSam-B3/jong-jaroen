@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import Link from 'next/link';
 
 // ── Types ──────────────────────────────────────────────────────
@@ -18,7 +18,7 @@ const themePalette = {
   textDark: '#1F2937',      
 };
 
-// 🌟 เพิ่มหมวดหมู่ให้เยอะขึ้น และมีปุ่ม "อื่นๆ" ตอนท้าย 🌟
+// 🌟 หมวดหมู่บริการ 🌟
 const categories: ServiceCategory[] = [
   { id: 'electrician', title: 'ช่างไฟฟ้า', icon: '⚡', bgColor: 'bg-orange-50' },
   { id: 'cleaning', title: 'แม่บ้าน', icon: '🧹', bgColor: 'bg-orange-50' },
@@ -34,6 +34,9 @@ const categories: ServiceCategory[] = [
 export default function HomePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
+  
+  // 🌟 เพิ่ม Ref สำหรับควบคุมการสไลด์หมวดหมู่ 🌟
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const handleSearch = () => {
     if (searchQuery.trim().length < 3) return; 
@@ -42,6 +45,15 @@ export default function HomePage() {
     setTimeout(() => {
       setIsSearching(false);
     }, 2000); 
+  };
+
+  // 🌟 ฟังก์ชันเลื่อนซ้าย-ขวา 🌟
+  const scroll = (direction: 'left' | 'right') => {
+    if (scrollContainerRef.current) {
+      // เลื่อนทีละ 200 พิกเซลแบบนุ่มนวล
+      const scrollAmount = direction === 'left' ? -200 : 200;
+      scrollContainerRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+    }
   };
 
   return (
@@ -53,7 +65,7 @@ export default function HomePage() {
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}} />
 
-      {/* ── Hero Section: Soft Shopee Orange Gradient ── */}
+      {/* ── Hero Section ── */}
       <section className="pt-8 pb-16 px-4 shadow-md relative overflow-hidden"
         style={{ background: `linear-gradient(180deg, ${themePalette.primaryOrange} 0%, ${themePalette.lightOrange} 100%)` }}>
         
@@ -99,14 +111,38 @@ export default function HomePage() {
 
       <main className="max-w-xl mx-auto px-2 space-y-4 -mt-4 relative z-20">
         
-        {/* ── 🌟 Categories Slider (สไตล์ Fastwork) 🌟 ── */}
-        <section className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 overflow-hidden">
-          {/* ใช้ flex overflow-x-auto เพื่อให้เลื่อนซ้ายขวาได้ */}
-          <div className="flex overflow-x-auto gap-5 pb-2 snap-x snap-mandatory scroll-smooth hide-scrollbar">
+        {/* ── 🌟 Categories Slider (มีปุ่มกดเลื่อนสไตล์ Fastwork) 🌟 ── */}
+        <section className="bg-white rounded-xl py-5 shadow-sm border border-gray-100 relative group overflow-hidden">
+          
+          {/* เงาขาวเฟดๆ ด้านขวา เพื่อบอกใบ้ว่ามีของซ่อนอยู่ */}
+          <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-white to-transparent z-10 pointer-events-none"></div>
+
+          {/* ปุ่มลูกศรเลื่อนขวา > */}
+          <button 
+            onClick={() => scroll('right')}
+            className="absolute right-1 top-1/2 -translate-y-1/2 z-20 w-8 h-8 bg-white rounded-full shadow-md border border-gray-100 flex items-center justify-center text-gray-500 hover:text-[#F05D40] hover:scale-110 transition-all opacity-90 hover:opacity-100"
+            aria-label="เลื่อนดูหมวดหมู่เพิ่มเติม"
+          >
+            ❯
+          </button>
+
+          {/* ปุ่มลูกศรเลื่อนซ้าย < (ซ่อนไว้ปกติ จะแสดงเมื่อผู้ใช้ต้องการย้อนกลับ) */}
+          <button 
+            onClick={() => scroll('left')}
+            className="absolute left-1 top-1/2 -translate-y-1/2 z-20 w-8 h-8 bg-white rounded-full shadow-md border border-gray-100 flex items-center justify-center text-gray-500 hover:text-[#F05D40] hover:scale-110 transition-all opacity-0 group-hover:opacity-90"
+            aria-label="เลื่อนกลับ"
+          >
+            ❮
+          </button>
+
+          {/* กล่องบรรจุหมวดหมู่ */}
+          <div 
+            ref={scrollContainerRef}
+            className="flex overflow-x-auto px-5 gap-5 pb-2 snap-x snap-mandatory scroll-smooth hide-scrollbar relative z-0 pr-12"
+          >
             {categories.map((cat) => (
-              <Link key={cat.id} href={`/services?cat=${cat.id}`} className="flex flex-col items-center gap-2 min-w-[64px] snap-start group">
-                {/* เปลี่ยนสีพื้นหลังให้หลากหลายขึ้นตาม Data */}
-                <div className={`w-14 h-14 flex items-center justify-center text-3xl group-hover:scale-110 transition-transform rounded-[18px] ${cat.bgColor}`}>
+              <Link key={cat.id} href={`/services?cat=${cat.id}`} className="flex flex-col items-center gap-2 min-w-[64px] snap-start group cursor-pointer">
+                <div className={`w-14 h-14 flex items-center justify-center text-3xl group-hover:scale-110 transition-transform rounded-[18px] ${cat.bgColor} shadow-sm border border-gray-50`}>
                   {cat.icon}
                 </div>
                 <span className="text-[11px] font-bold text-gray-700 whitespace-nowrap">{cat.title}</span>
