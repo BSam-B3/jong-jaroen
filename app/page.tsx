@@ -1,7 +1,6 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
-import { supabase } from '@/lib/supabase';
 
 // ── Types ──────────────────────────────────────────────────────
 interface ServiceCategory {
@@ -9,17 +8,6 @@ interface ServiceCategory {
   title: string;
   icon: string;
   bgColor: string;
-}
-
-interface Professional {
-  id: string;
-  full_name: string;
-  avatar_url?: string;
-  service_type: string;
-  rating: number;
-  review_count: number;
-  starting_price: number;
-  is_verified: boolean;
 }
 
 // ── Soft Shopee Palette ─────────────────────────────────────────
@@ -40,35 +28,8 @@ const categories: ServiceCategory[] = [
 ];
 
 export default function HomePage() {
-  const [professionals, setProfessionals] = useState<Professional[]>([]);
-  const [loading, setLoading] = useState(true);
-  
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
-
-  useEffect(() => {
-    const fetchPros = async () => {
-      const { data } = await supabase
-        .from('profiles')
-        .select('id, full_name, avatar_url, mode, rating, review_count')
-        .eq('mode', 'provider')
-        .limit(4);
-      
-      if (data) {
-        const mappedData = data.map(item => ({
-          ...item,
-          service_type: 'ผู้เชี่ยวชาญ',
-          starting_price: 350,
-          is_verified: true,
-          rating: 4.8,
-          review_count: 42
-        }));
-        setProfessionals(mappedData as any);
-      }
-      setLoading(false);
-    };
-    fetchPros();
-  }, []);
 
   const handleSearch = () => {
     if (searchQuery.trim().length < 3) return; 
@@ -89,13 +50,11 @@ export default function HomePage() {
         <div className="max-w-xl mx-auto text-center relative z-10 space-y-6">
           <div className="flex flex-col items-center justify-center space-y-3">
             
-            {/* 🌟 🌟 🌟 BIGGER LOGO, TINIER FRAME 🌟 🌟 🌟 */}
-            {/* เจมปรับกรอบขาวให้เล็กที่สุด (p-1.5) และขยายรูปโลโก้ให้ใหญ่สะใจ (h-48 ถึง h-56) */}
+            {/* 🌟 BIGGER LOGO, TINIER FRAME 🌟 */}
             <div className="bg-white/95 p-1.5 rounded-[30px] shadow-2xl inline-block border-2 border-white/20 transform hover:scale-105 transition-transform duration-300">
                <img 
                  src="/logo.png" 
                  alt="จงเจริญ โลโก้" 
-                 // ปรับ h-36 เป็น h-48 (บนมือถือ) และ h-56 (บนจอใหญ่) ให้ใหญ่สุดๆ เด่นกระแทกตา!
                  className="h-48 sm:h-56 w-auto object-contain drop-shadow-lg" 
                  onError={(e) => {
                    e.currentTarget.src = "/logo.jpg";
@@ -148,44 +107,30 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* ── Featured Professionals ── */}
-        <section className="space-y-2">
-          <div className="flex items-center justify-between px-2 bg-white py-3 border-b border-gray-100 rounded-t-xl">
-            <h2 className="text-sm font-bold uppercase tracking-wider" style={{ color: themePalette.primaryOrange }}>
-              ผู้เชี่ยวชาญยอดนิยม
+        {/* ── 🌟 NEW: Job Board Banner (แทนที่ผู้เชี่ยวชาญ) 🌟 ── */}
+        <section className="bg-white rounded-xl p-6 shadow-sm border border-orange-100 flex flex-col items-center text-center space-y-4 relative overflow-hidden group">
+          {/* Background Decoration เล่นลวดลายฟุ้งๆ */}
+          <div className="absolute top-0 right-0 w-32 h-32 bg-orange-50 rounded-full -mr-16 -mt-16 opacity-60 group-hover:scale-110 transition-transform duration-500"></div>
+          <div className="absolute bottom-0 left-0 w-24 h-24 bg-orange-50 rounded-full -ml-12 -mb-12 opacity-60 group-hover:scale-110 transition-transform duration-500"></div>
+
+          <div className="relative z-10 space-y-2">
+            <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center text-2xl mx-auto mb-2 shadow-inner">
+              📢
+            </div>
+            <h2 className="text-lg font-black tracking-tight" style={{ color: themePalette.primaryOrange }}>
+              บอร์ดงานจงเจริญ
             </h2>
-            <Link href="/services" className="text-xs text-gray-400">ดูทั้งหมด {' >'}</Link>
+            <p className="text-[11px] text-gray-500 font-medium leading-relaxed px-4">
+              แหล่งรวมประกาศจ้างงานในชุมชนปากน้ำประแสและพื้นที่ใกล้เคียง <br/>หาช่าง หาคนช่วยงาน หรือรับงานเพื่อสร้างรายได้
+            </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
-            {loading ? (
-              [1,2,3,4].map(i => <div key={i} className="h-52 bg-white animate-pulse rounded-xl" />)
-            ) : (
-              professionals.map((pro) => (
-                <div key={pro.id} className="bg-white shadow-sm hover:shadow-md transition-shadow border border-gray-100 hover:border-[#F05D40] rounded-xl overflow-hidden">
-                  <div className="aspect-square bg-gray-50 relative">
-                    {pro.avatar_url ? (
-                      <img src={pro.avatar_url} alt={pro.full_name} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-200 text-5xl font-black">👤</div>
-                    )}
-                    {pro.is_verified && (
-                      <div className="absolute top-0 left-0 text-white px-2 py-1 text-[9px] font-bold rounded-br-lg" style={{ backgroundColor: themePalette.primaryOrange }}>
-                        Mall
-                      </div>
-                    )}
-                  </div>
-                  <div className="p-3 space-y-1">
-                    <p className="text-[11px] text-gray-800 line-clamp-2 leading-snug font-medium">{pro.full_name}</p>
-                    <div className="flex items-center justify-between pt-2">
-                      <span className="text-sm font-bold" style={{ color: themePalette.primaryOrange }}>฿{pro.starting_price}</span>
-                      <span className="text-[9px] text-gray-400">⭐ {pro.rating}</span>
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
+          <Link href="/jobs"
+            className="relative z-10 w-full py-3.5 rounded-lg text-white text-xs font-bold shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2"
+            style={{ backgroundColor: themePalette.primaryOrange }}>
+            <span>ดูประกาศงานทั้งหมด</span>
+            <span className="text-lg leading-none">👉</span>
+          </Link>
         </section>
       </main>
 
@@ -203,7 +148,7 @@ export default function HomePage() {
           <span className="text-xl">🎟️</span>
           <span className="text-[10px]">รางวัล</span>
         </Link>
-        <Link href="/dashboard" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-orange-400 transition-colors">
+        <Link href="/jobs" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-orange-400 transition-colors">
           <span className="text-xl">📋</span>
           <span className="text-[10px]">งาน</span>
         </Link>
