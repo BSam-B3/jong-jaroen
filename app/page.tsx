@@ -18,13 +18,17 @@ const themePalette = {
   textDark: '#1F2937',      
 };
 
+// 🌟 เพิ่มหมวดหมู่ให้เยอะขึ้น และมีปุ่ม "อื่นๆ" ตอนท้าย 🌟
 const categories: ServiceCategory[] = [
   { id: 'electrician', title: 'ช่างไฟฟ้า', icon: '⚡', bgColor: 'bg-orange-50' },
   { id: 'cleaning', title: 'แม่บ้าน', icon: '🧹', bgColor: 'bg-orange-50' },
-  { id: 'plumbing', title: 'ช่างประปา', icon: '💧', bgColor: 'bg-orange-50' },
-  { id: 'mechanic', title: 'ช่างยนต์', icon: '🛠️', bgColor: 'bg-orange-50' },
-  { id: 'construction', title: 'ก่อสร้าง', icon: '🏗️', bgColor: 'bg-orange-50' },
-  { id: 'massage', title: 'นวดแผนไทย', icon: '💆', bgColor: 'bg-orange-50' },
+  { id: 'aircon', title: 'ล้างแอร์', icon: '❄️', bgColor: 'bg-blue-50' },
+  { id: 'plumbing', title: 'ช่างประปา', icon: '💧', bgColor: 'bg-cyan-50' },
+  { id: 'mechanic', title: 'ช่างยนต์', icon: '🛠️', bgColor: 'bg-gray-100' },
+  { id: 'construction', title: 'ก่อสร้าง', icon: '🏗️', bgColor: 'bg-amber-50' },
+  { id: 'massage', title: 'นวดแผนไทย', icon: '💆', bgColor: 'bg-pink-50' },
+  { id: 'tech', title: 'ซ่อมคอม', icon: '💻', bgColor: 'bg-indigo-50' },
+  { id: 'others', title: 'อื่นๆ', icon: '✨', bgColor: 'bg-gray-100' },
 ];
 
 export default function HomePage() {
@@ -43,14 +47,18 @@ export default function HomePage() {
   return (
     <div className="min-h-screen pb-24" style={{ backgroundColor: themePalette.bgGray }}>
       
+      {/* ── ซ่อน Scrollbar ที่ดูเกะกะด้วย CSS ── */}
+      <style dangerouslySetInnerHTML={{__html: `
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      `}} />
+
       {/* ── Hero Section: Soft Shopee Orange Gradient ── */}
       <section className="pt-8 pb-16 px-4 shadow-md relative overflow-hidden"
         style={{ background: `linear-gradient(180deg, ${themePalette.primaryOrange} 0%, ${themePalette.lightOrange} 100%)` }}>
         
         <div className="max-w-xl mx-auto text-center relative z-10 space-y-6">
           <div className="flex flex-col items-center justify-center space-y-3">
-            
-            {/* 🌟 BIGGER LOGO, TINIER FRAME 🌟 */}
             <div className="bg-white/95 p-1.5 rounded-[30px] shadow-2xl inline-block border-2 border-white/20 transform hover:scale-105 transition-transform duration-300">
                <img 
                  src="/logo.png" 
@@ -61,13 +69,11 @@ export default function HomePage() {
                  }}
                />
             </div>
-            
             <p className="text-white text-xs sm:text-sm font-bold tracking-wide drop-shadow-sm opacity-90">
               จงเจริญไปด้วยกัน • ผู้เชี่ยวชาญใกล้คุณ
             </p>
           </div>
 
-          {/* 🌟 AI Search Agent Input 🌟 */}
           <div className="relative max-w-md mx-auto mt-1">
             <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
               <span className="text-lg animate-pulse">✨</span>
@@ -93,23 +99,24 @@ export default function HomePage() {
 
       <main className="max-w-xl mx-auto px-2 space-y-4 -mt-4 relative z-20">
         
-        {/* ── Categories Grid ── */}
-        <section className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
-          <div className="grid grid-cols-3 gap-y-6">
+        {/* ── 🌟 Categories Slider (สไตล์ Fastwork) 🌟 ── */}
+        <section className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 overflow-hidden">
+          {/* ใช้ flex overflow-x-auto เพื่อให้เลื่อนซ้ายขวาได้ */}
+          <div className="flex overflow-x-auto gap-5 pb-2 snap-x snap-mandatory scroll-smooth hide-scrollbar">
             {categories.map((cat) => (
-              <Link key={cat.id} href={`/services?cat=${cat.id}`} className="flex flex-col items-center gap-2 group">
-                <div className="w-12 h-12 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
+              <Link key={cat.id} href={`/services?cat=${cat.id}`} className="flex flex-col items-center gap-2 min-w-[64px] snap-start group">
+                {/* เปลี่ยนสีพื้นหลังให้หลากหลายขึ้นตาม Data */}
+                <div className={`w-14 h-14 flex items-center justify-center text-3xl group-hover:scale-110 transition-transform rounded-[18px] ${cat.bgColor}`}>
                   {cat.icon}
                 </div>
-                <span className="text-[11px] font-medium text-gray-700">{cat.title}</span>
+                <span className="text-[11px] font-bold text-gray-700 whitespace-nowrap">{cat.title}</span>
               </Link>
             ))}
           </div>
         </section>
 
-        {/* ── 🌟 NEW: Job Board Banner (แทนที่ผู้เชี่ยวชาญ) 🌟 ── */}
+        {/* ── Job Board Banner ── */}
         <section className="bg-white rounded-xl p-6 shadow-sm border border-orange-100 flex flex-col items-center text-center space-y-4 relative overflow-hidden group">
-          {/* Background Decoration เล่นลวดลายฟุ้งๆ */}
           <div className="absolute top-0 right-0 w-32 h-32 bg-orange-50 rounded-full -mr-16 -mt-16 opacity-60 group-hover:scale-110 transition-transform duration-500"></div>
           <div className="absolute bottom-0 left-0 w-24 h-24 bg-orange-50 rounded-full -ml-12 -mb-12 opacity-60 group-hover:scale-110 transition-transform duration-500"></div>
 
@@ -134,7 +141,7 @@ export default function HomePage() {
         </section>
       </main>
 
-      {/* 🛠️ Bottom Nav (Shopee Style) + z-[100] 🛠️ */}
+      {/* 🛠️ Bottom Nav 🛠️ */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 flex justify-around py-2 z-[100] shadow-[0_-5px_20px_rgba(0,0,0,0.05)] pb-safe">
         <Link href="/" className="flex flex-col items-center gap-0.5 font-bold" style={{ color: themePalette.primaryOrange }}>
           <span className="text-xl">🏠</span>
