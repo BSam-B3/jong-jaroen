@@ -83,31 +83,32 @@ export default function HomePage() {
     <div className="min-h-screen pb-24" style={{ backgroundColor: themePalette.bgGray }}>
       
       {/* ── Hero Section: Soft Shopee Orange Gradient ── */}
-      <section className="pt-12 pb-20 px-4 shadow-sm relative overflow-hidden"
+      <section className="pt-10 pb-20 px-4 shadow-sm relative overflow-hidden"
         style={{ background: `linear-gradient(180deg, ${themePalette.primaryOrange} 0%, ${themePalette.lightOrange} 100%)` }}>
         
-        <div className="max-w-xl mx-auto text-center relative z-10 space-y-6">
-          <div className="flex flex-col items-center justify-center space-y-3">
-            {/* 🌟 แสดงรูปโลโก้แทนตัวหนังสือ 🌟 */}
-            {/* เจมตั้งค่าให้ดึงรูป logo.png มาแสดงตรงนี้ค่ะ ปรับขนาดให้พอดีเด่นๆ เลย */}
-            <div className="bg-white/90 p-3 rounded-[24px] shadow-lg inline-block backdrop-blur-sm border border-white/50">
+        <div className="max-w-xl mx-auto text-center relative z-10 space-y-8">
+          <div className="flex flex-col items-center justify-center space-y-4">
+            
+            {/* 🌟 ขยายขนาดโลโก้ให้เด่นตระหง่าน 🌟 */}
+            <div className="bg-white p-5 rounded-[36px] shadow-2xl inline-block border-4 border-white/40 transform hover:scale-105 transition-all duration-300">
                <img 
                  src="/logo.png" 
                  alt="จงเจริญ โลโก้" 
-                 className="h-20 w-auto object-contain drop-shadow-sm" 
+                 // ปรับจาก h-20 เป็น h-36 (บนมือถือ) และ h-40 (บนจอใหญ่) ให้ใหญ่สะใจ
+                 className="h-36 sm:h-40 w-auto object-contain drop-shadow-lg" 
                  onError={(e) => {
-                   // เผื่อบีสามอัปโหลดไฟล์เป็น .jpg เจมทำตัวดักไว้ให้มันเปลี่ยนนามสกุลอัตโนมัติค่ะ
                    e.currentTarget.src = "/logo.jpg";
                  }}
                />
             </div>
-            <p className="text-white/95 text-sm font-bold tracking-wide">
+            
+            <p className="text-white text-sm sm:text-base font-bold tracking-wide drop-shadow-md">
               จงเจริญไปด้วยกัน • ผู้เชี่ยวชาญใกล้คุณ
             </p>
           </div>
 
           {/* 🌟 AI Search Agent Input 🌟 */}
-          <div className="relative max-w-md mx-auto">
+          <div className="relative max-w-md mx-auto mt-2">
             <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
               <span className="text-lg animate-pulse">✨</span>
             </div>
@@ -116,12 +117,12 @@ export default function HomePage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="บอก AI ว่าต้องการให้ช่วยอะไร..." 
-              className="w-full py-4 pl-12 pr-24 rounded-lg shadow-inner focus:outline-none text-gray-800 text-sm border-2 border-transparent focus:border-white bg-white/95 backdrop-blur-sm"
+              className="w-full py-4 pl-12 pr-24 rounded-xl shadow-2xl focus:outline-none text-gray-800 text-sm border-2 border-transparent focus:border-white bg-white/95 backdrop-blur-sm transition-all"
             />
             <button 
               onClick={handleSearch}
               disabled={searchQuery.trim().length < 3 || isSearching}
-              className={`absolute right-1.5 top-1.5 bottom-1.5 px-4 rounded-md text-white text-xs font-bold shadow-sm transition-all 
+              className={`absolute right-2 top-2 bottom-2 px-5 rounded-lg text-white text-xs font-bold shadow-md transition-all 
                 ${searchQuery.trim().length < 3 || isSearching ? 'bg-orange-300/50 cursor-not-allowed' : 'bg-[#F05D40] hover:bg-[#D95339] hover:scale-105'}`}
             >
               {isSearching ? '⏳...' : 'ค้นหา'}
@@ -130,54 +131,54 @@ export default function HomePage() {
         </div>
       </section>
 
-      <main className="max-w-xl mx-auto px-2 space-y-4 -mt-6 relative z-20">
+      <main className="max-w-xl mx-auto px-3 space-y-5 -mt-8 relative z-20">
         
         {/* ── Categories Grid ── */}
-        <section className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
-          <div className="grid grid-cols-3 gap-y-6">
+        <section className="bg-white rounded-2xl p-6 shadow-md border border-gray-100">
+          <div className="grid grid-cols-3 gap-y-8">
             {categories.map((cat) => (
-              <Link key={cat.id} href={`/services?cat=${cat.id}`} className="flex flex-col items-center gap-2 group">
-                <div className="w-12 h-12 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
+              <Link key={cat.id} href={`/services?cat=${cat.id}`} className="flex flex-col items-center gap-3 group">
+                <div className="w-14 h-14 flex items-center justify-center text-3xl group-hover:scale-110 transition-transform">
                   {cat.icon}
                 </div>
-                <span className="text-[11px] font-medium text-gray-700">{cat.title}</span>
+                <span className="text-xs font-bold text-gray-700">{cat.title}</span>
               </Link>
             ))}
           </div>
         </section>
 
         {/* ── Featured Professionals ── */}
-        <section className="space-y-2">
-          <div className="flex items-center justify-between px-2 bg-white py-3 border-b border-gray-100 rounded-t-xl">
+        <section className="space-y-3">
+          <div className="flex items-center justify-between px-2 bg-white py-3 border-b border-gray-100 rounded-t-2xl">
             <h2 className="text-sm font-bold uppercase tracking-wider" style={{ color: themePalette.primaryOrange }}>
               ผู้เชี่ยวชาญยอดนิยม
             </h2>
-            <Link href="/services" className="text-xs text-gray-400">ดูทั้งหมด {' >'}</Link>
+            <Link href="/services" className="text-xs font-medium text-gray-400 hover:text-orange-500 transition-colors">ดูทั้งหมด {' >'}</Link>
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-3">
             {loading ? (
-              [1,2,3,4].map(i => <div key={i} className="h-52 bg-white animate-pulse rounded-xl" />)
+              [1,2,3,4].map(i => <div key={i} className="h-56 bg-white animate-pulse rounded-2xl" />)
             ) : (
               professionals.map((pro) => (
-                <div key={pro.id} className="bg-white shadow-sm hover:shadow-md transition-shadow border border-gray-100 hover:border-[#F05D40] rounded-xl overflow-hidden">
-                  <div className="aspect-square bg-gray-50 relative">
+                <div key={pro.id} className="bg-white shadow-sm hover:shadow-lg transition-all border border-gray-100 hover:border-[#F05D40] rounded-2xl overflow-hidden group">
+                  <div className="aspect-square bg-gray-50 relative overflow-hidden">
                     {pro.avatar_url ? (
-                      <img src={pro.avatar_url} alt={pro.full_name} className="w-full h-full object-cover" />
+                      <img src={pro.avatar_url} alt={pro.full_name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-gray-200 text-5xl font-black">👤</div>
                     )}
                     {pro.is_verified && (
-                      <div className="absolute top-0 left-0 text-white px-2 py-1 text-[9px] font-bold rounded-br-lg" style={{ backgroundColor: themePalette.primaryOrange }}>
+                      <div className="absolute top-0 left-0 text-white px-2 py-1 text-[10px] font-bold rounded-br-lg shadow-sm" style={{ backgroundColor: themePalette.primaryOrange }}>
                         Mall
                       </div>
                     )}
                   </div>
                   <div className="p-3 space-y-1">
-                    <p className="text-[11px] text-gray-800 line-clamp-2 leading-snug font-medium">{pro.full_name}</p>
+                    <p className="text-xs text-gray-800 line-clamp-2 leading-snug font-bold">{pro.full_name}</p>
                     <div className="flex items-center justify-between pt-2">
-                      <span className="text-sm font-bold" style={{ color: themePalette.primaryOrange }}>฿{pro.starting_price}</span>
-                      <span className="text-[9px] text-gray-400">⭐ {pro.rating}</span>
+                      <span className="text-sm font-black" style={{ color: themePalette.primaryOrange }}>฿{pro.starting_price}</span>
+                      <span className="text-[10px] font-bold text-gray-400">⭐ {pro.rating}</span>
                     </div>
                   </div>
                 </div>
@@ -187,25 +188,25 @@ export default function HomePage() {
         </section>
       </main>
 
-      {/* 🛠️ Bottom Nav (Shopee Style) + z-[100] 🛠️ */}
+      {/* 🛠️ Bottom Nav 🛠️ */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 flex justify-around py-2 z-[100] shadow-[0_-5px_20px_rgba(0,0,0,0.05)] pb-safe">
-        <Link href="/" className="flex flex-col items-center gap-0.5 font-bold" style={{ color: themePalette.primaryOrange }}>
+        <Link href="/" className="flex flex-col items-center gap-1 font-bold" style={{ color: themePalette.primaryOrange }}>
           <span className="text-xl">🏠</span>
           <span className="text-[10px]">หน้าแรก</span>
         </Link>
-        <Link href="/services" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-orange-400 transition-colors">
+        <Link href="/services" className="flex flex-col items-center gap-1 text-gray-400 hover:text-orange-400 transition-colors">
           <span className="text-xl">🔍</span>
           <span className="text-[10px]">ค้นหา</span>
         </Link>
-        <Link href="/coupons" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-orange-400 transition-colors">
+        <Link href="/coupons" className="flex flex-col items-center gap-1 text-gray-400 hover:text-orange-400 transition-colors">
           <span className="text-xl">🎟️</span>
           <span className="text-[10px]">รางวัล</span>
         </Link>
-        <Link href="/dashboard" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-orange-400 transition-colors">
+        <Link href="/dashboard" className="flex flex-col items-center gap-1 text-gray-400 hover:text-orange-400 transition-colors">
           <span className="text-xl">📋</span>
           <span className="text-[10px]">งาน</span>
         </Link>
-        <Link href="/profile" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-orange-400 transition-colors">
+        <Link href="/profile" className="flex flex-col items-center gap-1 text-gray-400 hover:text-orange-400 transition-colors">
           <span className="text-xl">👤</span>
           <span className="text-[10px]">ฉัน</span>
         </Link>
