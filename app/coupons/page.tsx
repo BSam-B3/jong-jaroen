@@ -114,7 +114,7 @@ export default function CouponsPage() {
           </div>
         </section>
 
-        {/* ── 🌟 3. เลขมังกรทอง (อัปเดต: เอาคำว่า "จงเจริญ" กลับมาแล้วค่ะ!) 🌟 ── */}
+        {/* ── 🌟 3. เลขมังกรทอง (อัปเดต: เปลี่ยนเป็น "คูปองมงคล") 🌟 ── */}
         <section>
           <div className="flex justify-between items-center mb-3 px-1">
             <h3 className="text-sm font-black text-gray-800 flex items-center gap-1.5">
@@ -138,10 +138,10 @@ export default function CouponsPage() {
                   {/* เส้นกรอบทองด้านใน */}
                   {!won && <div className="absolute inset-1 border border-yellow-500/30 rounded-xl pointer-events-none"></div>}
 
-                  {/* ส่วนหัว: ชื่อสลาก และ รหัสงวด */}
+                  {/* 🌟 ส่วนหัว: ชื่อคูปอง และ รหัสงวด 🌟 */}
                   <div className="w-full flex justify-between items-start z-10">
                     <div className={`text-[9px] font-bold ${won ? 'text-green-700' : 'text-yellow-400 drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]'}`}>
-                      สลากมงคล
+                      คูปองมงคล
                     </div>
                     <div className="text-right">
                       <div className={`text-[7px] font-medium ${won ? 'text-green-600' : 'text-white/90 drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]'}`}>
@@ -153,7 +153,7 @@ export default function CouponsPage() {
                     </div>
                   </div>
 
-                  {/* 🌟 ส่วนกลาง: คำว่า "จงเจริญ" + ตัวเลข 🌟 */}
+                  {/* ส่วนกลาง: คำว่า "จงเจริญ" + ตัวเลข */}
                   <div className="flex flex-col items-center justify-center my-1 z-10">
                     <div className={`text-[11px] font-black tracking-[0.2em] pl-[0.2em] mb-0.5
                       ${won 
