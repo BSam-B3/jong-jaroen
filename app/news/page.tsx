@@ -9,12 +9,10 @@ const themePalette = {
   bgGray: '#F9FAFB',        
 };
 
-// 🌟 Mock Data: ข่าวสารและกิจกรรม (เรียงมั่วๆ ไว้เดี๋ยวโค้ดจะเรียงให้ใหม่) 🌟
-// ใส่สีแยกระหว่าง Theme ของการ์ด, สีจุด (Dot), และสีตอนกด Active
+// 🌟 Mock Data: ข่าวสารและกิจกรรม 🌟
 const communityNews = [
   { id: 1, title: 'ประชุมลูกบ้าน: วางแผนรับมือน้ำทะเลหนุน', startDate: '2026-03-10', endDate: '2026-03-10', category: 'ส่วนรวม', icon: '🌊', colorCard: 'bg-cyan-100 text-cyan-700', colorDot: 'bg-cyan-500', colorActive: 'bg-cyan-500 text-white shadow-cyan-200' },
   { id: 2, title: 'นัดตรวจเบาหวานและความดัน ผู้สูงอายุ', startDate: '2026-03-15', endDate: '2026-03-15', category: 'สาธารณสุข', icon: '🩺', colorCard: 'bg-rose-100 text-rose-700', colorDot: 'bg-rose-500', colorActive: 'bg-rose-500 text-white shadow-rose-200' },
-  // 🌟 ตัวอย่างเทศกาล 3 วัน 🌟
   { id: 3, title: 'งานประเพณีทอดผ้าป่ากลางน้ำ ประแส', startDate: '2026-03-18', endDate: '2026-03-20', category: 'เทศกาล', icon: '🛶', colorCard: 'bg-amber-100 text-amber-700', colorDot: 'bg-amber-500', colorActive: 'bg-amber-500 text-white shadow-amber-200' },
   { id: 4, title: 'เทศบาลให้บริการฉีดวัคซีนพิษสุนัขบ้า ฟรี!', startDate: '2026-03-22', endDate: '2026-03-22', category: 'ปศุสัตว์', icon: '🐕', colorCard: 'bg-blue-100 text-blue-700', colorDot: 'bg-blue-500', colorActive: 'bg-blue-500 text-white shadow-blue-200' },
   { id: 5, title: 'สงกรานต์ปากน้ำประแส สาดน้ำอุโมงค์ไฟ', startDate: '2026-04-13', endDate: '2026-04-15', category: 'เทศกาล', icon: '💦', colorCard: 'bg-indigo-100 text-indigo-700', colorDot: 'bg-indigo-500', colorActive: 'bg-indigo-500 text-white shadow-indigo-200' },
@@ -24,21 +22,23 @@ const monthNames = ["มกราคม", "กุมภาพันธ์", "ม
 const weekDays = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
 
 export default function NewsPage() {
-  // ตั้งค่าเริ่มต้นเป็นเดือน มีนาคม 2026 (เดือนปัจจุบันตามบริบท)
-  const [viewDate, setViewDate] = useState(new Date(2026, 2, 1)); 
+  // ดึงวันที่ปัจจุบัน
+  const today = new Date();
+  const [viewDate, setViewDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1)); 
   const [activeEventId, setActiveEventId] = useState<number | null>(null);
+  
+  // 🌟 State สำหรับเปิด-ปิด Popup ปฏิทิน 🌟
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
-  // เลื่อนเดือน
   const prevMonth = () => {
     setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1));
-    setActiveEventId(null); // เคลียร์ Active เมื่อเปลี่ยนเดือน
+    setActiveEventId(null);
   };
   const nextMonth = () => {
     setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1));
     setActiveEventId(null);
   };
 
-  // คัดกรองงานเฉพาะเดือนที่กำลังดู และ **เรียงลำดับจากวันที่ใกล้สุดไปไกลสุด**
   const monthEvents = useMemo(() => {
     return communityNews.filter(event => {
       const dStart = new Date(event.startDate);
@@ -49,33 +49,93 @@ export default function NewsPage() {
     }).sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
   }, [viewDate]);
 
-  // ตัวช่วยสร้างปฏิทิน
   const formatYYYYMMDD = (year: number, month: number, day: number) => 
     `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
   const firstDayOfWeek = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1).getDay();
   const daysInMonth = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0).getDate();
-  
   const blanks = Array.from({ length: firstDayOfWeek });
   const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
 
-  // ฟังก์ชันหาว่าวันนี้มีงานอะไรบ้าง
   const getEventsForDay = (dayStr: string) => {
     return monthEvents.filter(e => dayStr >= e.startDate && dayStr <= e.endDate);
   };
 
-  // เมื่อกดวันที่ในปฏิทิน
   const handleDayClick = (dayStr: string) => {
     const evs = getEventsForDay(dayStr);
     if (evs.length > 0) {
       setActiveEventId(activeEventId === evs[0].id ? null : evs[0].id);
+      setIsCalendarOpen(false); // ปิด Popup ทันทีที่เลือกงานเสร็จ
     } else {
       setActiveEventId(null);
     }
   };
 
+  // 🌟 ฟังก์ชันวาดปฏิทิน (ใช้ได้ทั้งบนหน้าจอและใน Popup) 🌟
+  const renderCalendar = (isPopup = false) => (
+    <div className={`bg-white ${isPopup ? 'rounded-[32px] p-6 shadow-2xl w-full max-w-sm' : 'rounded-3xl p-5 shadow-sm border border-orange-50'} relative overflow-hidden`}>
+      <div className="flex items-center justify-between mb-4">
+        <button onClick={prevMonth} className="w-8 h-8 flex items-center justify-center bg-gray-50 rounded-full hover:bg-orange-50 text-gray-500 hover:text-orange-500 transition-colors">❮</button>
+        <h2 className="text-sm font-black text-gray-800 flex items-center gap-2">
+          📅 {monthNames[viewDate.getMonth()]} {viewDate.getFullYear() + 543}
+        </h2>
+        <button onClick={nextMonth} className="w-8 h-8 flex items-center justify-center bg-gray-50 rounded-full hover:bg-orange-50 text-gray-500 hover:text-orange-500 transition-colors">❯</button>
+      </div>
+
+      <div className="grid grid-cols-7 gap-y-3 gap-x-1 text-center mb-1">
+        {weekDays.map(day => (
+          <div key={day} className="text-[10px] font-bold text-gray-400">{day}</div>
+        ))}
+        {blanks.map((_, i) => <div key={`blank-${i}`} />)}
+
+        {days.map(day => {
+          const dayStr = formatYYYYMMDD(viewDate.getFullYear(), viewDate.getMonth(), day);
+          const dayEvents = getEventsForDay(dayStr);
+          const isActiveEvent = activeEventId && dayEvents.some(e => e.id === activeEventId);
+          const activeEvDetails = dayEvents.find(e => e.id === activeEventId);
+          
+          // 📍 เช็กว่าใช่วันนี้หรือไม่
+          const isToday = today.getDate() === day && today.getMonth() === viewDate.getMonth() && today.getFullYear() === viewDate.getFullYear();
+
+          return (
+            <div key={day} 
+                 onClick={() => handleDayClick(dayStr)}
+                 className={`flex flex-col items-center justify-center h-10 cursor-pointer relative ${dayEvents.length > 0 ? 'group' : ''}`}>
+              
+              {/* 📍 หมุดเช็คอินบอก "วันนี้" */}
+              {isToday && (
+                <span className="absolute -top-3.5 text-sm z-20 drop-shadow-sm animate-bounce-short">
+                  📍
+                </span>
+              )}
+
+              <span className={`w-8 h-8 flex items-center justify-center rounded-full text-xs font-bold transition-all duration-300 z-10
+                ${isToday && !isActiveEvent ? 'ring-2 ring-red-400 text-red-600' : ''} 
+                ${isActiveEvent && activeEvDetails 
+                  ? `${activeEvDetails.colorActive} scale-110 shadow-lg` 
+                  : dayEvents.length > 0 
+                    ? 'bg-gray-50 text-gray-800 group-hover:bg-gray-100' 
+                    : 'text-gray-500 hover:bg-gray-50'
+                }`}>
+                {day}
+              </span>
+
+              {dayEvents.length > 0 && !isActiveEvent && (
+                <div className="absolute bottom-0 flex gap-0.5">
+                  {dayEvents.slice(0, 2).map((ev, idx) => (
+                    <span key={idx} className={`w-1.5 h-1.5 rounded-full ${ev.colorDot}`}></span>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+
   return (
-    <div className="min-h-screen pb-24" style={{ backgroundColor: themePalette.bgGray }}>
+    <div className="min-h-screen pb-24 relative" style={{ backgroundColor: themePalette.bgGray }}>
       
       {/* ── Header ── */}
       <header className="pt-10 pb-8 px-4 shadow-sm relative overflow-hidden rounded-b-[32px]"
@@ -97,69 +157,13 @@ export default function NewsPage() {
 
       <main className="max-w-xl mx-auto px-3 relative z-20">
         
-        {/* ── 🌟 Sticky Calendar Container 🌟 ── */}
-        {/* ใช้ sticky และ top-0 เพื่อให้ปฏิทินติดหนึบเวลาเลื่อนลง มีพื้นหลังบังเนื้อหาด้านล่าง */}
-        <div className="sticky top-0 z-30 pt-3 pb-2" style={{ backgroundColor: themePalette.bgGray }}>
-          <section className="bg-white rounded-3xl p-5 shadow-md border border-orange-50 relative overflow-hidden">
-            
-            {/* Header ปฏิทิน (เลื่อนเดือนได้) */}
-            <div className="flex items-center justify-between mb-4">
-              <button onClick={prevMonth} className="w-8 h-8 flex items-center justify-center bg-gray-50 rounded-full hover:bg-orange-50 text-gray-500 hover:text-orange-500 transition-colors">❮</button>
-              <h2 className="text-sm font-black text-gray-800 flex items-center gap-2">
-                📅 {monthNames[viewDate.getMonth()]} {viewDate.getFullYear() + 543}
-              </h2>
-              <button onClick={nextMonth} className="w-8 h-8 flex items-center justify-center bg-gray-50 rounded-full hover:bg-orange-50 text-gray-500 hover:text-orange-500 transition-colors">❯</button>
-            </div>
-
-            {/* ตารางวัน */}
-            <div className="grid grid-cols-7 gap-y-3 gap-x-1 text-center mb-1">
-              {weekDays.map(day => (
-                <div key={day} className="text-[10px] font-bold text-gray-400">{day}</div>
-              ))}
-              
-              {blanks.map((_, i) => (
-                <div key={`blank-${i}`} />
-              ))}
-
-              {days.map(day => {
-                const dayStr = formatYYYYMMDD(viewDate.getFullYear(), viewDate.getMonth(), day);
-                const dayEvents = getEventsForDay(dayStr);
-                const isActiveEvent = activeEventId && dayEvents.some(e => e.id === activeEventId);
-                const activeEvDetails = dayEvents.find(e => e.id === activeEventId);
-
-                return (
-                  <div key={day} 
-                       onClick={() => handleDayClick(dayStr)}
-                       className={`flex flex-col items-center justify-center h-10 cursor-pointer relative ${dayEvents.length > 0 ? 'group' : ''}`}>
-                    
-                    {/* ตัวเลขวันที่ (เปลี่ยนสีตามงาน) */}
-                    <span className={`w-8 h-8 flex items-center justify-center rounded-full text-xs font-bold transition-all duration-300 z-10
-                      ${isActiveEvent && activeEvDetails 
-                        ? `${activeEvDetails.colorActive} scale-110 shadow-lg` 
-                        : dayEvents.length > 0 
-                          ? 'bg-gray-50 text-gray-800 group-hover:bg-gray-100' 
-                          : 'text-gray-500 hover:bg-gray-50'
-                      }`}>
-                      {day}
-                    </span>
-
-                    {/* จุดสีแสดงว่ามีงาน (ถ้างานหลายวัน สีจะยาวต่อกันได้) */}
-                    {dayEvents.length > 0 && !isActiveEvent && (
-                      <div className="absolute bottom-0 flex gap-0.5">
-                        {dayEvents.slice(0, 2).map((ev, idx) => (
-                          <span key={idx} className={`w-1.5 h-1.5 rounded-full ${ev.colorDot}`}></span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </section>
+        {/* ปล่อยปฏิทินให้เลื่อนตามธรรมชาติ */}
+        <div className="pt-4 pb-2">
+          {renderCalendar(false)}
         </div>
 
-        {/* ── News Feed (เรียงตามวันที่) ── */}
-        <section className="space-y-3 mt-4">
+        {/* ── News Feed ── */}
+        <section className="space-y-3 mt-2">
           <div className="flex justify-between items-end px-1">
             <h2 className="text-sm font-black text-gray-800">ประกาศเรียงตามวันที่</h2>
             <span className="text-[10px] text-gray-400">พบ {monthEvents.length} รายการ</span>
@@ -173,7 +177,6 @@ export default function NewsPage() {
             ) : (
               monthEvents.map((news) => {
                 const isActive = activeEventId === news.id;
-                // ตัดคำวันที่เพื่อโชว์สวยๆ
                 const startDay = parseInt(news.startDate.split('-')[2]);
                 const endDay = parseInt(news.endDate.split('-')[2]);
                 const dateDisplay = startDay === endDay ? `${startDay}` : `${startDay}-${endDay}`;
@@ -225,7 +228,31 @@ export default function NewsPage() {
 
       </main>
 
-      {/* 🛠️ Bottom Nav (หน้า ข่าวสาร Active สีส้ม) 🛠️ */}
+      {/* 🌟 Popup Calendar Modal 🌟 */}
+      {isCalendarOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4 animate-fade-in">
+          <div className="relative w-full max-w-sm">
+            <button 
+              onClick={() => setIsCalendarOpen(false)} 
+              className="absolute -top-14 right-0 w-10 h-10 bg-white/20 hover:bg-white text-white hover:text-gray-800 rounded-full text-xl shadow-lg transition-colors flex items-center justify-center"
+            >
+              ✕
+            </button>
+            {renderCalendar(true)}
+          </div>
+        </div>
+      )}
+
+      {/* 🌟 Floating Action Button (เปิด Popup) 🌟 */}
+      <button
+        onClick={() => setIsCalendarOpen(true)}
+        className="fixed bottom-20 right-4 z-[90] bg-[#F05D40] text-white w-14 h-14 rounded-full shadow-[0_4px_20px_rgba(240,93,64,0.4)] flex items-center justify-center text-2xl hover:scale-110 active:scale-95 transition-all border-2 border-white"
+        aria-label="เปิดปฏิทิน"
+      >
+        📅
+      </button>
+
+      {/* 🛠️ Bottom Nav 🛠️ */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 flex justify-around py-2 z-[100] shadow-[0_-5px_20px_rgba(0,0,0,0.05)] pb-safe">
         <Link href="/" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-orange-400 transition-colors">
           <span className="text-xl">🏠</span>
