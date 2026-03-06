@@ -8,6 +8,7 @@ interface ServiceCategory {
   title: string;
   icon: string;
   bgColor: string;
+  customLink?: string; // 🌟 เพิ่มตัวแปรนี้เพื่อแยกให้ลิงก์ไปหน้าอื่นได้โดยเฉพาะ
 }
 
 // ── Soft Shopee Palette ─────────────────────────────────────────
@@ -18,8 +19,11 @@ const themePalette = {
   textDark: '#1F2937',      
 };
 
-// 🌟 หมวดหมู่บริการ (แบบ Gradient ที่อัปเกรดแล้ว) 🌟
+// 🌟 หมวดหมู่บริการ (เพิ่ม "ข่าวชุมชน" ไว้คิวแรก) 🌟
 const categories: ServiceCategory[] = [
+  // 👉 ปุ่มข่าวสารชุมชน จะลิงก์ไปที่ /news ตรงๆ 
+  { id: 'news', title: 'ข่าวชุมชน', icon: '📰', bgColor: 'bg-gradient-to-br from-red-100 to-orange-100 border border-red-200', customLink: '/news' },
+  
   { id: 'electrician', title: 'ช่างไฟฟ้า', icon: '⚡', bgColor: 'bg-gradient-to-br from-yellow-100 to-orange-100 border border-orange-200' },
   { id: 'cleaning', title: 'แม่บ้าน', icon: '🧹', bgColor: 'bg-gradient-to-br from-blue-100 to-cyan-100 border border-blue-200' },
   { id: 'aircon', title: 'ล้างแอร์', icon: '❄️', bgColor: 'bg-gradient-to-br from-sky-100 to-blue-100 border border-sky-200' },
@@ -128,7 +132,12 @@ export default function HomePage() {
 
           <div ref={scrollContainerRef} className="flex overflow-x-auto px-5 gap-4 pb-4 snap-x snap-mandatory scroll-smooth hide-scrollbar relative z-0 pr-12 pt-2">
             {categories.map((cat) => (
-              <Link key={cat.id} href={`/services?cat=${cat.id}`} className="flex flex-col items-center gap-2.5 min-w-[72px] snap-start group cursor-pointer">
+              <Link 
+                key={cat.id} 
+                // 🌟 ถ้ามี customLink ให้ไปที่นั่น (เช่น /news) ถ้าไม่มีก็ไปหน้า /services ตามปกติ 🌟
+                href={cat.customLink || `/services?cat=${cat.id}`} 
+                className="flex flex-col items-center gap-2.5 min-w-[72px] snap-start group cursor-pointer"
+              >
                 <div className={`w-16 h-16 flex items-center justify-center text-3xl group-hover:scale-110 group-hover:-translate-y-1 transition-all duration-300 rounded-[20px] shadow-sm group-hover:shadow-md ${cat.bgColor}`}>
                   {cat.icon}
                 </div>
@@ -138,9 +147,8 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* ── 🌟 NEW: Job Board Preview (หย่อนเหยื่อล่อแมลง) 🌟 ── */}
+        {/* ── Job Board Preview ── */}
         <section className="space-y-3">
-          {/* Header ของ Section */}
           <div className="flex items-center justify-between px-2 bg-white py-3 border-b border-gray-100 rounded-t-xl">
             <h2 className="text-sm font-bold uppercase tracking-wider flex items-center gap-2" style={{ color: themePalette.primaryOrange }}>
               <span className="text-lg">📢</span> ประกาศงานล่าสุด
@@ -148,11 +156,9 @@ export default function HomePage() {
             <Link href="/jobs" className="text-xs font-medium text-gray-400 hover:text-orange-500 transition-colors">ดูทั้งหมด {' >'}</Link>
           </div>
 
-          {/* List ของงาน */}
           <div className="space-y-2.5">
             {recentJobs.map((job) => (
               <Link href="/jobs" key={job.id} className="block bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:border-[#F05D40] hover:shadow-md transition-all group relative overflow-hidden">
-                {/* แถบสีตกแต่งด้านซ้าย */}
                 <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-orange-300 to-orange-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                 
                 <div className="flex justify-between items-start mb-1.5">
@@ -178,7 +184,6 @@ export default function HomePage() {
             ))}
           </div>
 
-          {/* ปุ่มเชิญชวนไปดูเพิ่มเติม */}
           <Link href="/jobs" 
             className="block w-full py-3.5 mt-2 text-center rounded-xl text-[#F05D40] text-xs font-bold bg-orange-50 hover:bg-orange-100 transition-colors border border-orange-100 flex items-center justify-center gap-2">
             <span>ดูกระดานงานทั้งหมด</span>
