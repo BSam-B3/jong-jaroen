@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
 
 // ── Soft Shopee Palette ─────────────────────────────────────────
@@ -7,35 +7,78 @@ const themePalette = {
   primaryOrange: '#F05D40', 
   lightOrange: '#FF8769',   
   bgGray: '#F9FAFB',        
-  textDark: '#1F2937',      
 };
 
-// 🌟 Mock Data: ข่าวสารและกิจกรรมในชุมชน 🌟
+// 🌟 Mock Data: ข่าวสารและกิจกรรม (เรียงมั่วๆ ไว้เดี๋ยวโค้ดจะเรียงให้ใหม่) 🌟
+// ใส่สีแยกระหว่าง Theme ของการ์ด, สีจุด (Dot), และสีตอนกด Active
 const communityNews = [
-  { id: 1, title: 'นัดตรวจเบาหวานและความดัน ผู้สูงอายุ', date: 15, category: 'สาธารณสุข', icon: '🩺', color: 'bg-rose-100 text-rose-600' },
-  { id: 2, title: 'เทศบาลให้บริการฉีดวัคซีนพิษสุนัขบ้า ฟรี!', date: 22, category: 'ปศุสัตว์', icon: '🐕', color: 'bg-blue-100 text-blue-600' },
-  { id: 3, title: 'ประชุมลูกบ้าน: วางแผนรับมือน้ำทะเลหนุน', date: 10, category: 'ส่วนรวม', icon: '🌊', color: 'bg-cyan-100 text-cyan-600' },
-  { id: 4, title: 'แจ้งตัดไฟชั่วคราว บริเวณตลาดเก่า', date: 28, category: 'แจ้งเตือน', icon: '⚡', color: 'bg-amber-100 text-amber-600' },
+  { id: 1, title: 'ประชุมลูกบ้าน: วางแผนรับมือน้ำทะเลหนุน', startDate: '2026-03-10', endDate: '2026-03-10', category: 'ส่วนรวม', icon: '🌊', colorCard: 'bg-cyan-100 text-cyan-700', colorDot: 'bg-cyan-500', colorActive: 'bg-cyan-500 text-white shadow-cyan-200' },
+  { id: 2, title: 'นัดตรวจเบาหวานและความดัน ผู้สูงอายุ', startDate: '2026-03-15', endDate: '2026-03-15', category: 'สาธารณสุข', icon: '🩺', colorCard: 'bg-rose-100 text-rose-700', colorDot: 'bg-rose-500', colorActive: 'bg-rose-500 text-white shadow-rose-200' },
+  // 🌟 ตัวอย่างเทศกาล 3 วัน 🌟
+  { id: 3, title: 'งานประเพณีทอดผ้าป่ากลางน้ำ ประแส', startDate: '2026-03-18', endDate: '2026-03-20', category: 'เทศกาล', icon: '🛶', colorCard: 'bg-amber-100 text-amber-700', colorDot: 'bg-amber-500', colorActive: 'bg-amber-500 text-white shadow-amber-200' },
+  { id: 4, title: 'เทศบาลให้บริการฉีดวัคซีนพิษสุนัขบ้า ฟรี!', startDate: '2026-03-22', endDate: '2026-03-22', category: 'ปศุสัตว์', icon: '🐕', colorCard: 'bg-blue-100 text-blue-700', colorDot: 'bg-blue-500', colorActive: 'bg-blue-500 text-white shadow-blue-200' },
+  { id: 5, title: 'สงกรานต์ปากน้ำประแส สาดน้ำอุโมงค์ไฟ', startDate: '2026-04-13', endDate: '2026-04-15', category: 'เทศกาล', icon: '💦', colorCard: 'bg-indigo-100 text-indigo-700', colorDot: 'bg-indigo-500', colorActive: 'bg-indigo-500 text-white shadow-indigo-200' },
 ];
 
+const monthNames = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
+const weekDays = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
+
 export default function NewsPage() {
-  // State สำหรับเก็บวันที่ที่ถูกเลือก (เมื่อผู้ใช้คลิกข่าว)
-  const [activeDate, setActiveDate] = useState<number | null>(null);
+  // ตั้งค่าเริ่มต้นเป็นเดือน มีนาคม 2026 (เดือนปัจจุบันตามบริบท)
+  const [viewDate, setViewDate] = useState(new Date(2026, 2, 1)); 
+  const [activeEventId, setActiveEventId] = useState<number | null>(null);
 
-  // จำลองปฏิทินเดือนปัจจุบัน (มี 31 วัน)
-  const daysInMonth = Array.from({ length: 31 }, (_, i) => i + 1);
-  const weekDays = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
+  // เลื่อนเดือน
+  const prevMonth = () => {
+    setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1));
+    setActiveEventId(null); // เคลียร์ Active เมื่อเปลี่ยนเดือน
+  };
+  const nextMonth = () => {
+    setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1));
+    setActiveEventId(null);
+  };
 
-  // ฟังก์ชันเช็กว่าวันไหนมีกิจกรรมบ้าง
-  const getEventsForDay = (day: number) => {
-    return communityNews.filter(news => news.date === day);
+  // คัดกรองงานเฉพาะเดือนที่กำลังดู และ **เรียงลำดับจากวันที่ใกล้สุดไปไกลสุด**
+  const monthEvents = useMemo(() => {
+    return communityNews.filter(event => {
+      const dStart = new Date(event.startDate);
+      const dEnd = new Date(event.endDate);
+      const vStart = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1);
+      const vEnd = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0);
+      return dStart <= vEnd && dEnd >= vStart;
+    }).sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+  }, [viewDate]);
+
+  // ตัวช่วยสร้างปฏิทิน
+  const formatYYYYMMDD = (year: number, month: number, day: number) => 
+    `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+  const firstDayOfWeek = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1).getDay();
+  const daysInMonth = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0).getDate();
+  
+  const blanks = Array.from({ length: firstDayOfWeek });
+  const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+
+  // ฟังก์ชันหาว่าวันนี้มีงานอะไรบ้าง
+  const getEventsForDay = (dayStr: string) => {
+    return monthEvents.filter(e => dayStr >= e.startDate && dayStr <= e.endDate);
+  };
+
+  // เมื่อกดวันที่ในปฏิทิน
+  const handleDayClick = (dayStr: string) => {
+    const evs = getEventsForDay(dayStr);
+    if (evs.length > 0) {
+      setActiveEventId(activeEventId === evs[0].id ? null : evs[0].id);
+    } else {
+      setActiveEventId(null);
+    }
   };
 
   return (
     <div className="min-h-screen pb-24" style={{ backgroundColor: themePalette.bgGray }}>
       
       {/* ── Header ── */}
-      <header className="pt-10 pb-6 px-4 shadow-sm relative overflow-hidden rounded-b-[32px]"
+      <header className="pt-10 pb-8 px-4 shadow-sm relative overflow-hidden rounded-b-[32px]"
         style={{ background: `linear-gradient(180deg, ${themePalette.primaryOrange} 0%, ${themePalette.lightOrange} 100%)` }}>
         <div className="max-w-xl mx-auto flex items-center gap-4 relative z-10">
           <Link href="/" className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center text-white backdrop-blur-sm hover:bg-white/30 transition-colors">
@@ -52,109 +95,145 @@ export default function NewsPage() {
         </div>
       </header>
 
-      <main className="max-w-xl mx-auto px-4 mt-6 space-y-6 relative z-20">
+      <main className="max-w-xl mx-auto px-3 relative z-20">
         
-        {/* ── 🌟 Gimmick: Interactive Calendar 🌟 ── */}
-        <section className="bg-white rounded-3xl p-5 shadow-sm border border-orange-50">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-black text-gray-800 flex items-center gap-2">
-              📅 ปฏิทินกิจกรรมเดือนนี้
-            </h2>
-            <span className="text-xs font-bold text-[#F05D40] bg-orange-50 px-3 py-1 rounded-full">มีนาคม</span>
-          </div>
-
-          <div className="grid grid-cols-7 gap-y-3 gap-x-1 text-center mb-2">
-            {weekDays.map(day => (
-              <div key={day} className="text-[10px] font-bold text-gray-400">{day}</div>
-            ))}
+        {/* ── 🌟 Sticky Calendar Container 🌟 ── */}
+        {/* ใช้ sticky และ top-0 เพื่อให้ปฏิทินติดหนึบเวลาเลื่อนลง มีพื้นหลังบังเนื้อหาด้านล่าง */}
+        <div className="sticky top-0 z-30 pt-3 pb-2" style={{ backgroundColor: themePalette.bgGray }}>
+          <section className="bg-white rounded-3xl p-5 shadow-md border border-orange-50 relative overflow-hidden">
             
-            {/* พื้นที่ว่าง (สมมติให้วันที่ 1 เริ่มวันอาทิตย์) */}
-            {/* {Array.from({ length: 0 }).map((_, i) => <div key={`empty-${i}`} />)} */}
+            {/* Header ปฏิทิน (เลื่อนเดือนได้) */}
+            <div className="flex items-center justify-between mb-4">
+              <button onClick={prevMonth} className="w-8 h-8 flex items-center justify-center bg-gray-50 rounded-full hover:bg-orange-50 text-gray-500 hover:text-orange-500 transition-colors">❮</button>
+              <h2 className="text-sm font-black text-gray-800 flex items-center gap-2">
+                📅 {monthNames[viewDate.getMonth()]} {viewDate.getFullYear() + 543}
+              </h2>
+              <button onClick={nextMonth} className="w-8 h-8 flex items-center justify-center bg-gray-50 rounded-full hover:bg-orange-50 text-gray-500 hover:text-orange-500 transition-colors">❯</button>
+            </div>
 
-            {daysInMonth.map(day => {
-              const hasEvents = getEventsForDay(day).length > 0;
-              const isActive = activeDate === day;
+            {/* ตารางวัน */}
+            <div className="grid grid-cols-7 gap-y-3 gap-x-1 text-center mb-1">
+              {weekDays.map(day => (
+                <div key={day} className="text-[10px] font-bold text-gray-400">{day}</div>
+              ))}
+              
+              {blanks.map((_, i) => (
+                <div key={`blank-${i}`} />
+              ))}
 
-              return (
-                <div key={day} className="flex flex-col items-center justify-center relative h-10 cursor-pointer group"
-                     onClick={() => setActiveDate(day)}>
-                  <span className={`w-8 h-8 flex items-center justify-center rounded-full text-xs font-bold transition-all duration-300
-                    ${isActive 
-                      ? 'bg-[#F05D40] text-white shadow-lg scale-110 animate-bounce-short' // ไฮไลต์เด้งดึ๋งเมื่อกดข่าว
-                      : hasEvents 
-                        ? 'bg-orange-50 text-orange-600 border border-orange-100' // วันที่มีงาน
-                        : 'text-gray-600 hover:bg-gray-50' // วันปกติ
-                    }`}>
-                    {day}
-                  </span>
-                  {/* จุดไข่ปลาบอกว่ามีงาน */}
-                  {hasEvents && !isActive && (
-                    <span className="absolute bottom-0 w-1 h-1 bg-orange-400 rounded-full"></span>
-                  )}
-                </div>
-              );
-            })}
+              {days.map(day => {
+                const dayStr = formatYYYYMMDD(viewDate.getFullYear(), viewDate.getMonth(), day);
+                const dayEvents = getEventsForDay(dayStr);
+                const isActiveEvent = activeEventId && dayEvents.some(e => e.id === activeEventId);
+                const activeEvDetails = dayEvents.find(e => e.id === activeEventId);
+
+                return (
+                  <div key={day} 
+                       onClick={() => handleDayClick(dayStr)}
+                       className={`flex flex-col items-center justify-center h-10 cursor-pointer relative ${dayEvents.length > 0 ? 'group' : ''}`}>
+                    
+                    {/* ตัวเลขวันที่ (เปลี่ยนสีตามงาน) */}
+                    <span className={`w-8 h-8 flex items-center justify-center rounded-full text-xs font-bold transition-all duration-300 z-10
+                      ${isActiveEvent && activeEvDetails 
+                        ? `${activeEvDetails.colorActive} scale-110 shadow-lg` 
+                        : dayEvents.length > 0 
+                          ? 'bg-gray-50 text-gray-800 group-hover:bg-gray-100' 
+                          : 'text-gray-500 hover:bg-gray-50'
+                      }`}>
+                      {day}
+                    </span>
+
+                    {/* จุดสีแสดงว่ามีงาน (ถ้างานหลายวัน สีจะยาวต่อกันได้) */}
+                    {dayEvents.length > 0 && !isActiveEvent && (
+                      <div className="absolute bottom-0 flex gap-0.5">
+                        {dayEvents.slice(0, 2).map((ev, idx) => (
+                          <span key={idx} className={`w-1.5 h-1.5 rounded-full ${ev.colorDot}`}></span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        </div>
+
+        {/* ── News Feed (เรียงตามวันที่) ── */}
+        <section className="space-y-3 mt-4">
+          <div className="flex justify-between items-end px-1">
+            <h2 className="text-sm font-black text-gray-800">ประกาศเรียงตามวันที่</h2>
+            <span className="text-[10px] text-gray-400">พบ {monthEvents.length} รายการ</span>
           </div>
-        </section>
-
-        {/* ── News Feed ── */}
-        <section className="space-y-3">
-          <h2 className="text-sm font-black text-gray-800 px-1">ประกาศล่าสุด</h2>
           
           <div className="space-y-3">
-            {communityNews.map((news) => {
-              const isActive = activeDate === news.date;
-              
-              return (
-                <div 
-                  key={news.id} 
-                  onClick={() => setActiveDate(isActive ? null : news.date)}
-                  className={`bg-white rounded-2xl p-4 shadow-sm border cursor-pointer transition-all duration-300 hover:shadow-md
-                    ${isActive ? 'border-[#F05D40] ring-2 ring-orange-100 scale-[1.02]' : 'border-gray-100'}
-                  `}
-                >
-                  <div className="flex gap-4 items-start">
-                    <div className={`w-12 h-12 rounded-[16px] flex items-center justify-center text-2xl shadow-inner shrink-0 ${news.color}`}>
-                      {news.icon}
-                    </div>
-                    <div className="space-y-1 flex-1">
-                      <div className="flex justify-between items-start">
-                        <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded
-                          ${isActive ? 'bg-[#F05D40] text-white' : 'bg-gray-100 text-gray-500'}`}>
-                          {news.category}
-                        </span>
-                        <span className="text-[10px] font-bold text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full">
-                          {news.date} มี.ค.
-                        </span>
+            {monthEvents.length === 0 ? (
+              <div className="bg-white rounded-2xl p-8 text-center border border-dashed border-gray-200">
+                <p className="text-xs text-gray-400">ไม่มีกิจกรรมในเดือนนี้</p>
+              </div>
+            ) : (
+              monthEvents.map((news) => {
+                const isActive = activeEventId === news.id;
+                // ตัดคำวันที่เพื่อโชว์สวยๆ
+                const startDay = parseInt(news.startDate.split('-')[2]);
+                const endDay = parseInt(news.endDate.split('-')[2]);
+                const dateDisplay = startDay === endDay ? `${startDay}` : `${startDay}-${endDay}`;
+                
+                return (
+                  <div 
+                    key={news.id} 
+                    onClick={() => setActiveEventId(isActive ? null : news.id)}
+                    className={`bg-white rounded-2xl p-4 shadow-sm border cursor-pointer transition-all duration-300 hover:shadow-md
+                      ${isActive ? `border-transparent ring-2 ring-offset-1 ${news.colorCard.replace('bg-', 'ring-').split(' ')[0]} scale-[1.02] z-10 relative` : 'border-gray-100'}
+                    `}
+                  >
+                    <div className="flex gap-4 items-start">
+                      <div className={`w-12 h-12 rounded-[16px] flex items-center justify-center text-2xl shadow-inner shrink-0 ${news.colorCard}`}>
+                        {news.icon}
                       </div>
-                      <h3 className={`text-sm font-bold leading-snug transition-colors
-                        ${isActive ? 'text-[#F05D40]' : 'text-gray-800'}`}>
-                        {news.title}
-                      </h3>
-                      {isActive && (
-                        <p className="text-xs text-gray-500 pt-2 border-t border-gray-50 mt-2 animate-fade-in-up">
-                          แตะเพื่อดูรายละเอียดสถานที่และเวลาเพิ่มเติม...
-                        </p>
-                      )}
+                      <div className="space-y-1 flex-1">
+                        <div className="flex justify-between items-start">
+                          <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded
+                            ${isActive ? news.colorActive : 'bg-gray-100 text-gray-500'}`}>
+                            {news.category}
+                          </span>
+                          <span className="text-[10px] font-bold text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full">
+                            {dateDisplay} {monthNames[viewDate.getMonth()].slice(0, 3)}.
+                          </span>
+                        </div>
+                        <h3 className={`text-sm font-bold leading-snug transition-colors
+                          ${isActive ? news.colorCard.split(' ')[1] : 'text-gray-800'}`}>
+                          {news.title}
+                        </h3>
+                        {isActive && (
+                          <div className="pt-2 border-t border-gray-50 mt-2 animate-fade-in-up space-y-2">
+                            <p className="text-xs text-gray-500">
+                              🕒 เวลา: 09:00 - 16:00 น.
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              📍 สถานที่: ลานอเนกประสงค์ปากน้ำประแส
+                            </p>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         </section>
 
       </main>
 
-      {/* 🛠️ Bottom Nav (ไม่มีการ Active สีส้ม เพราะถือเป็นหน้าย่อย) 🛠️ */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-gray-100 flex justify-around py-2 z-[100] shadow-[0_-5px_20px_rgba(0,0,0,0.05)] pb-safe">
+      {/* 🛠️ Bottom Nav (หน้า ข่าวสาร Active สีส้ม) 🛠️ */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 flex justify-around py-2 z-[100] shadow-[0_-5px_20px_rgba(0,0,0,0.05)] pb-safe">
         <Link href="/" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-orange-400 transition-colors">
           <span className="text-xl">🏠</span>
           <span className="text-[10px]">หน้าแรก</span>
         </Link>
-        <Link href="/services" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-orange-400 transition-colors">
-          <span className="text-xl">🔍</span>
-          <span className="text-[10px]">ค้นหา</span>
+        <Link href="/news" className="flex flex-col items-center gap-0.5 font-bold" style={{ color: themePalette.primaryOrange }}>
+          <span className="text-xl">📰</span>
+          <span className="text-[10px]">ข่าวสาร</span>
         </Link>
         <Link href="/coupons" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-orange-400 transition-colors">
           <span className="text-xl">🎟️</span>
