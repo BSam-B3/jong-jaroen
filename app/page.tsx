@@ -18,24 +18,34 @@ const themePalette = {
   textDark: '#1F2937',      
 };
 
-// 🌟 หมวดหมู่บริการ 🌟
+// 🌟 อัปเดต: เพิ่มหมวดหมู่ใหม่จัดเต็ม + อัปเกรดสีพื้นหลังเป็น Gradient ให้ดูมีมิติ 🌟
 const categories: ServiceCategory[] = [
-  { id: 'electrician', title: 'ช่างไฟฟ้า', icon: '⚡', bgColor: 'bg-orange-50' },
-  { id: 'cleaning', title: 'แม่บ้าน', icon: '🧹', bgColor: 'bg-orange-50' },
-  { id: 'aircon', title: 'ล้างแอร์', icon: '❄️', bgColor: 'bg-blue-50' },
-  { id: 'plumbing', title: 'ช่างประปา', icon: '💧', bgColor: 'bg-cyan-50' },
-  { id: 'mechanic', title: 'ช่างยนต์', icon: '🛠️', bgColor: 'bg-gray-100' },
-  { id: 'construction', title: 'ก่อสร้าง', icon: '🏗️', bgColor: 'bg-amber-50' },
-  { id: 'massage', title: 'นวดแผนไทย', icon: '💆', bgColor: 'bg-pink-50' },
-  { id: 'tech', title: 'ซ่อมคอม', icon: '💻', bgColor: 'bg-indigo-50' },
-  { id: 'others', title: 'อื่นๆ', icon: '✨', bgColor: 'bg-gray-100' },
+  { id: 'electrician', title: 'ช่างไฟฟ้า', icon: '⚡', bgColor: 'bg-gradient-to-br from-yellow-100 to-orange-100 border border-orange-200' },
+  { id: 'cleaning', title: 'แม่บ้าน', icon: '🧹', bgColor: 'bg-gradient-to-br from-blue-100 to-cyan-100 border border-blue-200' },
+  { id: 'aircon', title: 'ล้างแอร์', icon: '❄️', bgColor: 'bg-gradient-to-br from-sky-100 to-blue-100 border border-sky-200' },
+  { id: 'plumbing', title: 'ช่างประปา', icon: '💧', bgColor: 'bg-gradient-to-br from-cyan-100 to-teal-100 border border-cyan-200' },
+  { id: 'mechanic', title: 'ช่างยนต์', icon: '🛠️', bgColor: 'bg-gradient-to-br from-gray-100 to-slate-200 border border-gray-300' },
+  { id: 'construction', title: 'ก่อสร้าง', icon: '🏗️', bgColor: 'bg-gradient-to-br from-amber-100 to-orange-100 border border-amber-200' },
+  
+  // ✂️ หมวดหมู่ใหม่ด้านความงามและไลฟ์สไตล์
+  { id: 'haircut', title: 'ตัดผม', icon: '✂️', bgColor: 'bg-gradient-to-br from-purple-100 to-fuchsia-100 border border-purple-200' },
+  { id: 'nails', title: 'ทำเล็บ', icon: '💅', bgColor: 'bg-gradient-to-br from-pink-100 to-rose-100 border border-pink-200' },
+  { id: 'beauty', title: 'เสริมสวย', icon: '💄', bgColor: 'bg-gradient-to-br from-red-100 to-rose-100 border border-red-200' },
+  { id: 'massage', title: 'นวดแผนไทย', icon: '💆', bgColor: 'bg-gradient-to-br from-rose-100 to-pink-100 border border-rose-200' },
+  
+  // 🚚 หมวดหมู่ใหม่ด้านการขนส่งและแรงงาน
+  { id: 'moving', title: 'ย้ายบ้าน', icon: '🏠', bgColor: 'bg-gradient-to-br from-emerald-100 to-green-100 border border-emerald-200' },
+  { id: 'lifting', title: 'ยกของ', icon: '📦', bgColor: 'bg-gradient-to-br from-orange-100 to-amber-100 border border-orange-200' },
+  { id: 'transport', title: 'รถขนส่ง', icon: '🚚', bgColor: 'bg-gradient-to-br from-indigo-100 to-blue-100 border border-indigo-200' },
+  
+  { id: 'tech', title: 'ซ่อมคอม', icon: '💻', bgColor: 'bg-gradient-to-br from-slate-100 to-gray-200 border border-slate-300' },
+  { id: 'others', title: 'อื่นๆ', icon: '✨', bgColor: 'bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-200' },
 ];
 
 export default function HomePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   
-  // 🌟 เพิ่ม Ref สำหรับควบคุมการสไลด์หมวดหมู่ 🌟
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const handleSearch = () => {
@@ -47,10 +57,8 @@ export default function HomePage() {
     }, 2000); 
   };
 
-  // 🌟 ฟังก์ชันเลื่อนซ้าย-ขวา 🌟
   const scroll = (direction: 'left' | 'right') => {
     if (scrollContainerRef.current) {
-      // เลื่อนทีละ 200 พิกเซลแบบนุ่มนวล
       const scrollAmount = direction === 'left' ? -200 : 200;
       scrollContainerRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
     }
@@ -59,7 +67,6 @@ export default function HomePage() {
   return (
     <div className="min-h-screen pb-24" style={{ backgroundColor: themePalette.bgGray }}>
       
-      {/* ── ซ่อน Scrollbar ที่ดูเกะกะด้วย CSS ── */}
       <style dangerouslySetInnerHTML={{__html: `
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -111,13 +118,11 @@ export default function HomePage() {
 
       <main className="max-w-xl mx-auto px-2 space-y-4 -mt-4 relative z-20">
         
-        {/* ── 🌟 Categories Slider (มีปุ่มกดเลื่อนสไตล์ Fastwork) 🌟 ── */}
-        <section className="bg-white rounded-xl py-5 shadow-sm border border-gray-100 relative group overflow-hidden">
+        {/* ── 🌟 Categories Slider (อัปเกรด UI ให้น่าดึงดูด) 🌟 ── */}
+        <section className="bg-white rounded-xl py-6 shadow-sm border border-gray-100 relative group overflow-hidden">
           
-          {/* เงาขาวเฟดๆ ด้านขวา เพื่อบอกใบ้ว่ามีของซ่อนอยู่ */}
           <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-white to-transparent z-10 pointer-events-none"></div>
 
-          {/* ปุ่มลูกศรเลื่อนขวา > */}
           <button 
             onClick={() => scroll('right')}
             className="absolute right-1 top-1/2 -translate-y-1/2 z-20 w-8 h-8 bg-white rounded-full shadow-md border border-gray-100 flex items-center justify-center text-gray-500 hover:text-[#F05D40] hover:scale-110 transition-all opacity-90 hover:opacity-100"
@@ -126,7 +131,6 @@ export default function HomePage() {
             ❯
           </button>
 
-          {/* ปุ่มลูกศรเลื่อนซ้าย < (ซ่อนไว้ปกติ จะแสดงเมื่อผู้ใช้ต้องการย้อนกลับ) */}
           <button 
             onClick={() => scroll('left')}
             className="absolute left-1 top-1/2 -translate-y-1/2 z-20 w-8 h-8 bg-white rounded-full shadow-md border border-gray-100 flex items-center justify-center text-gray-500 hover:text-[#F05D40] hover:scale-110 transition-all opacity-0 group-hover:opacity-90"
@@ -135,17 +139,17 @@ export default function HomePage() {
             ❮
           </button>
 
-          {/* กล่องบรรจุหมวดหมู่ */}
+          {/* ปรับขนาดกล่องและเพิ่ม Animation ให้เด้งสู้มือ */}
           <div 
             ref={scrollContainerRef}
-            className="flex overflow-x-auto px-5 gap-5 pb-2 snap-x snap-mandatory scroll-smooth hide-scrollbar relative z-0 pr-12"
+            className="flex overflow-x-auto px-5 gap-4 pb-4 snap-x snap-mandatory scroll-smooth hide-scrollbar relative z-0 pr-12 pt-2"
           >
             {categories.map((cat) => (
-              <Link key={cat.id} href={`/services?cat=${cat.id}`} className="flex flex-col items-center gap-2 min-w-[64px] snap-start group cursor-pointer">
-                <div className={`w-14 h-14 flex items-center justify-center text-3xl group-hover:scale-110 transition-transform rounded-[18px] ${cat.bgColor} shadow-sm border border-gray-50`}>
+              <Link key={cat.id} href={`/services?cat=${cat.id}`} className="flex flex-col items-center gap-2.5 min-w-[72px] snap-start group cursor-pointer">
+                <div className={`w-16 h-16 flex items-center justify-center text-3xl group-hover:scale-110 group-hover:-translate-y-1 transition-all duration-300 rounded-[20px] shadow-sm group-hover:shadow-md ${cat.bgColor}`}>
                   {cat.icon}
                 </div>
-                <span className="text-[11px] font-bold text-gray-700 whitespace-nowrap">{cat.title}</span>
+                <span className="text-[11px] font-bold text-gray-700 whitespace-nowrap group-hover:text-[#F05D40] transition-colors">{cat.title}</span>
               </Link>
             ))}
           </div>
