@@ -22,12 +22,11 @@ const monthNames = ["มกราคม", "กุมภาพันธ์", "ม
 const weekDays = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
 
 export default function NewsPage() {
-  // ดึงวันที่ปัจจุบัน
   const today = new Date();
   const [viewDate, setViewDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1)); 
   const [activeEventId, setActiveEventId] = useState<number | null>(null);
   
-  // 🌟 State สำหรับเปิด-ปิด Popup ปฏิทิน 🌟
+  // 🌟 State ควบคุมการสไลด์ขึ้น/ลง ของ Widget ปฏิทิน 🌟
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
   const prevMonth = () => {
@@ -65,21 +64,22 @@ export default function NewsPage() {
     const evs = getEventsForDay(dayStr);
     if (evs.length > 0) {
       setActiveEventId(activeEventId === evs[0].id ? null : evs[0].id);
-      setIsCalendarOpen(false); // ปิด Popup ทันทีที่เลือกงานเสร็จ
+      // เมื่อกดเลือกวันที่มีงาน ให้สไลด์ปฏิทินเก็บลงอัตโนมัติ เพื่อให้เห็นรายละเอียดข่าว
+      setIsCalendarOpen(false); 
     } else {
       setActiveEventId(null);
     }
   };
 
-  // 🌟 ฟังก์ชันวาดปฏิทิน (ใช้ได้ทั้งบนหน้าจอและใน Popup) 🌟
-  const renderCalendar = (isPopup = false) => (
-    <div className={`bg-white ${isPopup ? 'rounded-[32px] p-6 shadow-2xl w-full max-w-sm' : 'rounded-3xl p-5 shadow-sm border border-orange-50'} relative overflow-hidden`}>
+  // 🌟 คอมโพเนนต์ปฏิทิน 🌟
+  const renderCalendar = () => (
+    <div className="bg-white/95 backdrop-blur-xl rounded-[28px] p-5 shadow-[0_10px_40px_rgba(0,0,0,0.12)] border border-white/50 relative overflow-hidden w-full h-full">
       <div className="flex items-center justify-between mb-4">
-        <button onClick={prevMonth} className="w-8 h-8 flex items-center justify-center bg-gray-50 rounded-full hover:bg-orange-50 text-gray-500 hover:text-orange-500 transition-colors">❮</button>
+        <button onClick={prevMonth} className="w-8 h-8 flex items-center justify-center bg-gray-50 rounded-full hover:bg-orange-50 text-gray-500 hover:text-orange-500 transition-colors shadow-sm">❮</button>
         <h2 className="text-sm font-black text-gray-800 flex items-center gap-2">
           📅 {monthNames[viewDate.getMonth()]} {viewDate.getFullYear() + 543}
         </h2>
-        <button onClick={nextMonth} className="w-8 h-8 flex items-center justify-center bg-gray-50 rounded-full hover:bg-orange-50 text-gray-500 hover:text-orange-500 transition-colors">❯</button>
+        <button onClick={nextMonth} className="w-8 h-8 flex items-center justify-center bg-gray-50 rounded-full hover:bg-orange-50 text-gray-500 hover:text-orange-500 transition-colors shadow-sm">❯</button>
       </div>
 
       <div className="grid grid-cols-7 gap-y-3 gap-x-1 text-center mb-1">
@@ -94,7 +94,7 @@ export default function NewsPage() {
           const isActiveEvent = activeEventId && dayEvents.some(e => e.id === activeEventId);
           const activeEvDetails = dayEvents.find(e => e.id === activeEventId);
           
-          // 📍 เช็กว่าใช่วันนี้หรือไม่
+          // เช็กว่าใช่วันนี้หรือไม่
           const isToday = today.getDate() === day && today.getMonth() === viewDate.getMonth() && today.getFullYear() === viewDate.getFullYear();
 
           return (
@@ -157,13 +157,8 @@ export default function NewsPage() {
 
       <main className="max-w-xl mx-auto px-3 relative z-20">
         
-        {/* ปล่อยปฏิทินให้เลื่อนตามธรรมชาติ */}
-        <div className="pt-4 pb-2">
-          {renderCalendar(false)}
-        </div>
-
-        {/* ── News Feed ── */}
-        <section className="space-y-3 mt-2">
+        {/* ── News Feed (กินพื้นที่เต็มจอ ไม่มีปฏิทินมาเกะกะด้านบนแล้ว) ── */}
+        <section className="space-y-3 mt-4">
           <div className="flex justify-between items-end px-1">
             <h2 className="text-sm font-black text-gray-800">ประกาศเรียงตามวันที่</h2>
             <span className="text-[10px] text-gray-400">พบ {monthEvents.length} รายการ</span>
@@ -228,28 +223,26 @@ export default function NewsPage() {
 
       </main>
 
-      {/* 🌟 Popup Calendar Modal 🌟 */}
-      {isCalendarOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4 animate-fade-in">
-          <div className="relative w-full max-w-sm">
-            <button 
-              onClick={() => setIsCalendarOpen(false)} 
-              className="absolute -top-14 right-0 w-10 h-10 bg-white/20 hover:bg-white text-white hover:text-gray-800 rounded-full text-xl shadow-lg transition-colors flex items-center justify-center"
-            >
-              ✕
-            </button>
-            {renderCalendar(true)}
-          </div>
-        </div>
-      )}
-
-      {/* 🌟 Floating Action Button (เปิด Popup) 🌟 */}
-      <button
-        onClick={() => setIsCalendarOpen(true)}
-        className="fixed bottom-20 right-4 z-[90] bg-[#F05D40] text-white w-14 h-14 rounded-full shadow-[0_4px_20px_rgba(240,93,64,0.4)] flex items-center justify-center text-2xl hover:scale-110 active:scale-95 transition-all border-2 border-white"
-        aria-label="เปิดปฏิทิน"
+      {/* 🌟 Floating Calendar Widget (สไลด์ขึ้น-ลง จากมุมขวาล่าง) 🌟 */}
+      {/* เอาระบบจอดำ (Overlay) ออกไปแล้ว ทำให้เลื่อนอ่านข่าวข้างหลังได้อิสระ */}
+      <div 
+        className={`fixed right-4 z-[90] transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] origin-bottom-right w-[90vw] max-w-[340px]
+          ${isCalendarOpen 
+            ? 'bottom-[88px] opacity-100 scale-100 translate-y-0' 
+            : 'bottom-[88px] opacity-0 scale-50 translate-y-10 pointer-events-none' // ซ่อนและย่อลงไปที่ปุ่ม
+          }`}
       >
-        📅
+        {renderCalendar()}
+      </div>
+
+      {/* 🌟 ปุ่มเปิด/ปิด ปฏิทินลอยตัว (Floating Action Button) 🌟 */}
+      <button
+        onClick={() => setIsCalendarOpen(!isCalendarOpen)}
+        className={`fixed bottom-[76px] right-4 z-[95] text-white w-14 h-14 rounded-full shadow-[0_8px_25px_rgba(240,93,64,0.4)] flex items-center justify-center text-2xl transition-all duration-300 border-2 border-white
+          ${isCalendarOpen ? 'bg-gray-800 rotate-180 hover:bg-gray-700' : 'bg-[#F05D40] hover:scale-110 active:scale-95'}`}
+        aria-label="Toggle Calendar"
+      >
+        {isCalendarOpen ? '↓' : '📅'}
       </button>
 
       {/* 🛠️ Bottom Nav 🛠️ */}
