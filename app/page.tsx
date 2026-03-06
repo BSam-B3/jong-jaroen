@@ -8,7 +8,7 @@ interface ServiceCategory {
   title: string;
   icon: string;
   bgColor: string;
-  customLink?: string; // 🌟 เพิ่มตัวแปรนี้เพื่อแยกให้ลิงก์ไปหน้าอื่นได้โดยเฉพาะ
+  customLink?: string; 
 }
 
 // ── Soft Shopee Palette ─────────────────────────────────────────
@@ -19,11 +19,8 @@ const themePalette = {
   textDark: '#1F2937',      
 };
 
-// 🌟 หมวดหมู่บริการ (เพิ่ม "ข่าวชุมชน" ไว้คิวแรก) 🌟
+// 🌟 หมวดหมู่บริการ (ถอดข่าวชุมชนออก เพราะย้ายไปเมนูด้านล่างแล้ว) 🌟
 const categories: ServiceCategory[] = [
-  // 👉 ปุ่มข่าวสารชุมชน จะลิงก์ไปที่ /news ตรงๆ 
-  { id: 'news', title: 'ข่าวชุมชน', icon: '📰', bgColor: 'bg-gradient-to-br from-red-100 to-orange-100 border border-red-200', customLink: '/news' },
-  
   { id: 'electrician', title: 'ช่างไฟฟ้า', icon: '⚡', bgColor: 'bg-gradient-to-br from-yellow-100 to-orange-100 border border-orange-200' },
   { id: 'cleaning', title: 'แม่บ้าน', icon: '🧹', bgColor: 'bg-gradient-to-br from-blue-100 to-cyan-100 border border-blue-200' },
   { id: 'aircon', title: 'ล้างแอร์', icon: '❄️', bgColor: 'bg-gradient-to-br from-sky-100 to-blue-100 border border-sky-200' },
@@ -41,7 +38,6 @@ const categories: ServiceCategory[] = [
   { id: 'others', title: 'อื่นๆ', icon: '✨', bgColor: 'bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-200' },
 ];
 
-// 🌟 Mock Data: จำลองงานล่าสุดเพื่อเอามา "ล่อแมลง" 🌟
 const recentJobs = [
   { id: 1, title: 'ต้องการช่างซ่อมหลังคารั่ว ด่วนมาก!', category: 'ก่อสร้าง', location: 'ปากน้ำประแส', budget: 800, time: '15 นาทีที่แล้ว' },
   { id: 2, title: 'หาแม่บ้านทำความสะอาดบ้าน 2 ชั้น', category: 'แม่บ้าน', location: 'แกลง', budget: 1200, time: '2 ชั่วโมงที่แล้ว' },
@@ -134,7 +130,6 @@ export default function HomePage() {
             {categories.map((cat) => (
               <Link 
                 key={cat.id} 
-                // 🌟 ถ้ามี customLink ให้ไปที่นั่น (เช่น /news) ถ้าไม่มีก็ไปหน้า /services ตามปกติ 🌟
                 href={cat.customLink || `/services?cat=${cat.id}`} 
                 className="flex flex-col items-center gap-2.5 min-w-[72px] snap-start group cursor-pointer"
               >
@@ -193,28 +188,39 @@ export default function HomePage() {
 
       </main>
 
-      {/* 🛠️ Bottom Nav 🛠️ */}
+      {/* 🛠️ Bottom Nav (อัปเดตใหม่: เอาข่าวสารมาแทนที่ค้นหา) 🛠️ */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 flex justify-around py-2 z-[100] shadow-[0_-5px_20px_rgba(0,0,0,0.05)] pb-safe">
+        
+        {/* 1. หน้าแรก */}
         <Link href="/" className="flex flex-col items-center gap-0.5 font-bold" style={{ color: themePalette.primaryOrange }}>
           <span className="text-xl">🏠</span>
           <span className="text-[10px]">หน้าแรก</span>
         </Link>
-        <Link href="/services" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-orange-400 transition-colors">
-          <span className="text-xl">🔍</span>
-          <span className="text-[10px]">ค้นหา</span>
+        
+        {/* 2. ข่าวสาร (🌟 ย้ายมาตรงนี้ 🌟) */}
+        <Link href="/news" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-orange-400 transition-colors">
+          <span className="text-xl">📰</span>
+          <span className="text-[10px]">ข่าวสาร</span>
         </Link>
+        
+        {/* 3. รางวัล */}
         <Link href="/coupons" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-orange-400 transition-colors">
           <span className="text-xl">🎟️</span>
           <span className="text-[10px]">รางวัล</span>
         </Link>
+        
+        {/* 4. งาน */}
         <Link href="/jobs" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-orange-400 transition-colors">
           <span className="text-xl">📋</span>
           <span className="text-[10px]">งาน</span>
         </Link>
+        
+        {/* 5. ฉัน */}
         <Link href="/profile" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-orange-400 transition-colors">
           <span className="text-xl">👤</span>
           <span className="text-[10px]">ฉัน</span>
         </Link>
+        
       </nav>
     </div>
   );
