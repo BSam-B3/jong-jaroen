@@ -9,15 +9,20 @@ const themePalette = {
   bgGray: '#F9FAFB',        
 };
 
-// 🌟 Mock Data: ตัวเลขสลากของบีสาม 🌟
+// 🌟 Mock Data: อัปเดตข้อมูลให้มี รหัสงวด (Serial) ติดมาด้วย 🌟
 const rewardData = {
   currentSpend: 2150,
   targetSpend: 3000,
-  myTickets: ['820866', '124068', '554321', '098706'], // เจมเพิ่มเลขให้ดูเป็นตัวอย่างว่าพอย่อแล้วจัดเรียงสวยแค่ไหนค่ะ
-  nextDrawDate: '16 มีนาคม 2569',
+  nextDrawDate: '16 มี.ค. 69',
+  myTickets: [
+    { number: '820866', serial: 'JC-88291' },
+    { number: '124068', serial: 'JC-40128' },
+    { number: '554321', serial: 'JC-99382' },
+    { number: '098706', serial: 'JC-10293' }
+  ],
 };
 
-// 🌟 Mock Data: ผลสลาก (เตรียมพร้อมรอต่อ API) 🌟
+// 🌟 Mock Data: ผลสลาก (รอต่อ API) 🌟
 const lottoResults = {
   date: '1 มีนาคม 2569',
   prize1: '820866',
@@ -51,7 +56,7 @@ export default function CouponsPage() {
 
       <main className="max-w-xl mx-auto px-3 -mt-10 relative z-20 space-y-5">
         
-        {/* ── 1. หลอดสะสมยอด (ย่อให้บางลงนิดนึงเพื่อประหยัดพื้นที่) ── */}
+        {/* ── 1. หลอดสะสมยอด ── */}
         <section className="bg-white rounded-3xl p-4 shadow-lg border border-gray-100">
           <div className="flex justify-between items-end mb-3">
             <div>
@@ -78,7 +83,7 @@ export default function CouponsPage() {
           </p>
         </section>
 
-        {/* ── 🌟 2. กระดานผลสลากกินแบ่งรัฐบาล (เตรียมต่อ API) 🌟 ── */}
+        {/* ── 2. กระดานผลสลากกินแบ่งรัฐบาล ── */}
         <section className="rounded-3xl p-4 shadow-md relative overflow-hidden"
           style={{ background: 'linear-gradient(135deg, #FFB787 0%, #F65D7B 100%)' }}>
           
@@ -91,25 +96,18 @@ export default function CouponsPage() {
           </div>
 
           <div className="grid grid-cols-3 gap-2 relative z-10">
-            {/* รางวัลที่ 1 */}
             <div className="col-span-2 bg-white rounded-2xl p-2 shadow-sm flex flex-col items-center justify-center">
               <div className="bg-gradient-to-r from-orange-400 to-pink-500 text-white text-[8px] font-bold px-2 py-0.5 rounded-full mb-0.5">รางวัลที่ 1</div>
               <div className="text-2xl font-black text-gray-900 tracking-widest">{lottoResults.prize1}</div>
             </div>
-
-            {/* เลขท้าย 2 ตัว */}
             <div className="col-span-1 bg-white rounded-2xl p-2 shadow-sm flex flex-col items-center justify-center">
               <div className="text-2xl font-black text-gray-900 tracking-tight">{lottoResults.back2}</div>
               <div className="bg-gradient-to-r from-orange-400 to-pink-500 text-white text-[8px] font-bold px-2 py-0.5 rounded-full mt-0.5">ท้าย 2 ตัว</div>
             </div>
-
-            {/* เลขหน้า 3 ตัว */}
             <div className="col-span-1 bg-white rounded-xl py-1.5 shadow-sm flex flex-col items-center justify-center mt-0.5">
               <div className="text-xs font-black text-gray-900 tracking-wider">{lottoResults.front3.join(' | ')}</div>
               <div className="text-[7px] text-gray-400 font-bold mt-0.5">เลขหน้า 3 ตัว</div>
             </div>
-
-            {/* เลขท้าย 3 ตัว */}
             <div className="col-span-2 bg-white rounded-xl py-1.5 shadow-sm flex flex-col items-center justify-center mt-0.5">
               <div className="text-xs font-black text-gray-900 tracking-wider">{lottoResults.back3.join(' | ')}</div>
               <div className="text-[7px] text-gray-400 font-bold mt-0.5">เลขท้าย 3 ตัว</div>
@@ -117,7 +115,7 @@ export default function CouponsPage() {
           </div>
         </section>
 
-        {/* ── 🌟 3. เลขมังกรทองแบบกะทัดรัด (Compact Minimalist) 🌟 ── */}
+        {/* ── 🌟 3. เลขมังกรทองแบบกะทัดรัด (อัปเดตใหม่: มีชื่อสลาก, งวด, ขอบทอง) 🌟 ── */}
         <section>
           <div className="flex justify-between items-center mb-3 px-1">
             <h3 className="text-sm font-black text-gray-800 flex items-center gap-1.5">
@@ -128,43 +126,58 @@ export default function CouponsPage() {
             </span>
           </div>
 
-          {/* จัดเรียงเป็น Grid 2 คอลัมน์ เพื่อความกะทัดรัด */}
           <div className="grid grid-cols-2 gap-3">
             {rewardData.myTickets.map((ticket, idx) => {
-              const isPrize1 = ticket === lottoResults.prize1;
-              const isBack2 = ticket.endsWith(lottoResults.back2);
+              const isPrize1 = ticket.number === lottoResults.prize1;
+              const isBack2 = ticket.number.endsWith(lottoResults.back2);
               const won = isPrize1 || isBack2;
 
               return (
-                <div key={idx} className={`relative flex flex-col items-center justify-center py-4 rounded-2xl shadow-sm border-2 overflow-hidden transition-transform hover:-translate-y-0.5 cursor-pointer
-                  ${won ? 'bg-green-50 border-green-400' : 'bg-gradient-to-br from-red-800 to-red-950 border-red-700'}`}>
+                <div key={idx} className={`relative flex flex-col justify-between p-3 rounded-2xl shadow-md overflow-hidden transition-transform hover:-translate-y-1 cursor-pointer border
+                  ${won ? 'bg-green-50 border-green-400' : 'bg-gradient-to-br from-red-800 to-red-950 border-yellow-500/80'}`}>
                   
-                  {/* ป้ายถูกรางวัล */}
-                  {won && (
-                    <div className="absolute top-0 right-0 bg-green-500 text-white text-[7px] font-bold px-1.5 py-0.5 rounded-bl-lg">
-                      ถูกรางวัล! 🎉
+                  {/* 🌟 เส้นกรอบทองด้านใน (Double Border Effect) 🌟 */}
+                  {!won && <div className="absolute inset-1 border border-yellow-500/30 rounded-xl pointer-events-none"></div>}
+
+                  {/* 🌟 ส่วนหัว: ชื่อสลาก และ รหัสงวด 🌟 */}
+                  <div className="w-full flex justify-between items-start z-10">
+                    <div className={`text-[9px] font-bold ${won ? 'text-green-700' : 'text-yellow-400 drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]'}`}>
+                      สลากมงคล
                     </div>
-                  )}
-
-                  {/* ลายมังกรจางๆ พื้นหลัง (เผื่ออยากให้ดูมีอะไร) */}
-                  {!won && (
-                    <div className="absolute inset-0 flex items-center justify-center text-4xl opacity-[0.03] grayscale pointer-events-none">🐉</div>
-                  )}
-
-                  {/* ตัวเลขทองสะท้อนแสง (ย่อไซส์เป็น text-2xl หรือ 3xl) */}
-                  <div className={`text-2xl font-black tracking-[0.1em] pl-[0.1em] z-10
-                    ${won 
-                      ? 'text-green-600 drop-shadow-sm' 
-                      : 'bg-gradient-to-b from-yellow-100 via-yellow-400 to-yellow-600 bg-clip-text text-transparent drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]'
-                    }`}
-                  >
-                    {ticket}
+                    <div className="text-right">
+                      <div className={`text-[7px] font-medium ${won ? 'text-green-600' : 'text-white/90 drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]'}`}>
+                        งวด {rewardData.nextDrawDate}
+                      </div>
+                      <div className={`text-[6px] font-medium tracking-wider ${won ? 'text-green-500' : 'text-white/60'}`}>
+                        {ticket.serial}
+                      </div>
+                    </div>
                   </div>
 
-                  {won && (
-                    <div className="text-[8px] font-bold text-green-600 mt-1">
-                      {isPrize1 ? 'อั่งเปา ฿5,000' : 'อั่งเปา ฿200'}
+                  {/* 🌟 ส่วนกลาง: ตัวเลข 🌟 */}
+                  <div className="flex items-center justify-center my-2">
+                    <div className={`text-2xl font-black tracking-[0.15em] pl-[0.15em] z-10
+                      ${won 
+                        ? 'text-green-600 drop-shadow-sm' 
+                        : 'bg-gradient-to-b from-yellow-100 via-yellow-300 to-yellow-600 bg-clip-text text-transparent drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]'
+                      }`}
+                    >
+                      {ticket.number}
                     </div>
+                  </div>
+
+                  {/* 🌟 ส่วนล่าง: ป้ายถูกรางวัล (ถ้ามี) 🌟 */}
+                  <div className="w-full text-center h-[14px]">
+                    {won && (
+                      <span className="inline-block text-[8px] font-bold text-white bg-green-500 px-2 py-0.5 rounded-full shadow-sm animate-pulse">
+                        🎉 {isPrize1 ? 'รับ ฿5,000' : 'รับ ฿200'}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* ลายมังกรจางๆ พื้นหลัง (เพื่อให้แดงไม่เรียบเกินไป) */}
+                  {!won && (
+                    <div className="absolute inset-0 flex items-center justify-center text-4xl opacity-[0.05] grayscale pointer-events-none z-0">🐉</div>
                   )}
                 </div>
               );
