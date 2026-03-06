@@ -15,13 +15,14 @@ const rewardData = {
   targetSpend: 3000,
   nextDrawDate: '16 มี.ค. 69',
   myTickets: [
-    { number: '820866', serial: 'JC-88291' },
-    { number: '124068', serial: 'JC-40128' },
-    { number: '554321', serial: 'JC-99382' },
-    { number: '098706', serial: 'JC-10293' }
+    { number: '820866', serial: 'JC-88291' }, // ตรงรางวัลที่ 1 (ได้ 50,000)
+    { number: '124068', serial: 'JC-40128' }, // ลงท้ายด้วย 068 ตรงเลขท้าย 3 ตัว (ได้ 2,000)
+    { number: '554321', serial: 'JC-99382' }, // ไม่ถูกรางวัล
+    { number: '098706', serial: 'JC-10293' }  // ลงท้ายด้วย 06 ตรงเลขท้าย 2 ตัว (ได้ 1,000)
   ],
 };
 
+// 🌟 ผลสลาก 🌟
 const lottoResults = {
   date: '1 มีนาคม 2569',
   prize1: '820866',
@@ -61,12 +62,12 @@ export default function CouponsPage() {
             <div>
               <h2 className="text-[10px] font-bold text-gray-500 mb-0.5">ยอดจ้างงานสะสม</h2>
               <div className="text-xl font-black leading-none" style={{ color: themePalette.primaryOrange }}>
-                ฿{rewardData.currentSpend.toLocaleString()}
+                {rewardData.currentSpend.toLocaleString()} บาท
               </div>
             </div>
             <div className="text-right">
               <div className="text-[9px] text-gray-400 font-bold">เป้าหมาย</div>
-              <div className="text-xs font-black text-gray-800">฿{rewardData.targetSpend.toLocaleString()}</div>
+              <div className="text-xs font-black text-gray-800">{rewardData.targetSpend.toLocaleString()} บาท</div>
             </div>
           </div>
 
@@ -78,7 +79,7 @@ export default function CouponsPage() {
           </div>
           
           <p className="text-[9px] text-center font-bold text-gray-500">
-            จ้างเพิ่มอีก <span className="text-[#F05D40]">฿{remainingToTarget.toLocaleString()}</span> รับเลขเด็ดลุ้นโชค 1 สิทธิ์! 🚀
+            จ้างเพิ่มอีก <span className="text-[#F05D40]">{remainingToTarget.toLocaleString()} บาท</span> รับคูปองมงคล 1 สิทธิ์! 🚀
           </p>
         </section>
 
@@ -114,11 +115,32 @@ export default function CouponsPage() {
           </div>
         </section>
 
-        {/* ── 🌟 3. เลขมังกรทอง (อัปเดต: เปลี่ยนเป็น "คูปองมงคล") 🌟 ── */}
+        {/* ── 🌟 3. กติกาและเงินรางวัล (ใส่ให้ครบถ้วน 100%) 🌟 ── */}
+        <section className="bg-white rounded-3xl p-4 shadow-sm border border-orange-100">
+          <h3 className="text-xs font-black text-gray-800 mb-3 flex items-center gap-1.5">
+            <span className="text-base">💰</span> เงินรางวัลคูปองมงคล
+          </h3>
+          <div className="space-y-2">
+            <div className="flex justify-between items-center bg-orange-50 px-3 py-2 rounded-xl border border-orange-200">
+              <span className="text-[11px] font-bold text-orange-800">🏆 รางวัลที่ 1 (ตรง 6 ตัว)</span>
+              <span className="text-sm font-black text-[#F05D40]">50,000 บาท</span>
+            </div>
+            <div className="flex justify-between items-center bg-gray-50 px-3 py-2 rounded-xl border border-gray-100">
+              <span className="text-[11px] font-bold text-gray-700">🥈 เลขหน้า / เลขท้าย 3 ตัว</span>
+              <span className="text-xs font-black text-gray-800">2,000 บาท</span>
+            </div>
+            <div className="flex justify-between items-center bg-gray-50 px-3 py-2 rounded-xl border border-gray-100">
+              <span className="text-[11px] font-bold text-gray-700">🥉 เลขท้าย 2 ตัว</span>
+              <span className="text-xs font-black text-gray-800">1,000 บาท</span>
+            </div>
+          </div>
+        </section>
+
+        {/* ── 4. คูปองมงคลของคุณ ── */}
         <section>
           <div className="flex justify-between items-center mb-3 px-1">
             <h3 className="text-sm font-black text-gray-800 flex items-center gap-1.5">
-              <span className="text-base">🎫</span> เลขของคุณ
+              <span className="text-base">🎫</span> คูปองของคุณ
             </h3>
             <span className="text-[10px] bg-orange-100 text-[#F05D40] px-3 py-1 rounded-full font-bold">
               {rewardData.myTickets.length} สิทธิ์
@@ -127,18 +149,26 @@ export default function CouponsPage() {
 
           <div className="grid grid-cols-2 gap-3">
             {rewardData.myTickets.map((ticket, idx) => {
+              
+              // 🌟 ตรรกะตรวจรางวัล 🌟
               const isPrize1 = ticket.number === lottoResults.prize1;
+              const isFront3 = lottoResults.front3.some(num => ticket.number.startsWith(num));
+              const isBack3 = lottoResults.back3.some(num => ticket.number.endsWith(num));
               const isBack2 = ticket.number.endsWith(lottoResults.back2);
-              const won = isPrize1 || isBack2;
+              const won = isPrize1 || isFront3 || isBack3 || isBack2;
+
+              // 🌟 โชว์จำนวนเงินรางวัลตามกติกาเป๊ะๆ 🌟
+              let prizeText = '';
+              if (isPrize1) prizeText = 'รับ 50,000 บาท';
+              else if (isFront3 || isBack3) prizeText = 'รับ 2,000 บาท';
+              else if (isBack2) prizeText = 'รับ 1,000 บาท';
 
               return (
                 <div key={idx} className={`relative flex flex-col justify-between p-3 rounded-2xl shadow-md overflow-hidden transition-transform hover:-translate-y-1 cursor-pointer border
                   ${won ? 'bg-green-50 border-green-400' : 'bg-gradient-to-br from-red-800 to-red-950 border-yellow-500/80'}`}>
                   
-                  {/* เส้นกรอบทองด้านใน */}
                   {!won && <div className="absolute inset-1 border border-yellow-500/30 rounded-xl pointer-events-none"></div>}
 
-                  {/* 🌟 ส่วนหัว: ชื่อคูปอง และ รหัสงวด 🌟 */}
                   <div className="w-full flex justify-between items-start z-10">
                     <div className={`text-[9px] font-bold ${won ? 'text-green-700' : 'text-yellow-400 drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]'}`}>
                       คูปองมงคล
@@ -153,36 +183,28 @@ export default function CouponsPage() {
                     </div>
                   </div>
 
-                  {/* ส่วนกลาง: คำว่า "จงเจริญ" + ตัวเลข */}
                   <div className="flex flex-col items-center justify-center my-1 z-10">
                     <div className={`text-[11px] font-black tracking-[0.2em] pl-[0.2em] mb-0.5
-                      ${won 
-                        ? 'text-green-700' 
-                        : 'bg-gradient-to-b from-yellow-100 via-yellow-300 to-yellow-600 bg-clip-text text-transparent drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]'
-                      }`}
+                      ${won ? 'text-green-700' : 'bg-gradient-to-b from-yellow-100 via-yellow-300 to-yellow-600 bg-clip-text text-transparent drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]'}`}
                     >
                       จงเจริญ
                     </div>
                     <div className={`text-2xl font-black tracking-[0.15em] pl-[0.15em] leading-none
-                      ${won 
-                        ? 'text-green-600 drop-shadow-sm' 
-                        : 'bg-gradient-to-b from-yellow-100 via-yellow-300 to-yellow-600 bg-clip-text text-transparent drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]'
-                      }`}
+                      ${won ? 'text-green-600 drop-shadow-sm' : 'bg-gradient-to-b from-yellow-100 via-yellow-300 to-yellow-600 bg-clip-text text-transparent drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]'}`}
                     >
                       {ticket.number}
                     </div>
                   </div>
 
-                  {/* ส่วนล่าง: ป้ายถูกรางวัล (ถ้ามี) */}
                   <div className="w-full text-center h-[14px]">
+                    {/* 🌟 แสดงยอดเงินที่ถูกรางวัลตรงนี้ 🌟 */}
                     {won && (
-                      <span className="inline-block text-[8px] font-bold text-white bg-green-500 px-2 py-0.5 rounded-full shadow-sm animate-pulse z-10 relative">
-                        🎉 {isPrize1 ? 'รับ ฿5,000' : 'รับ ฿200'}
+                      <span className="inline-block text-[7px] font-bold text-white bg-green-500 px-2 py-0.5 rounded-full shadow-sm animate-pulse z-10 relative">
+                        🎉 {prizeText}
                       </span>
                     )}
                   </div>
 
-                  {/* ลายมังกรจางๆ พื้นหลัง */}
                   {!won && (
                     <div className="absolute inset-0 flex items-center justify-center text-4xl opacity-[0.05] grayscale pointer-events-none z-0">🐉</div>
                   )}
