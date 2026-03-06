@@ -1,7 +1,6 @@
 'use client';
 import { useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image'; // 🌟 นำเข้า Image component เพื่อโหลดรูปแมวกวัก
 
 // ── Soft Shopee Palette ─────────────────────────────────────────
 const themePalette = {
@@ -12,10 +11,25 @@ const themePalette = {
 
 // 🌟 Mock Data: ตัวเลขสลากของบีสาม 🌟
 const rewardData = {
-  myTickets: ['820866', '124068'], 
+  currentSpend: 2150,
+  targetSpend: 3000,
+  myTickets: ['820866', '124068', '554321', '098706'], // เจมเพิ่มเลขให้ดูเป็นตัวอย่างว่าพอย่อแล้วจัดเรียงสวยแค่ไหนค่ะ
+  nextDrawDate: '16 มีนาคม 2569',
+};
+
+// 🌟 Mock Data: ผลสลาก (เตรียมพร้อมรอต่อ API) 🌟
+const lottoResults = {
+  date: '1 มีนาคม 2569',
+  prize1: '820866',
+  front3: ['479', '054'],
+  back3: ['068', '837'],
+  back2: '06',
 };
 
 export default function CouponsPage() {
+  const progressPercent = Math.min((rewardData.currentSpend / rewardData.targetSpend) * 100, 100);
+  const remainingToTarget = rewardData.targetSpend - rewardData.currentSpend;
+
   return (
     <div className="min-h-screen pb-28 relative" style={{ backgroundColor: themePalette.bgGray }}>
       
@@ -29,58 +43,132 @@ export default function CouponsPage() {
               🎟️ อั่งเปาจงเจริญ
             </h1>
             <p className="text-white/90 text-[11px] font-medium">
-              จ้างงานชุมชน ลุ้นรับโชคสไตล์มินิมอล
+              เทียบเลขลุ้นโชค อิงผลสลากกินแบ่งรัฐบาล
             </p>
           </div>
         </div>
       </header>
 
-      <main className="max-w-xl mx-auto px-4 -mt-10 relative z-20 space-y-6">
+      <main className="max-w-xl mx-auto px-3 -mt-10 relative z-20 space-y-5">
         
-        {/* ── 🌟 การ์ดแมวกวัก + ตัวเลขทองมังกร 🌟 ── */}
+        {/* ── 1. หลอดสะสมยอด (ย่อให้บางลงนิดนึงเพื่อประหยัดพื้นที่) ── */}
+        <section className="bg-white rounded-3xl p-4 shadow-lg border border-gray-100">
+          <div className="flex justify-between items-end mb-3">
+            <div>
+              <h2 className="text-[10px] font-bold text-gray-500 mb-0.5">ยอดจ้างงานสะสม</h2>
+              <div className="text-xl font-black leading-none" style={{ color: themePalette.primaryOrange }}>
+                ฿{rewardData.currentSpend.toLocaleString()}
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-[9px] text-gray-400 font-bold">เป้าหมาย</div>
+              <div className="text-xs font-black text-gray-800">฿{rewardData.targetSpend.toLocaleString()}</div>
+            </div>
+          </div>
+
+          <div className="relative h-2.5 w-full bg-orange-50 rounded-full overflow-hidden mb-2">
+            <div 
+              className="absolute top-0 left-0 h-full bg-gradient-to-r from-[#FF8769] to-[#F05D40] rounded-full transition-all duration-1000" 
+              style={{ width: `${progressPercent}%` }}
+            ></div>
+          </div>
+          
+          <p className="text-[9px] text-center font-bold text-gray-500">
+            จ้างเพิ่มอีก <span className="text-[#F05D40]">฿{remainingToTarget.toLocaleString()}</span> รับเลขเด็ดลุ้นโชค 1 สิทธิ์! 🚀
+          </p>
+        </section>
+
+        {/* ── 🌟 2. กระดานผลสลากกินแบ่งรัฐบาล (เตรียมต่อ API) 🌟 ── */}
+        <section className="rounded-3xl p-4 shadow-md relative overflow-hidden"
+          style={{ background: 'linear-gradient(135deg, #FFB787 0%, #F65D7B 100%)' }}>
+          
+          <div className="mb-3 relative z-10 text-white flex justify-between items-end">
+            <div>
+              <h2 className="text-base font-black drop-shadow-sm leading-tight">ผลสลากกินแบ่งรัฐบาล</h2>
+              <p className="text-[10px] font-medium opacity-90">งวดประจำวันที่ {lottoResults.date}</p>
+            </div>
+            <div className="text-[9px] bg-white/20 px-2 py-1 rounded-full backdrop-blur-sm">🔴 สด</div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2 relative z-10">
+            {/* รางวัลที่ 1 */}
+            <div className="col-span-2 bg-white rounded-2xl p-2 shadow-sm flex flex-col items-center justify-center">
+              <div className="bg-gradient-to-r from-orange-400 to-pink-500 text-white text-[8px] font-bold px-2 py-0.5 rounded-full mb-0.5">รางวัลที่ 1</div>
+              <div className="text-2xl font-black text-gray-900 tracking-widest">{lottoResults.prize1}</div>
+            </div>
+
+            {/* เลขท้าย 2 ตัว */}
+            <div className="col-span-1 bg-white rounded-2xl p-2 shadow-sm flex flex-col items-center justify-center">
+              <div className="text-2xl font-black text-gray-900 tracking-tight">{lottoResults.back2}</div>
+              <div className="bg-gradient-to-r from-orange-400 to-pink-500 text-white text-[8px] font-bold px-2 py-0.5 rounded-full mt-0.5">ท้าย 2 ตัว</div>
+            </div>
+
+            {/* เลขหน้า 3 ตัว */}
+            <div className="col-span-1 bg-white rounded-xl py-1.5 shadow-sm flex flex-col items-center justify-center mt-0.5">
+              <div className="text-xs font-black text-gray-900 tracking-wider">{lottoResults.front3.join(' | ')}</div>
+              <div className="text-[7px] text-gray-400 font-bold mt-0.5">เลขหน้า 3 ตัว</div>
+            </div>
+
+            {/* เลขท้าย 3 ตัว */}
+            <div className="col-span-2 bg-white rounded-xl py-1.5 shadow-sm flex flex-col items-center justify-center mt-0.5">
+              <div className="text-xs font-black text-gray-900 tracking-wider">{lottoResults.back3.join(' | ')}</div>
+              <div className="text-[7px] text-gray-400 font-bold mt-0.5">เลขท้าย 3 ตัว</div>
+            </div>
+          </div>
+        </section>
+
+        {/* ── 🌟 3. เลขมังกรทองแบบกะทัดรัด (Compact Minimalist) 🌟 ── */}
         <section>
-          <div className="flex justify-between items-center mb-4 px-1">
+          <div className="flex justify-between items-center mb-3 px-1">
             <h3 className="text-sm font-black text-gray-800 flex items-center gap-1.5">
-              <span className="text-lg">🎫</span> เลขมังกรทองของคุณ
+              <span className="text-base">🎫</span> เลขของคุณ
             </h3>
-            <span className="text-[10px] bg-orange-100 text-[#F05D40] px-3 py-1.5 rounded-full font-bold">
-              มี {rewardData.myTickets.length} สิทธิ์
+            <span className="text-[10px] bg-orange-100 text-[#F05D40] px-3 py-1 rounded-full font-bold">
+              {rewardData.myTickets.length} สิทธิ์
             </span>
           </div>
 
-          {/* 🌟 กรอบหลักของการ์ด (สัดส่วนแนวตั้ง) 🌟 */}
-          <div className="relative w-full aspect-[3/5] max-w-sm mx-auto rounded-[32px] overflow-hidden shadow-2xl border-4 border-red-500/20 group bg-red-800">
-            
-            {/* 🌟 ดึงไฟล์รูป Lucky_Cat.png ของบีสามมาแสดง 🌟 */}
-            <Image 
-              src="/Lucky_Cat.png" 
-              alt="แมวกวักนำโชค" 
-              fill 
-              className="object-cover" // ทำให้รูปเต็มกรอบพอดีโดยไม่เบี้ยว
-              priority 
-            />
+          {/* จัดเรียงเป็น Grid 2 คอลัมน์ เพื่อความกะทัดรัด */}
+          <div className="grid grid-cols-2 gap-3">
+            {rewardData.myTickets.map((ticket, idx) => {
+              const isPrize1 = ticket === lottoResults.prize1;
+              const isBack2 = ticket.endsWith(lottoResults.back2);
+              const won = isPrize1 || isBack2;
 
-            {/* 🌟 วางตัวเลขไว้ "ด้านล่าง" ของรูปแมว 🌟 */}
-            <div className="absolute inset-x-0 bottom-[8%] flex flex-col items-center gap-5 z-10">
-              {rewardData.myTickets.map((ticket, idx) => (
-                <div key={idx} className="relative hover:scale-110 transition-transform cursor-pointer">
+              return (
+                <div key={idx} className={`relative flex flex-col items-center justify-center py-4 rounded-2xl shadow-sm border-2 overflow-hidden transition-transform hover:-translate-y-0.5 cursor-pointer
+                  ${won ? 'bg-green-50 border-green-400' : 'bg-gradient-to-br from-red-800 to-red-950 border-red-700'}`}>
                   
-                  {/* 🌟 สไตล์ตัวเลขสีทองมินิมอล นูน 3D ไม่มีกรอบ 🌟 */}
-                  <div className="text-5xl font-black tracking-[0.15em] pl-[0.15em] uppercase 
-                    bg-gradient-to-b from-yellow-100 via-yellow-300 to-yellow-600 bg-clip-text text-transparent
-                    drop-shadow-[0_4px_4px_rgba(0,0,0,0.8)]
-                    after:content-[attr(data-text)] after:absolute after:inset-0 after:z-[-1] after:text-yellow-100 after:blur-md after:opacity-50"
-                    data-text={ticket}
+                  {/* ป้ายถูกรางวัล */}
+                  {won && (
+                    <div className="absolute top-0 right-0 bg-green-500 text-white text-[7px] font-bold px-1.5 py-0.5 rounded-bl-lg">
+                      ถูกรางวัล! 🎉
+                    </div>
+                  )}
+
+                  {/* ลายมังกรจางๆ พื้นหลัง (เผื่ออยากให้ดูมีอะไร) */}
+                  {!won && (
+                    <div className="absolute inset-0 flex items-center justify-center text-4xl opacity-[0.03] grayscale pointer-events-none">🐉</div>
+                  )}
+
+                  {/* ตัวเลขทองสะท้อนแสง (ย่อไซส์เป็น text-2xl หรือ 3xl) */}
+                  <div className={`text-2xl font-black tracking-[0.1em] pl-[0.1em] z-10
+                    ${won 
+                      ? 'text-green-600 drop-shadow-sm' 
+                      : 'bg-gradient-to-b from-yellow-100 via-yellow-400 to-yellow-600 bg-clip-text text-transparent drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]'
+                    }`}
                   >
                     {ticket}
                   </div>
-                  
+
+                  {won && (
+                    <div className="text-[8px] font-bold text-green-600 mt-1">
+                      {isPrize1 ? 'อั่งเปา ฿5,000' : 'อั่งเปา ฿200'}
+                    </div>
+                  )}
                 </div>
-              ))}
-            </div>
-            
-            {/* Effect แสงสะท้อนวิ่งผ่านการ์ดเบาๆ เวลากดหรือเอาเมาส์ชี้ */}
-            <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/20 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none transform -skew-x-12 translate-x-[-100%] group-hover:translate-x-[100%]"></div>
+              );
+            })}
           </div>
         </section>
 
