@@ -19,22 +19,6 @@ const userData = {
 
 export default function DashboardPage() {
   const [isHiringMode, setIsHiringMode] = useState(true); // true = จ้างงาน, false = รับงาน
-  
-  // 🌟 State สำหรับระบบ Promo Code 🌟
-  const [promoInput, setPromoInput] = useState('');
-  const [activePromos, setActivePromos] = useState<{code: string, desc: string}[]>([
-    { code: 'NEWBIE', desc: 'ลด 50฿ เมื่อจ้างครบ 1,000฿ (สำหรับผู้ใช้ใหม่)' }
-  ]);
-
-  const handleApplyPromo = () => {
-    if (promoInput.trim() === 'ลด50') {
-      setActivePromos([...activePromos, { code: 'ลด50', desc: 'ลด 50฿ เมื่อจ้างครบ 1,000฿' }]);
-      setPromoInput('');
-      alert('เพิ่มโค้ดส่วนลดสำเร็จ!');
-    } else if (promoInput.trim() !== '') {
-      alert('โค้ดส่วนลดไม่ถูกต้อง หรือหมดอายุแล้ว');
-    }
-  };
 
   return (
     <div className="min-h-screen pb-24" style={{ backgroundColor: themePalette.bgGray }}>
@@ -74,7 +58,7 @@ export default function DashboardPage() {
           </button>
         </div>
 
-        {/* ── User ID Card (สไตล์ Gradient Orange) ── */}
+        {/* ── User ID Card ── */}
         <section className="rounded-3xl p-5 shadow-lg text-white relative overflow-hidden"
           style={{ background: `linear-gradient(135deg, ${themePalette.primaryOrange} 0%, ${themePalette.lightOrange} 100%)` }}>
           <div className="absolute -right-10 -top-10 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
@@ -105,46 +89,6 @@ export default function DashboardPage() {
               <div className="text-lg font-black">฿{userData.stats.spent.toLocaleString()}</div>
               <div className="text-[9px] text-white/80">ยอดใช้จ่าย</div>
             </div>
-          </div>
-        </section>
-
-        {/* ── 🌟 NEW: ระบบ Promo Code (โค้ดส่วนลด) 🌟 ── */}
-        <section className="bg-white rounded-2xl p-4 shadow-sm border border-orange-100">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
-              <span className="text-base">🎟️</span> โค้ดส่วนลดของคุณ
-            </h3>
-          </div>
-          
-          {/* ช่องกรอกโค้ด */}
-          <div className="flex gap-2 mb-3">
-            <input 
-              type="text" 
-              value={promoInput}
-              onChange={(e) => setPromoInput(e.target.value)}
-              placeholder="พิมพ์โค้ดส่วนลดที่นี่ (เช่น ลด50)" 
-              className="flex-1 text-xs border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-[#F05D40] bg-gray-50 uppercase"
-            />
-            <button 
-              onClick={handleApplyPromo}
-              disabled={!promoInput.trim()}
-              className="bg-gray-800 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-black disabled:opacity-50 transition-colors"
-            >
-              เก็บโค้ด
-            </button>
-          </div>
-
-          {/* รายการโค้ดที่มีอยู่ */}
-          <div className="space-y-2">
-            {activePromos.map((promo, idx) => (
-              <div key={idx} className="flex items-center justify-between bg-orange-50 border border-orange-100 rounded-lg p-2 border-dashed">
-                <div>
-                  <div className="text-[10px] font-black text-[#F05D40]">{promo.code}</div>
-                  <div className="text-[9px] text-gray-600">{promo.desc}</div>
-                </div>
-                <button className="text-[9px] bg-[#F05D40] text-white px-2 py-1 rounded font-bold shadow-sm">ใช้เลย</button>
-              </div>
-            ))}
           </div>
         </section>
 
@@ -215,7 +159,7 @@ export default function DashboardPage() {
         ➕
       </Link>
 
-      {/* 🛠️ Bottom Nav (ปุ่ม งาน Active) 🛠️ */}
+      {/* 🛠️ Bottom Nav 🛠️ */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 flex justify-around py-2 z-[100] shadow-[0_-5px_20px_rgba(0,0,0,0.05)] pb-safe">
         <Link href="/" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-orange-400 transition-colors">
           <span className="text-xl">🏠</span>
@@ -229,13 +173,10 @@ export default function DashboardPage() {
           <span className="text-xl">🎟️</span>
           <span className="text-[10px]">รางวัล</span>
         </Link>
-        
-        {/* 🌟 หน้า Dashboard ปัจจุบัน 🌟 */}
         <Link href="/dashboard" className="flex flex-col items-center gap-0.5 font-bold" style={{ color: themePalette.primaryOrange }}>
           <span className="text-xl">📋</span>
           <span className="text-[10px]">งาน</span>
         </Link>
-        
         <Link href="/profile" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-orange-400 transition-colors">
           <span className="text-xl">👤</span>
           <span className="text-[10px]">ฉัน</span>
