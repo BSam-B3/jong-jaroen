@@ -9,7 +9,7 @@ const themePalette = {
   bgGray: '#F9FAFB',        
 };
 
-// 🌟 Mock Data: อัปเดตข้อมูลให้มี รหัสงวด (Serial) ติดมาด้วย 🌟
+// 🌟 Mock Data 🌟
 const rewardData = {
   currentSpend: 2150,
   targetSpend: 3000,
@@ -22,7 +22,6 @@ const rewardData = {
   ],
 };
 
-// 🌟 Mock Data: ผลสลาก (รอต่อ API) 🌟
 const lottoResults = {
   date: '1 มีนาคม 2569',
   prize1: '820866',
@@ -115,7 +114,7 @@ export default function CouponsPage() {
           </div>
         </section>
 
-        {/* ── 🌟 3. เลขมังกรทองแบบกะทัดรัด (อัปเดตใหม่: มีชื่อสลาก, งวด, ขอบทอง) 🌟 ── */}
+        {/* ── 🌟 3. เลขมังกรทอง (อัปเดต: เอาคำว่า "จงเจริญ" กลับมาแล้วค่ะ!) 🌟 ── */}
         <section>
           <div className="flex justify-between items-center mb-3 px-1">
             <h3 className="text-sm font-black text-gray-800 flex items-center gap-1.5">
@@ -136,10 +135,10 @@ export default function CouponsPage() {
                 <div key={idx} className={`relative flex flex-col justify-between p-3 rounded-2xl shadow-md overflow-hidden transition-transform hover:-translate-y-1 cursor-pointer border
                   ${won ? 'bg-green-50 border-green-400' : 'bg-gradient-to-br from-red-800 to-red-950 border-yellow-500/80'}`}>
                   
-                  {/* 🌟 เส้นกรอบทองด้านใน (Double Border Effect) 🌟 */}
+                  {/* เส้นกรอบทองด้านใน */}
                   {!won && <div className="absolute inset-1 border border-yellow-500/30 rounded-xl pointer-events-none"></div>}
 
-                  {/* 🌟 ส่วนหัว: ชื่อสลาก และ รหัสงวด 🌟 */}
+                  {/* ส่วนหัว: ชื่อสลาก และ รหัสงวด */}
                   <div className="w-full flex justify-between items-start z-10">
                     <div className={`text-[9px] font-bold ${won ? 'text-green-700' : 'text-yellow-400 drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]'}`}>
                       สลากมงคล
@@ -154,9 +153,17 @@ export default function CouponsPage() {
                     </div>
                   </div>
 
-                  {/* 🌟 ส่วนกลาง: ตัวเลข 🌟 */}
-                  <div className="flex items-center justify-center my-2">
-                    <div className={`text-2xl font-black tracking-[0.15em] pl-[0.15em] z-10
+                  {/* 🌟 ส่วนกลาง: คำว่า "จงเจริญ" + ตัวเลข 🌟 */}
+                  <div className="flex flex-col items-center justify-center my-1 z-10">
+                    <div className={`text-[11px] font-black tracking-[0.2em] pl-[0.2em] mb-0.5
+                      ${won 
+                        ? 'text-green-700' 
+                        : 'bg-gradient-to-b from-yellow-100 via-yellow-300 to-yellow-600 bg-clip-text text-transparent drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]'
+                      }`}
+                    >
+                      จงเจริญ
+                    </div>
+                    <div className={`text-2xl font-black tracking-[0.15em] pl-[0.15em] leading-none
                       ${won 
                         ? 'text-green-600 drop-shadow-sm' 
                         : 'bg-gradient-to-b from-yellow-100 via-yellow-300 to-yellow-600 bg-clip-text text-transparent drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]'
@@ -166,16 +173,16 @@ export default function CouponsPage() {
                     </div>
                   </div>
 
-                  {/* 🌟 ส่วนล่าง: ป้ายถูกรางวัล (ถ้ามี) 🌟 */}
+                  {/* ส่วนล่าง: ป้ายถูกรางวัล (ถ้ามี) */}
                   <div className="w-full text-center h-[14px]">
                     {won && (
-                      <span className="inline-block text-[8px] font-bold text-white bg-green-500 px-2 py-0.5 rounded-full shadow-sm animate-pulse">
+                      <span className="inline-block text-[8px] font-bold text-white bg-green-500 px-2 py-0.5 rounded-full shadow-sm animate-pulse z-10 relative">
                         🎉 {isPrize1 ? 'รับ ฿5,000' : 'รับ ฿200'}
                       </span>
                     )}
                   </div>
 
-                  {/* ลายมังกรจางๆ พื้นหลัง (เพื่อให้แดงไม่เรียบเกินไป) */}
+                  {/* ลายมังกรจางๆ พื้นหลัง */}
                   {!won && (
                     <div className="absolute inset-0 flex items-center justify-center text-4xl opacity-[0.05] grayscale pointer-events-none z-0">🐉</div>
                   )}
