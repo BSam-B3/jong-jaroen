@@ -18,7 +18,7 @@ const themePalette = {
   textDark: '#1F2937',      
 };
 
-// 🌟 อัปเดต: เพิ่มหมวดหมู่ใหม่จัดเต็ม + อัปเกรดสีพื้นหลังเป็น Gradient ให้ดูมีมิติ 🌟
+// 🌟 หมวดหมู่บริการ (แบบ Gradient ที่อัปเกรดแล้ว) 🌟
 const categories: ServiceCategory[] = [
   { id: 'electrician', title: 'ช่างไฟฟ้า', icon: '⚡', bgColor: 'bg-gradient-to-br from-yellow-100 to-orange-100 border border-orange-200' },
   { id: 'cleaning', title: 'แม่บ้าน', icon: '🧹', bgColor: 'bg-gradient-to-br from-blue-100 to-cyan-100 border border-blue-200' },
@@ -26,20 +26,22 @@ const categories: ServiceCategory[] = [
   { id: 'plumbing', title: 'ช่างประปา', icon: '💧', bgColor: 'bg-gradient-to-br from-cyan-100 to-teal-100 border border-cyan-200' },
   { id: 'mechanic', title: 'ช่างยนต์', icon: '🛠️', bgColor: 'bg-gradient-to-br from-gray-100 to-slate-200 border border-gray-300' },
   { id: 'construction', title: 'ก่อสร้าง', icon: '🏗️', bgColor: 'bg-gradient-to-br from-amber-100 to-orange-100 border border-amber-200' },
-  
-  // ✂️ หมวดหมู่ใหม่ด้านความงามและไลฟ์สไตล์
   { id: 'haircut', title: 'ตัดผม', icon: '✂️', bgColor: 'bg-gradient-to-br from-purple-100 to-fuchsia-100 border border-purple-200' },
   { id: 'nails', title: 'ทำเล็บ', icon: '💅', bgColor: 'bg-gradient-to-br from-pink-100 to-rose-100 border border-pink-200' },
   { id: 'beauty', title: 'เสริมสวย', icon: '💄', bgColor: 'bg-gradient-to-br from-red-100 to-rose-100 border border-red-200' },
   { id: 'massage', title: 'นวดแผนไทย', icon: '💆', bgColor: 'bg-gradient-to-br from-rose-100 to-pink-100 border border-rose-200' },
-  
-  // 🚚 หมวดหมู่ใหม่ด้านการขนส่งและแรงงาน
   { id: 'moving', title: 'ย้ายบ้าน', icon: '🏠', bgColor: 'bg-gradient-to-br from-emerald-100 to-green-100 border border-emerald-200' },
   { id: 'lifting', title: 'ยกของ', icon: '📦', bgColor: 'bg-gradient-to-br from-orange-100 to-amber-100 border border-orange-200' },
   { id: 'transport', title: 'รถขนส่ง', icon: '🚚', bgColor: 'bg-gradient-to-br from-indigo-100 to-blue-100 border border-indigo-200' },
-  
   { id: 'tech', title: 'ซ่อมคอม', icon: '💻', bgColor: 'bg-gradient-to-br from-slate-100 to-gray-200 border border-slate-300' },
   { id: 'others', title: 'อื่นๆ', icon: '✨', bgColor: 'bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-200' },
+];
+
+// 🌟 Mock Data: จำลองงานล่าสุดเพื่อเอามา "ล่อแมลง" 🌟
+const recentJobs = [
+  { id: 1, title: 'ต้องการช่างซ่อมหลังคารั่ว ด่วนมาก!', category: 'ก่อสร้าง', location: 'ปากน้ำประแส', budget: 800, time: '15 นาทีที่แล้ว' },
+  { id: 2, title: 'หาแม่บ้านทำความสะอาดบ้าน 2 ชั้น', category: 'แม่บ้าน', location: 'แกลง', budget: 1200, time: '2 ชั่วโมงที่แล้ว' },
+  { id: 3, title: 'แอร์ห้องนอนไม่เย็น มีน้ำหยด', category: 'ช่างไฟฟ้า', location: 'ปากน้ำประแส', budget: 500, time: '5 ชั่วโมงที่แล้ว' },
 ];
 
 export default function HomePage() {
@@ -116,34 +118,15 @@ export default function HomePage() {
         </div>
       </section>
 
-      <main className="max-w-xl mx-auto px-2 space-y-4 -mt-4 relative z-20">
+      <main className="max-w-xl mx-auto px-2 space-y-5 -mt-4 relative z-20">
         
-        {/* ── 🌟 Categories Slider (อัปเกรด UI ให้น่าดึงดูด) 🌟 ── */}
+        {/* ── Categories Slider ── */}
         <section className="bg-white rounded-xl py-6 shadow-sm border border-gray-100 relative group overflow-hidden">
-          
           <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-white to-transparent z-10 pointer-events-none"></div>
+          <button onClick={() => scroll('right')} className="absolute right-1 top-1/2 -translate-y-1/2 z-20 w-8 h-8 bg-white rounded-full shadow-md border border-gray-100 flex items-center justify-center text-gray-500 hover:text-[#F05D40] hover:scale-110 transition-all opacity-90 hover:opacity-100">❯</button>
+          <button onClick={() => scroll('left')} className="absolute left-1 top-1/2 -translate-y-1/2 z-20 w-8 h-8 bg-white rounded-full shadow-md border border-gray-100 flex items-center justify-center text-gray-500 hover:text-[#F05D40] hover:scale-110 transition-all opacity-0 group-hover:opacity-90">❮</button>
 
-          <button 
-            onClick={() => scroll('right')}
-            className="absolute right-1 top-1/2 -translate-y-1/2 z-20 w-8 h-8 bg-white rounded-full shadow-md border border-gray-100 flex items-center justify-center text-gray-500 hover:text-[#F05D40] hover:scale-110 transition-all opacity-90 hover:opacity-100"
-            aria-label="เลื่อนดูหมวดหมู่เพิ่มเติม"
-          >
-            ❯
-          </button>
-
-          <button 
-            onClick={() => scroll('left')}
-            className="absolute left-1 top-1/2 -translate-y-1/2 z-20 w-8 h-8 bg-white rounded-full shadow-md border border-gray-100 flex items-center justify-center text-gray-500 hover:text-[#F05D40] hover:scale-110 transition-all opacity-0 group-hover:opacity-90"
-            aria-label="เลื่อนกลับ"
-          >
-            ❮
-          </button>
-
-          {/* ปรับขนาดกล่องและเพิ่ม Animation ให้เด้งสู้มือ */}
-          <div 
-            ref={scrollContainerRef}
-            className="flex overflow-x-auto px-5 gap-4 pb-4 snap-x snap-mandatory scroll-smooth hide-scrollbar relative z-0 pr-12 pt-2"
-          >
+          <div ref={scrollContainerRef} className="flex overflow-x-auto px-5 gap-4 pb-4 snap-x snap-mandatory scroll-smooth hide-scrollbar relative z-0 pr-12 pt-2">
             {categories.map((cat) => (
               <Link key={cat.id} href={`/services?cat=${cat.id}`} className="flex flex-col items-center gap-2.5 min-w-[72px] snap-start group cursor-pointer">
                 <div className={`w-16 h-16 flex items-center justify-center text-3xl group-hover:scale-110 group-hover:-translate-y-1 transition-all duration-300 rounded-[20px] shadow-sm group-hover:shadow-md ${cat.bgColor}`}>
@@ -155,30 +138,54 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* ── Job Board Banner ── */}
-        <section className="bg-white rounded-xl p-6 shadow-sm border border-orange-100 flex flex-col items-center text-center space-y-4 relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-orange-50 rounded-full -mr-16 -mt-16 opacity-60 group-hover:scale-110 transition-transform duration-500"></div>
-          <div className="absolute bottom-0 left-0 w-24 h-24 bg-orange-50 rounded-full -ml-12 -mb-12 opacity-60 group-hover:scale-110 transition-transform duration-500"></div>
-
-          <div className="relative z-10 space-y-2">
-            <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center text-2xl mx-auto mb-2 shadow-inner">
-              📢
-            </div>
-            <h2 className="text-lg font-black tracking-tight" style={{ color: themePalette.primaryOrange }}>
-              บอร์ดงานจงเจริญ
+        {/* ── 🌟 NEW: Job Board Preview (หย่อนเหยื่อล่อแมลง) 🌟 ── */}
+        <section className="space-y-3">
+          {/* Header ของ Section */}
+          <div className="flex items-center justify-between px-2 bg-white py-3 border-b border-gray-100 rounded-t-xl">
+            <h2 className="text-sm font-bold uppercase tracking-wider flex items-center gap-2" style={{ color: themePalette.primaryOrange }}>
+              <span className="text-lg">📢</span> ประกาศงานล่าสุด
             </h2>
-            <p className="text-[11px] text-gray-500 font-medium leading-relaxed px-4">
-              แหล่งรวมประกาศจ้างงานในชุมชนปากน้ำประแสและพื้นที่ใกล้เคียง <br/>หาช่าง หาคนช่วยงาน หรือรับงานเพื่อสร้างรายได้
-            </p>
+            <Link href="/jobs" className="text-xs font-medium text-gray-400 hover:text-orange-500 transition-colors">ดูทั้งหมด {' >'}</Link>
           </div>
 
-          <Link href="/jobs"
-            className="relative z-10 w-full py-3.5 rounded-lg text-white text-xs font-bold shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2"
-            style={{ backgroundColor: themePalette.primaryOrange }}>
-            <span>ดูประกาศงานทั้งหมด</span>
-            <span className="text-lg leading-none">👉</span>
+          {/* List ของงาน */}
+          <div className="space-y-2.5">
+            {recentJobs.map((job) => (
+              <Link href="/jobs" key={job.id} className="block bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:border-[#F05D40] hover:shadow-md transition-all group relative overflow-hidden">
+                {/* แถบสีตกแต่งด้านซ้าย */}
+                <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-orange-300 to-orange-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                
+                <div className="flex justify-between items-start mb-1.5">
+                  <span className="bg-orange-50 text-[#F05D40] px-2 py-0.5 rounded text-[10px] font-bold">
+                    {job.category}
+                  </span>
+                  <span className="text-[10px] text-gray-400">{job.time}</span>
+                </div>
+                
+                <h3 className="text-sm font-bold text-gray-800 mb-2 group-hover:text-[#F05D40] transition-colors line-clamp-1">
+                  {job.title}
+                </h3>
+                
+                <div className="flex items-center justify-between mt-1">
+                  <div className="flex items-center gap-1 text-[11px] text-gray-500 font-medium">
+                    <span>📍 {job.location}</span>
+                  </div>
+                  <div className="text-sm font-black" style={{ color: themePalette.primaryOrange }}>
+                    ฿{job.budget.toLocaleString()}
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+
+          {/* ปุ่มเชิญชวนไปดูเพิ่มเติม */}
+          <Link href="/jobs" 
+            className="block w-full py-3.5 mt-2 text-center rounded-xl text-[#F05D40] text-xs font-bold bg-orange-50 hover:bg-orange-100 transition-colors border border-orange-100 flex items-center justify-center gap-2">
+            <span>ดูกระดานงานทั้งหมด</span>
+            <span className="text-base leading-none">🚀</span>
           </Link>
         </section>
+
       </main>
 
       {/* 🛠️ Bottom Nav 🛠️ */}
