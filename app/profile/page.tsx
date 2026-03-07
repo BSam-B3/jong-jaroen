@@ -1,399 +1,192 @@
 'use client';
-import { useEffect, useState, useRef, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useState } from 'react';
 import Link from 'next/link';
-import { supabase } from '@/lib/supabase';
 
-const SKILL_OPTIONS = [
-  'ช่างไฟ', 'ช่างประปา', 'ช่างไม้', 'ช่างเชื่อม', 'ช่างทาสี',
-  'แม่บ้าน', 'ทำสวน', 'ซ่อมเรือ', 'ประมง', 'เกษตร',
-  'ขับรถ', 'ส่งของ', 'ทำอาหาร', 'นวดแผนไทย', 'ดูแลผู้สูงอายุ',
-  'สอนพิเศษ', 'ภาษาอังกฤษ', 'คอมพิวเตอร์', 'ช่างภาพ', 'รับจ้างทั่วไป',
-];
+// ── Soft Shopee Palette ─────────────────────────────────────────
+const themePalette = {
+  primaryOrange: '#F05D40', 
+  lightOrange: '#FF8769',   
+  bgGray: '#F9FAFB',        
+};
 
-interface Profile {
-  id: string;
-  full_name: string;
-  phone: string;
-  location: string;
-  bio: string | null;
-  skills: string[];
-  is_verified: boolean;
-  kyc_status: string;
-  avg_rating: number;
-  total_jobs: number;
-  mode: string;
-  id_card_url: string | null;
-  selfie_with_id_url: string | null;
-  bank_account_number: string | null;
-  bank_name: string | null;
-}
+// 🌟 Mock Data: ข้อมูลผู้ใช้งาน 🌟
+const userData = {
+  name: 'บีสาม',
+  role: 'ลูกค้าทั่วไป',
+  phone: '089-XXX-XXXX',
+  address: 'ต.ปากน้ำประแส อ.แกลง จ.ระยอง',
+  kycStatus: 'unverified', // สถานะ KYC: 'verified' | 'unverified' | 'pending'
+  joinedDate: 'ม.ค. 2569'
+};
 
-function ProfileContent() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const activeTab = searchParams?.get('tab') || 'profile';
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [uploading, setUploading] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState('');
-  const [error, setError] = useState('');
-  const [userId, setUserId] = useState('');
-  const idCardRef = useRef<HTMLInputElement>(null);
-  const selfieRef = useRef<HTMLInputElement>(null);
+export default function ProfilePage() {
+  const [kycStatus, setKycStatus] = useState(userData.kycStatus);
 
-  const [bio, setBio] = useState('');
-  const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
-  const [phone, setPhone] = useState('');
-  const [location, setLocation] = useState('');
-  const [bankAccount, setBankAccount] = useState('');
-  const [bankName, setBankName] = useState('');
-  const [idCardUrl, setIdCardUrl] = useState('');
-  const [selfieUrl, setSelfieUrl] = useState('');
-
-  useEffect(() => {
-    const load = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push('/auth/login'); return; }
-      setUserId(user.id);
-      const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-      if (data) {
-        setProfile(data as Profile);
-        setBio(data.bio || '');
-        setSelectedSkills(data.skills || []);
-        setPhone(data.phone || '');
-        setLocation(data.location || '');
-        setBankAccount(data.bank_account_number || '');
-        setBankName(data.bank_name || '');
-        setIdCardUrl(data.id_card_url || '');
-        setSelfieUrl(data.selfie_with_id_url || '');
-      }
-      setLoading(false);
-    };
-    load();
-  }, [router]);
-
-  const toggleSkill = (skill: string) => {
-    setSelectedSkills(prev =>
-      prev.includes(skill) ? prev.filter(s => s !== skill) : [...prev, skill]
-    );
+  // จำลองฟังก์ชันกดปุ่มอัปโหลดบัตรประชาชน
+  const handleKycUpload = () => {
+    alert('ระบบกำลังเปิดกล้องเพื่อถ่ายรูปบัตรประชาชน...');
+    setKycStatus('pending');
   };
-
-  const saveProfile = async () => {
-    setSaving(true); setError('');
-    try {
-      const { error: updateError } = await supabase.from('profiles').update({
-        bio: bio.trim() || null,
-        skills: selectedSkills,
-        phone: phone.trim(),
-        location: location.trim(),
-      }).eq('id', userId);
-      if (updateError) throw updateError;
-      setProfile(prev => prev ? { ...prev, bio, skills: selectedSkills, phone, location } : null);
-      setSuccessMsg('✅ บันทึกโปรไฟล์สำเร็จ!');
-      setTimeout(() => setSuccessMsg(''), 3000);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'บันทึกไม่สำเร็จ');
-    } finally { setSaving(false); }
-  };
-
-  const saveKYC = async () => {
-    if (!bankAccount.trim()) { setError('กรุณาใส่เลขบัญชีธนาคาร'); return; }
-    if (!idCardUrl) { setError('กรุณาอัปโหลดรูปบัตรประชาชน'); return; }
-    if (!selfieUrl) { setError('กรุณาอัปโหลดรูปถ่ายคู่บัตร'); return; }
-    setSaving(true); setError('');
-    try {
-      const { error: updateError } = await supabase.from('profiles').update({
-        bank_account_number: bankAccount.trim(),
-        bank_name: bankName.trim() || 'ไม่ระบุ',
-        id_card_url: idCardUrl,
-        selfie_with_id_url: selfieUrl,
-        kyc_status: 'pending',
-      }).eq('id', userId);
-      if (updateError) throw updateError;
-      setProfile(prev => prev ? { ...prev, kyc_status: 'pending' } : null);
-      setSuccessMsg('✅ ส่งข้อมูล KYC สำเร็จ! Admin จะตรวจสอบภายใน 24 ชั่วโมง');
-      setTimeout(() => setSuccessMsg(''), 5000);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'ส่ง KYC ไม่สำเร็จ');
-    } finally { setSaving(false); }
-  };
-
-  const uploadFile = async (file: File, field: 'id_card' | 'selfie'): Promise<string | null> => {
-    if (file.size > 5 * 1024 * 1024) { setError('ไฟล์ต้องไม่เกิน 5MB'); return null; }
-    setUploading(field);
-    try {
-      const ext = file.name.split('.').pop();
-      const path = `kyc/${userId}/${field}-${Date.now()}.${ext}`;
-      const { error: uploadError } = await supabase.storage.from('job-images').upload(path, file, { upsert: true });
-      if (uploadError) throw uploadError;
-      const { data: { publicUrl } } = supabase.storage.from('job-images').getPublicUrl(path);
-      return publicUrl;
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Upload ไม่สำเร็จ');
-      return null;
-    } finally { setUploading(null); }
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center"><div className="text-4xl animate-bounce mb-2">👤</div><p className="text-gray-500 text-sm">กำลังโหลด...</p></div>
-      </div>
-    );
-  }
-
-  const kycStatusInfo = {
-    none: { label: 'ยังไม่ยื่น KYC', color: 'text-gray-500', bg: 'bg-gray-100', emoji: '📋' },
-    pending: { label: 'รอ Admin ตรวจสอบ', color: 'text-yellow-700', bg: 'bg-yellow-100', emoji: '⏳' },
-    approved: { label: 'ผ่านการยืนยันแล้ว', color: 'text-green-700', bg: 'bg-green-100', emoji: '✅' },
-    rejected: { label: 'ไม่ผ่าน — กรุณายื่นใหม่', color: 'text-red-700', bg: 'bg-red-100', emoji: '❌' },
-  }[profile?.kyc_status || 'none'] || { label: 'ไม่ทราบสถานะ', color: 'text-gray-500', bg: 'bg-gray-100', emoji: '❓' };
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
-      <header className="bg-white shadow-sm sticky top-0 z-10">
-        <div className="max-w-xl mx-auto px-4 py-3 flex items-center gap-3">
-          <Link href="/dashboard" className="text-gray-400 hover:text-gray-600">← กลับ</Link>
-          <h1 className="text-lg font-bold text-gray-800 flex-1">👤 โปรไฟล์ของฉัน</h1>
-          {profile?.is_verified && (
-            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-medium">✓ ยืนยันแล้ว</span>
-          )}
-        </div>
-        <div className="max-w-xl mx-auto px-4 flex border-b border-gray-100">
-          {[
-            { key: 'profile', label: '📝 โปรไฟล์', href: '/profile' },
-            { key: 'kyc', label: '🪪 KYC', href: '/profile?tab=kyc' },
-            { key: 'certificate', label: '📄 ใบรับรอง', href: '/profile/certificate' },
-            { key: 'licenses', label: '📜 เอกสาร', href: '/profile/licenses' },
-            { key: 'portfolio', label: '📋 Portfolio', href: '/profile/portfolio' },
-          ].map(tab => (
-            <Link key={tab.key} href={tab.href}
-              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === tab.key
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              {tab.label}
-            </Link>
-          ))}
+    <div className="min-h-screen pb-28 relative" style={{ backgroundColor: themePalette.bgGray }}>
+      
+      {/* ── Header: ข้อมูลผู้ใช้ ── */}
+      <header className="pt-12 pb-20 px-4 relative overflow-hidden rounded-b-[40px]"
+        style={{ background: `linear-gradient(135deg, ${themePalette.primaryOrange} 0%, ${themePalette.lightOrange} 100%)` }}>
+        <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/20 rounded-full blur-3xl"></div>
+        <div className="absolute left-0 top-10 w-20 h-20 bg-yellow-300/20 rounded-full blur-2xl"></div>
+        
+        <div className="max-w-xl mx-auto relative z-10 flex items-center gap-4">
+          {/* Avatar */}
+          <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center text-2xl shadow-md border-2 border-white/50 relative">
+            🧑🏻‍💻
+            {/* Badge */}
+            <div className="absolute -bottom-1 -right-1 bg-green-500 w-4 h-4 rounded-full border-2 border-white"></div>
+          </div>
+          
+          {/* ข้อมูล */}
+          <div className="text-white">
+            <h1 className="text-xl font-black drop-shadow-sm">{userData.name}</h1>
+            <p className="text-[11px] font-medium opacity-90">{userData.phone}</p>
+            <div className="inline-block mt-1 bg-white/20 px-2 py-0.5 rounded-full text-[9px] font-bold backdrop-blur-sm">
+              {userData.role} • สมาชิกตั้งแต่ {userData.joinedDate}
+            </div>
+          </div>
         </div>
       </header>
 
-      <main className="max-w-xl mx-auto px-4 py-5 space-y-4">
-        {error && <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 text-sm">⚠️ {error}</div>}
-        {successMsg && <div className="bg-green-50 border border-green-200 text-green-700 rounded-xl p-3 text-sm font-medium">{successMsg}</div>}
-
-        {activeTab === 'profile' && (
-          <>
-            <div className="bg-white rounded-2xl p-5 shadow-sm">
-              <div className="flex items-center gap-4 mb-4">
-                <div className="w-16 h-16 bg-blue-900 rounded-full flex items-center justify-center text-white font-black text-2xl">
-                  {profile?.full_name?.charAt(0) || '?'}
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold text-gray-800">{profile?.full_name}</h2>
-                  <p className="text-sm text-gray-500">📍 {profile?.location || 'ปากน้ำประแส'}</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    {profile?.is_verified && <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">✓ Verified</span>}
-                    <span className="text-xs text-gray-400">⭐ {(profile?.avg_rating || 0).toFixed(1)} · {profile?.total_jobs || 0} งาน</span>
-                  </div>
-                </div>
-              </div>
-              {(profile?.skills || []).length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mb-3">
-                  {(profile?.skills || []).map((skill, i) => (
-                    <span key={i} className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded-full border border-blue-100">{skill}</span>
-                  ))}
-                </div>
-              )}
-              {profile?.bio && <p className="text-sm text-gray-600 italic">"{profile.bio}"</p>}
+      <main className="max-w-xl mx-auto px-4 -mt-10 relative z-20 space-y-4">
+        
+        {/* ── 🌟 1. ส่วนยืนยันตัวตน (KYC) 🌟 ── */}
+        <section className={`rounded-2xl p-4 shadow-sm border ${kycStatus === 'verified' ? 'bg-green-50 border-green-100' : 'bg-white border-orange-100'}`}>
+          <div className="flex items-start gap-3">
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl shrink-0 ${kycStatus === 'verified' ? 'bg-green-100' : 'bg-orange-50'}`}>
+              {kycStatus === 'verified' ? '🛡️' : '⚠️'}
             </div>
-
-            <div className="bg-white rounded-2xl p-5 shadow-sm">
-              <h3 className="text-sm font-bold text-gray-800 mb-3">✏️ แก้ไขโปรไฟล์</h3>
-              <div className="space-y-3">
-                <div>
-                  <label className="text-xs font-medium text-gray-500 mb-1 block">เบอร์โทรศัพท์</label>
-                  <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="08X-XXX-XXXX"
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-gray-500 mb-1 block">ที่อยู่</label>
-                  <input type="text" value={location} onChange={e => setLocation(e.target.value)} placeholder="ที่อยู่ / หมู่บ้าน"
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-gray-500 mb-1 block">แนะนำตัว (Bio)</label>
-                  <textarea value={bio} onChange={e => setBio(e.target.value)} rows={3} placeholder="แนะนำตัวเองสั้นๆ เช่น ช่างไฟประสบการณ์ 10 ปี..."
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none" />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-2xl p-5 shadow-sm">
-              <h3 className="text-sm font-bold text-gray-800 mb-3">🏷️ ทักษะ / ความเชี่ยวชาญ</h3>
-              <p className="text-xs text-gray-400 mb-3">เลือกทักษะที่คุณมี (แสดงบน Marketplace)</p>
-              <div className="flex flex-wrap gap-2">
-                {SKILL_OPTIONS.map(skill => (
-                  <button key={skill} onClick={() => toggleSkill(skill)}
-                    className={`text-xs px-3 py-1.5 rounded-full border transition-all ${
-                      selectedSkills.includes(skill)
-                        ? 'bg-blue-600 text-white border-blue-600'
-                        : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-blue-300'
-                    }`}
-                  >
-                    {skill}
-                  </button>
-                ))}
-              </div>
-              <p className="text-xs text-gray-400 mt-2">เลือกแล้ว: {selectedSkills.length} ทักษะ</p>
-            </div>
-
-            <button onClick={saveProfile} disabled={saving}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white font-bold py-3 rounded-xl text-sm transition-colors">
-              {saving ? '⏳ กำลังบันทึก...' : '💾 บันทึกโปรไฟล์'}
-            </button>
-          </>
-        )}
-
-        {activeTab === 'kyc' && (
-          <>
-            <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
-              <h3 className="text-sm font-bold text-blue-800 mb-1">🪪 ยืนยันตัวตน (KYC)</h3>
-              <p className="text-xs text-blue-600">เพื่อรับงานและโอนเงินได้ กรุณายืนยันตัวตนก่อน</p>
-              <div className={`mt-2 inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-full font-medium ${kycStatusInfo.bg} ${kycStatusInfo.color}`}>
-                {kycStatusInfo.emoji} {kycStatusInfo.label}
-              </div>
-            </div>
-
-            {(profile?.kyc_status === 'none' || profile?.kyc_status === 'rejected' || !profile?.kyc_status) && (
-              <div className="space-y-4">
-                <div className="bg-white rounded-2xl p-5 shadow-sm">
-                  <h3 className="text-sm font-bold text-gray-800 mb-3">🏦 บัญชีธนาคาร</h3>
-                  <div className="space-y-3">
-                    <div>
-                      <label className="text-xs font-medium text-gray-500 mb-1 block">ชื่อธนาคาร</label>
-                      <input type="text" value={bankName} onChange={e => setBankName(e.target.value)} placeholder="เช่น กสิกรไทย, SCB, กรุงไทย"
-                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-gray-500 mb-1 block">เลขบัญชี *</label>
-                      <input type="text" value={bankAccount} onChange={e => setBankAccount(e.target.value)} placeholder="XXX-X-XXXXX-X"
-                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
-                    </div>
-                  </div>
-                  <p className="text-xs text-orange-600 mt-2">🔒 ข้อมูลนี้เห็นได้เฉพาะ Admin เท่านั้น</p>
-                </div>
-
-                <div className="bg-white rounded-2xl p-5 shadow-sm">
-                  <h3 className="text-sm font-bold text-gray-800 mb-3">🪪 รูปบัตรประชาชน *</h3>
-                  <div onClick={() => idCardRef.current?.click()}
-                    className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-colors ${idCardUrl ? 'border-green-300 bg-green-50' : 'border-gray-200 hover:border-blue-300'}`}>
-                    {uploading === 'id_card' ? (
-                      <div className="py-3"><div className="text-2xl animate-spin inline-block">⏳</div><p className="text-xs text-gray-500 mt-1">กำลังอัปโหลด...</p></div>
-                    ) : idCardUrl ? (
-                      <div>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={idCardUrl} alt="ID Card" className="max-h-32 mx-auto rounded-lg object-cover mb-1" />
-                        <p className="text-xs text-green-600">✅ อัปโหลดแล้ว — คลิกเพื่อเปลี่ยน</p>
-                      </div>
-                    ) : (
-                      <div className="py-3"><div className="text-3xl mb-1">🪪</div><p className="text-sm text-gray-500">แตะเพื่ออัปโหลดบัตรประชาชน</p></div>
-                    )}
-                  </div>
-                  <input ref={idCardRef} type="file" accept="image/*" className="hidden"
-                    onChange={async (e) => {
-                      const f = e.target.files?.[0];
-                      if (f) { const url = await uploadFile(f, 'id_card'); if (url) setIdCardUrl(url); }
-                    }} />
-                </div>
-
-                <div className="bg-white rounded-2xl p-5 shadow-sm">
-                  <h3 className="text-sm font-bold text-gray-800 mb-1">🤳 รูปถ่ายคู่บัตร (Selfie with ID) *</h3>
-                  <p className="text-xs text-gray-400 mb-3">ถ่ายรูปตัวเองพร้อมถือบัตรประชาชนให้เห็นชัด</p>
-                  <div onClick={() => selfieRef.current?.click()}
-                    className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-colors ${selfieUrl ? 'border-green-300 bg-green-50' : 'border-gray-200 hover:border-blue-300'}`}>
-                    {uploading === 'selfie' ? (
-                      <div className="py-3"><div className="text-2xl animate-spin inline-block">⏳</div><p className="text-xs text-gray-500 mt-1">กำลังอัปโหลด...</p></div>
-                    ) : selfieUrl ? (
-                      <div>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={selfieUrl} alt="Selfie" className="max-h-32 mx-auto rounded-lg object-cover mb-1" />
-                        <p className="text-xs text-green-600">✅ อัปโหลดแล้ว — คลิกเพื่อเปลี่ยน</p>
-                      </div>
-                    ) : (
-                      <div className="py-3"><div className="text-3xl mb-1">🤳</div><p className="text-sm text-gray-500">แตะเพื่ออัปโหลดรูปถ่ายคู่บัตร</p></div>
-                    )}
-                  </div>
-                  <input ref={selfieRef} type="file" accept="image/*" className="hidden"
-                    onChange={async (e) => {
-                      const f = e.target.files?.[0];
-                      if (f) { const url = await uploadFile(f, 'selfie'); if (url) setSelfieUrl(url); }
-                    }} />
-                </div>
-
-                <button onClick={saveKYC} disabled={saving || !!uploading}
-                  className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white font-bold py-3 rounded-xl text-sm transition-colors">
-                  {saving ? '⏳ กำลังส่ง...' : '📤 ส่งข้อมูล KYC เพื่อตรวจสอบ'}
-                </button>
-              </div>
-            )}
-
-            {profile?.kyc_status === 'pending' && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-5 text-center">
-                <div className="text-4xl mb-2">⏳</div>
-                <p className="text-yellow-800 font-bold">รอ Admin ตรวจสอบ</p>
-                <p className="text-yellow-600 text-sm mt-1">ปกติใช้เวลา 1-24 ชั่วโมง</p>
-              </div>
-            )}
-
-            {!profile?.kyc_status && (
-              <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-xl">
-                <p className="text-sm text-orange-700 font-medium mb-2">🪪 ยังไม่ได้ยืนยันตัวตน</p>
-                <a
-                  href="/profile/kyc"
-                  className="block w-full text-center bg-orange-500 text-white py-2 rounded-xl text-sm font-semibold hover:bg-orange-600 transition"
+            <div className="flex-1">
+              <h2 className="text-sm font-black text-gray-800">
+                {kycStatus === 'verified' ? 'ยืนยันตัวตนสำเร็จ' : 'การยืนยันตัวตน (KYC)'}
+              </h2>
+              <p className="text-[10px] text-gray-500 mt-0.5 leading-relaxed">
+                {kycStatus === 'verified' 
+                  ? 'บัญชีของคุณมีความน่าเชื่อถือสูง สามารถใช้งานได้ทุกฟีเจอร์' 
+                  : kycStatus === 'pending'
+                    ? 'เอกสารของคุณกำลังอยู่ในขั้นตอนการตรวจสอบโดยแอดมิน'
+                    : 'อัปโหลดรูปถ่ายบัตรประชาชนเพื่อเพิ่มความน่าเชื่อถือ และรับสิทธิพิเศษในการจ้างงาน'}
+              </p>
+              
+              {kycStatus === 'unverified' && (
+                <button 
+                  onClick={handleKycUpload}
+                  className="mt-3 w-full py-2 bg-gradient-to-r from-[#F05D40] to-[#FF8769] text-white text-[11px] font-bold rounded-xl hover:opacity-90 transition-opacity shadow-sm"
                 >
-                  เริ่มยืนยันตัวตน (KYC)
-                </a>
-              </div>
-            )}
-            {profile?.kyc_status === 'approved' && (
-              <div className="bg-green-50 border border-green-200 rounded-2xl p-5 text-center">
-                <div className="text-4xl mb-2">✅</div>
-                <p className="text-green-800 font-bold">ยืนยันตัวตนสำเร็จแล้ว!</p>
-                <p className="text-green-600 text-sm mt-1">คุณสามารถรับงานและรับเงินได้แล้ว</p>
-                <button onClick={() => router.push('/dashboard')}
-                  className="mt-3 bg-green-600 text-white text-sm px-5 py-2 rounded-xl font-medium">
-                  ไปรับงานเลย →
+                  📸 ถ่ายรูปบัตรประชาชน
                 </button>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* ── 2. เมนูจัดการบัญชี ── */}
+        <section className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-50 text-xs font-bold text-gray-400">
+            การตั้งค่าและการเดินทาง
+          </div>
+          
+          <div className="divide-y divide-gray-50">
+            {/* เมนูที่อยู่ */}
+            <button className="w-full px-4 py-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-500 text-sm">📍</div>
+                <div className="text-left">
+                  <div className="text-xs font-bold text-gray-800">ที่อยู่ของฉัน</div>
+                  <div className="text-[10px] text-gray-500 mt-0.5 line-clamp-1">{userData.address}</div>
+                </div>
               </div>
-            )}
-          </>
-        )}
+              <span className="text-gray-300 text-lg">›</span>
+            </button>
+
+            {/* เมนูประวัติ */}
+            <button className="w-full px-4 py-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-purple-50 flex items-center justify-center text-purple-500 text-sm">📝</div>
+                <div className="text-left">
+                  <div className="text-xs font-bold text-gray-800">ประวัติการจ้างงาน</div>
+                  <div className="text-[10px] text-gray-500 mt-0.5">ดูงานที่ผ่านมาและรีวิว</div>
+                </div>
+              </div>
+              <span className="text-gray-300 text-lg">›</span>
+            </button>
+
+            {/* เมนูบัญชีรับเงิน (สำหรับช่าง) */}
+            <button className="w-full px-4 py-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-green-50 flex items-center justify-center text-green-500 text-sm">🏦</div>
+                <div className="text-left">
+                  <div className="text-xs font-bold text-gray-800">บัญชีธนาคาร / รับเงิน</div>
+                  <div className="text-[10px] text-gray-500 mt-0.5">จัดการช่องทางการรับ-จ่ายเงิน</div>
+                </div>
+              </div>
+              <span className="text-gray-300 text-lg">›</span>
+            </button>
+          </div>
+        </section>
+
+        {/* ── 3. เมนูช่วยเหลือ ── */}
+        <section className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="divide-y divide-gray-50">
+            <button className="w-full px-4 py-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-orange-50 flex items-center justify-center text-orange-500 text-sm">💬</div>
+                <span className="text-xs font-bold text-gray-800">ติดต่อแอดมิน (ช่วยเหลือ)</span>
+              </div>
+              <span className="text-gray-300 text-lg">›</span>
+            </button>
+            <button className="w-full px-4 py-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center text-gray-500 text-sm">📄</div>
+                <span className="text-xs font-bold text-gray-800">เงื่อนไขและข้อตกลง</span>
+              </div>
+              <span className="text-gray-300 text-lg">›</span>
+            </button>
+          </div>
+        </section>
+
+        {/* ── 4. ปุ่มออกจากระบบ ── */}
+        <button className="w-full py-3.5 mt-4 bg-red-50 text-red-500 text-xs font-bold rounded-2xl hover:bg-red-100 transition-colors border border-red-100">
+          ออกจากระบบ
+        </button>
+        
+        <div className="text-center pb-4 pt-2">
+          <span className="text-[9px] text-gray-300">Jong Jaroen App v1.0.0</span>
+        </div>
+
       </main>
 
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 flex justify-around py-2 z-50">
-        <Link href="/" className="flex flex-col items-center text-gray-400 text-xs gap-0.5"><span>🏠</span>หน้าหลัก</Link>
-        <Link href="/services" className="flex flex-col items-center text-gray-400 text-xs gap-0.5"><span>🔍</span>ค้นหา</Link>
-        <Link href="/dashboard" className="flex flex-col items-center text-gray-400 text-xs gap-0.5"><span>📋</span>งานของฉัน</Link>
-        <Link href="/profile" className="flex flex-col items-center text-blue-600 text-xs gap-0.5"><span>👤</span>โปรไฟล์</Link>
+      {/* 🛠️ Bottom Nav (หน้า โปรไฟล์ Active) 🛠️ */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 flex justify-around py-2 z-[100] shadow-[0_-5px_20px_rgba(0,0,0,0.05)] pb-safe">
+        <Link href="/" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-orange-400 transition-colors">
+          <span className="text-xl">🏠</span>
+          <span className="text-[10px]">หน้าแรก</span>
+        </Link>
+        <Link href="/news" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-orange-400 transition-colors">
+          <span className="text-xl">📰</span>
+          <span className="text-[10px]">ข่าวสาร</span>
+        </Link>
+        <Link href="/coupons" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-orange-400 transition-colors">
+          <span className="text-xl">🎟️</span>
+          <span className="text-[10px]">รางวัล</span>
+        </Link>
+        <Link href="/dashboard" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-orange-400 transition-colors">
+          <span className="text-xl">📋</span>
+          <span className="text-[10px]">งาน</span>
+        </Link>
+        <Link href="/profile" className="flex flex-col items-center gap-0.5 font-bold" style={{ color: themePalette.primaryOrange }}>
+          <span className="text-xl">👤</span>
+          <span className="text-[10px]">ฉัน</span>
+        </Link>
       </nav>
     </div>
-  );
-}
-
-export default function ProfilePage() {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center"><div className="text-4xl animate-bounce mb-2">👤</div><p className="text-gray-500 text-sm">กำลังโหลด...</p></div>
-      </div>
-    }>
-      <ProfileContent />
-    </Suspense>
   );
 }
