@@ -1,190 +1,157 @@
 'use client';
-import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
 // ── Soft Shopee Palette ─────────────────────────────────────────
 const themePalette = {
   primaryOrange: '#F05D40', 
-  lightOrange: '#FF8769',   
-  bgGray: '#F9FAFB',        
-};
-
-// 🌟 Mock Data: ข้อมูลผู้ใช้งาน 🌟
-const userData = {
-  name: 'บีสาม',
-  role: 'ลูกค้าทั่วไป',
-  phone: '089-XXX-XXXX',
-  address: 'ต.ปากน้ำประแส อ.แกลง จ.ระยอง',
-  kycStatus: 'unverified', // สถานะ KYC: 'verified' | 'unverified' | 'pending'
-  joinedDate: 'ม.ค. 2569'
+  bgGray: '#F4F6F8',        
 };
 
 export default function ProfilePage() {
-  const [kycStatus, setKycStatus] = useState(userData.kycStatus);
+  const router = useRouter();
 
-  // จำลองฟังก์ชันกดปุ่มอัปโหลดบัตรประชาชน
-  const handleKycUpload = () => {
-    alert('ระบบกำลังเปิดกล้องเพื่อถ่ายรูปบัตรประชาชน...');
-    setKycStatus('pending');
+  const handleLogout = () => {
+    alert('จำลองการออกจากระบบ (รอคุณ C เชื่อมต่อ Supabase Auth ค่ะ)');
+    // router.push('/login');
   };
 
   return (
-    <div className="min-h-screen pb-28 relative" style={{ backgroundColor: themePalette.bgGray }}>
+    <div className="min-h-screen pb-28 max-w-md mx-auto relative selection:bg-orange-200" style={{ backgroundColor: themePalette.bgGray }}>
       
-      {/* ── Header: ข้อมูลผู้ใช้ ── */}
-      <header className="pt-12 pb-20 px-4 relative overflow-hidden rounded-b-[40px]"
-        style={{ background: `linear-gradient(135deg, ${themePalette.primaryOrange} 0%, ${themePalette.lightOrange} 100%)` }}>
-        <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/20 rounded-full blur-3xl"></div>
-        <div className="absolute left-0 top-10 w-20 h-20 bg-yellow-300/20 rounded-full blur-2xl"></div>
-        
-        <div className="max-w-xl mx-auto relative z-10 flex items-center gap-4">
-          {/* Avatar */}
-          <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center text-2xl shadow-md border-2 border-white/50 relative">
-            🧑🏻‍💻
-            {/* Badge */}
-            <div className="absolute -bottom-1 -right-1 bg-green-500 w-4 h-4 rounded-full border-2 border-white"></div>
+      {/* ── Profile Header (Gradient) ── */}
+      <div className="bg-gradient-to-b from-[#F05D40] to-[#FF8769] px-5 pt-12 pb-8 rounded-b-[32px] shadow-sm relative z-10 text-white">
+        <div className="flex justify-between items-start mb-2">
+          <h1 className="text-xl font-bold drop-shadow-sm">โปรไฟล์ของฉัน</h1>
+          <button className="p-2 bg-white/20 rounded-full backdrop-blur-sm border border-white/30 hover:bg-white/30 transition">
+            ⚙️
+          </button>
+        </div>
+
+        <div className="flex items-center gap-4 mt-6">
+          <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center text-4xl shadow-inner border-4 border-white/30">
+            👦🏻
           </div>
-          
-          {/* ข้อมูล */}
-          <div className="text-white">
-            <h1 className="text-xl font-black drop-shadow-sm">{userData.name}</h1>
-            <p className="text-[11px] font-medium opacity-90">{userData.phone}</p>
-            <div className="inline-block mt-1 bg-white/20 px-2 py-0.5 rounded-full text-[9px] font-bold backdrop-blur-sm">
-              {userData.role} • สมาชิกตั้งแต่ {userData.joinedDate}
+          <div>
+            <h2 className="text-2xl font-black drop-shadow-sm">คุณบีสาม</h2>
+            <p className="text-white/90 text-sm font-medium mt-1 flex items-center gap-1">
+              📍 ปากน้ำประแส, ระยอง
+            </p>
+            <div className="mt-2 inline-flex items-center gap-1 bg-white/20 px-2 py-0.5 rounded-full text-xs font-bold border border-white/30 backdrop-blur-sm">
+              ✅ ยืนยันตัวตนแล้ว
             </div>
           </div>
         </div>
-      </header>
+      </div>
 
-      <main className="max-w-xl mx-auto px-4 -mt-10 relative z-20 space-y-4">
+      <main className="px-4 mt-6 space-y-4">
         
-        {/* ── 🌟 1. ส่วนยืนยันตัวตน (KYC) 🌟 ── */}
-        <section className={`rounded-2xl p-4 shadow-sm border ${kycStatus === 'verified' ? 'bg-green-50 border-green-100' : 'bg-white border-orange-100'}`}>
-          <div className="flex items-start gap-3">
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl shrink-0 ${kycStatus === 'verified' ? 'bg-green-100' : 'bg-orange-50'}`}>
-              {kycStatus === 'verified' ? '🛡️' : '⚠️'}
+        {/* ── Wallet / Balance ── */}
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-orange-50 rounded-full flex items-center justify-center text-2xl text-[#F05D40]">
+              👛
             </div>
-            <div className="flex-1">
-              <h2 className="text-sm font-black text-gray-800">
-                {kycStatus === 'verified' ? 'ยืนยันตัวตนสำเร็จ' : 'การยืนยันตัวตน (KYC)'}
-              </h2>
-              <p className="text-[10px] text-gray-500 mt-0.5 leading-relaxed">
-                {kycStatus === 'verified' 
-                  ? 'บัญชีของคุณมีความน่าเชื่อถือสูง สามารถใช้งานได้ทุกฟีเจอร์' 
-                  : kycStatus === 'pending'
-                    ? 'เอกสารของคุณกำลังอยู่ในขั้นตอนการตรวจสอบโดยแอดมิน'
-                    : 'อัปโหลดรูปถ่ายบัตรประชาชนเพื่อเพิ่มความน่าเชื่อถือ และรับสิทธิพิเศษในการจ้างงาน'}
-              </p>
-              
-              {kycStatus === 'unverified' && (
-                <button 
-                  onClick={handleKycUpload}
-                  className="mt-3 w-full py-2 bg-gradient-to-r from-[#F05D40] to-[#FF8769] text-white text-[11px] font-bold rounded-xl hover:opacity-90 transition-opacity shadow-sm"
-                >
-                  📸 ถ่ายรูปบัตรประชาชน
-                </button>
-              )}
+            <div>
+              <p className="text-[11px] text-gray-500 font-bold">ยอดเงินในระบบ</p>
+              <p className="text-xl font-black text-gray-800">1,250 <span className="text-sm">บาท</span></p>
             </div>
           </div>
-        </section>
+          <button className="bg-[#F05D40] text-white text-xs font-bold px-4 py-2 rounded-xl shadow-md shadow-orange-200 active:scale-95 transition-transform">
+            ถอนเงิน
+          </button>
+        </div>
 
-        {/* ── 2. เมนูจัดการบัญชี ── */}
-        <section className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-50 text-xs font-bold text-gray-400">
-            การตั้งค่าและการเดินทาง
+        {/* ── Menu Group 1: บัญชีของฉัน ── */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-5 py-3 border-b border-gray-50 bg-gray-50/50">
+            <h3 className="text-[13px] font-bold text-gray-600">บัญชีของฉัน</h3>
           </div>
           
-          <div className="divide-y divide-gray-50">
-            {/* เมนูที่อยู่ */}
-            <button className="w-full px-4 py-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-500 text-sm">📍</div>
-                <div className="text-left">
-                  <div className="text-xs font-bold text-gray-800">ที่อยู่ของฉัน</div>
-                  <div className="text-[10px] text-gray-500 mt-0.5 line-clamp-1">{userData.address}</div>
-                </div>
-              </div>
-              <span className="text-gray-300 text-lg">›</span>
-            </button>
+          <button className="w-full px-5 py-4 flex items-center justify-between border-b border-gray-50 hover:bg-gray-50 transition-colors active:bg-gray-100">
+            <div className="flex items-center gap-3">
+              <span className="text-xl">📝</span>
+              <span className="text-[15px] font-bold text-gray-700">แก้ไขข้อมูลส่วนตัว</span>
+            </div>
+            <span className="text-gray-400">❯</span>
+          </button>
+          
+          <button className="w-full px-5 py-4 flex items-center justify-between border-b border-gray-50 hover:bg-gray-50 transition-colors active:bg-gray-100">
+            <div className="flex items-center gap-3">
+              <span className="text-xl">💳</span>
+              <span className="text-[15px] font-bold text-gray-700">บัญชีธนาคารรับเงิน</span>
+            </div>
+            <span className="text-gray-400">❯</span>
+          </button>
 
-            {/* เมนูประวัติ */}
-            <button className="w-full px-4 py-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-purple-50 flex items-center justify-center text-purple-500 text-sm">📝</div>
-                <div className="text-left">
-                  <div className="text-xs font-bold text-gray-800">ประวัติการจ้างงาน</div>
-                  <div className="text-[10px] text-gray-500 mt-0.5">ดูงานที่ผ่านมาและรีวิว</div>
-                </div>
-              </div>
-              <span className="text-gray-300 text-lg">›</span>
-            </button>
+          <button 
+            onClick={() => router.push('/services/manage')}
+            className="w-full px-5 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors active:bg-gray-100"
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-xl">🏪</span>
+              <span className="text-[15px] font-bold text-gray-700">จัดการประกาศรับงานของฉัน</span>
+            </div>
+            <span className="text-gray-400">❯</span>
+          </button>
+        </div>
 
-            {/* เมนูบัญชีรับเงิน (สำหรับช่าง) */}
-            <button className="w-full px-4 py-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-green-50 flex items-center justify-center text-green-500 text-sm">🏦</div>
-                <div className="text-left">
-                  <div className="text-xs font-bold text-gray-800">บัญชีธนาคาร / รับเงิน</div>
-                  <div className="text-[10px] text-gray-500 mt-0.5">จัดการช่องทางการรับ-จ่ายเงิน</div>
-                </div>
-              </div>
-              <span className="text-gray-300 text-lg">›</span>
-            </button>
+        {/* ── Menu Group 2: ช่วยเหลือ & ตั้งค่า ── */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-5 py-3 border-b border-gray-50 bg-gray-50/50">
+            <h3 className="text-[13px] font-bold text-gray-600">ช่วยเหลือ & ตั้งค่า</h3>
           </div>
-        </section>
+          
+          <button className="w-full px-5 py-4 flex items-center justify-between border-b border-gray-50 hover:bg-gray-50 transition-colors active:bg-gray-100">
+            <div className="flex items-center gap-3">
+              <span className="text-xl">🎧</span>
+              <span className="text-[15px] font-bold text-gray-700">ติดต่อศูนย์ช่วยเหลือ</span>
+            </div>
+            <span className="text-gray-400">❯</span>
+          </button>
 
-        {/* ── 3. เมนูช่วยเหลือ ── */}
-        <section className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="divide-y divide-gray-50">
-            <button className="w-full px-4 py-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-orange-50 flex items-center justify-center text-orange-500 text-sm">💬</div>
-                <span className="text-xs font-bold text-gray-800">ติดต่อแอดมิน (ช่วยเหลือ)</span>
-              </div>
-              <span className="text-gray-300 text-lg">›</span>
-            </button>
-            <button className="w-full px-4 py-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center text-gray-500 text-sm">📄</div>
-                <span className="text-xs font-bold text-gray-800">เงื่อนไขและข้อตกลง</span>
-              </div>
-              <span className="text-gray-300 text-lg">›</span>
-            </button>
-          </div>
-        </section>
+          <button className="w-full px-5 py-4 flex items-center justify-between border-b border-gray-50 hover:bg-gray-50 transition-colors active:bg-gray-100">
+            <div className="flex items-center gap-3">
+              <span className="text-xl">📜</span>
+              <span className="text-[15px] font-bold text-gray-700">เงื่อนไขและข้อตกลง</span>
+            </div>
+            <span className="text-gray-400">❯</span>
+          </button>
 
-        {/* ── 4. ปุ่มออกจากระบบ ── */}
-        <button className="w-full py-3.5 mt-4 bg-red-50 text-red-500 text-xs font-bold rounded-2xl hover:bg-red-100 transition-colors border border-red-100">
-          ออกจากระบบ
-        </button>
-        
-        <div className="text-center pb-4 pt-2">
-          <span className="text-[9px] text-gray-300">Jong Jaroen App v1.0.0</span>
+          <button 
+            onClick={handleLogout}
+            className="w-full px-5 py-4 flex items-center justify-between hover:bg-red-50 transition-colors active:bg-red-100 group"
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-xl">🚪</span>
+              <span className="text-[15px] font-bold text-red-500 group-hover:text-red-600">ออกจากระบบ</span>
+            </div>
+          </button>
         </div>
 
       </main>
 
-      {/* 🛠️ Bottom Nav (หน้า โปรไฟล์ Active) 🛠️ */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 flex justify-around py-2 z-[100] shadow-[0_-5px_20px_rgba(0,0,0,0.05)] pb-safe">
-        <Link href="/" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-orange-400 transition-colors">
-          <span className="text-xl">🏠</span>
-          <span className="text-[10px]">หน้าแรก</span>
+      {/* ── Bottom Navigation Bar (เน้นปุ่ม Profile) ── */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 flex justify-around py-2 z-50 shadow-[0_-5px_20px_rgba(0,0,0,0.05)] pb-safe">
+        <Link href="/" className="flex flex-col items-center gap-1 text-gray-400 hover:text-[#F05D40] transition-colors">
+          <span className="text-[22px]">🏠</span>
+          <span className="text-[10px] font-medium">หน้าแรก</span>
         </Link>
-        <Link href="/news" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-orange-400 transition-colors">
-          <span className="text-xl">📰</span>
-          <span className="text-[10px]">ข่าวสาร</span>
+        <Link href="/services" className="flex flex-col items-center gap-1 text-gray-400 hover:text-[#F05D40] transition-colors">
+          <span className="text-[22px]">🛠️</span>
+          <span className="text-[10px] font-medium">บริการ</span>
         </Link>
-        <Link href="/coupons" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-orange-400 transition-colors">
-          <span className="text-xl">🎟️</span>
-          <span className="text-[10px]">รางวัล</span>
+        <Link href="/jobs" className="flex flex-col items-center gap-1 text-gray-400 hover:text-[#F05D40] transition-colors">
+          <span className="text-[22px]">📋</span>
+          <span className="text-[10px] font-medium">งานด่วน</span>
         </Link>
-        <Link href="/dashboard" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-orange-400 transition-colors">
-          <span className="text-xl">📋</span>
-          <span className="text-[10px]">งาน</span>
+        <Link href="/history" className="flex flex-col items-center gap-1 text-gray-400 hover:text-[#F05D40] transition-colors">
+          <span className="text-[22px]">🧾</span>
+          <span className="text-[10px] font-medium">ประวัติ</span>
         </Link>
-        <Link href="/profile" className="flex flex-col items-center gap-0.5 font-bold" style={{ color: themePalette.primaryOrange }}>
-          <span className="text-xl">👤</span>
-          <span className="text-[10px]">ฉัน</span>
+        <Link href="/profile" className="flex flex-col items-center gap-1 text-[#F05D40]">
+          <span className="text-[22px]">👤</span>
+          <span className="text-[10px] font-bold">ฉัน</span>
         </Link>
       </nav>
     </div>
