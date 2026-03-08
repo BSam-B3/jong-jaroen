@@ -1,11 +1,12 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
-// ── Soft Shopee Palette ─────────────────────────────────────────
+// ── Soft Shopee Palette ───────────────────────────────────────────────────────────────────────────────────────
 const themePalette = {
   primaryOrange: '#F05D40', 
-  bgGray: '#F9FAFB',        
+  bgGray: '#F9FAFB',         
 };
 
 export default function NewServicePage() {
@@ -13,12 +14,37 @@ export default function NewServicePage() {
   const [desc, setDesc] = useState('');
   const [price, setPrice] = useState('');
   const [category, setCategory] = useState('aircon');
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const supabase = createClientComponentClient();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    alert('เจมจำลองการกดบันทึกข้อมูลค่ะ! (รอคุณ C มาต่อท่อเข้าฐานข้อมูลนะคะ)');
-    router.push('/services');
+    setLoading(true);
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      alert('กรุณาเข้าสู่ระบบก่อนลงประกาศ');
+      setLoading(false);
+      return;
+    }
+
+    const { error } = await supabase
+      .from('provider_services')
+      .insert({
+        provider_id: user.id,
+        category,
+        title,
+        description: desc,
+        price_start: Number(price),
+      });
+
+    setLoading(false);
+    if (error) {
+      alert('เกิดข้อผิดพลาด: ' + error.message);
+    } else {
+      router.push('/services');
+    }
   };
 
   return (
@@ -100,9 +126,10 @@ export default function NewServicePage() {
           <div className="pt-2">
             <button 
               type="submit" 
-              className="w-full bg-[#F05D40] hover:bg-[#E04D30] text-white text-base font-bold py-3.5 rounded-xl shadow-md shadow-orange-200 active:scale-95 transition-all"
+              disabled={loading}
+              className="w-full bg-[#F05D40] hover:bg-[#E04D30] text-white text-base font-bold py-3.5 rounded-xl shadow-md shadow-orange-200 active:scale-95 transition-all disabled:opacity-50"
             >
-              บันทึกการลงประกาศ
+              {loading ? 'กำลังบันทึก...' : 'บันทึกการลงประกาศ'}
             </button>
           </div>
           
