@@ -74,7 +74,7 @@ export default function JobChatPage() {
           event: 'INSERT',
           schema: 'public',
           table: 'job_messages',
-          filter: 'job_id=eq.' + jobId,
+          filter: `job_id=eq.${jobId}`,
         }, (payload) => {
           setMessages((prev) => [...prev, payload.new as Message]);
         })
@@ -130,7 +130,7 @@ export default function JobChatPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col max-w-md mx-auto relative">
-      {/* Header */}
+      {/* ส่วนหัว */}
       <div className="bg-white shadow-sm px-4 py-4 flex items-center gap-3 sticky top-0 z-10">
         <button onClick={() => router.back()} className="text-gray-600 text-3xl font-bold pr-2">
           ←
@@ -140,13 +140,13 @@ export default function JobChatPage() {
             {job?.destination || 'แชทคุยงาน'}
           </h1>
           <p className="text-sm font-bold text-gray-500">
-            {job?.status === 'in_progress' ? '🔵 กำลังคุยกัน' :
+            {job?.status === 'in_progress' ? '🔵 กำลังดำเนินการ' :
              job?.status === 'completed' ? '✅ งานนี้จบแล้ว' : '📍 ' + job?.status}
           </p>
         </div>
       </div>
 
-      {/* ปุ่มกดเสร็จงานสำหรับผู้ช่วย */}
+      {/* ปุ่มจบงานสำหรับผู้ช่วย */}
       {isProvider && job?.status === 'in_progress' && (
         <div className="px-4 pt-4">
           <button
@@ -160,7 +160,7 @@ export default function JobChatPage() {
         </div>
       )}
 
-      {/* พื้นที่แสดงข้อความ */}
+      {/* พื้นที่แชท */}
       <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4 pb-32">
         {messages.map((msg) => {
           const isMine = msg.sender_id === currentUser?.id;
