@@ -1,154 +1,90 @@
 'use client';
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
-  const router = useRouter();
-  const [step, setStep] = useState('phone'); // 'phone' | 'otp'
-  const [phone, setPhone] = useState('');
-  const [otp, setOtp] = useState('');
+  const [loginMethod, setLoginMethod] = useState<'email' | 'phone'>('phone');
+  const [emailOrPhone, setEmailOrPhone] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const router = useRouter();
 
-  // ฟอร์แมตเบอร์ไทยเป็น E.164 (+66xxxxxxxxx)
-  function formatPhone(raw) {
-    const digits = raw.replace(/\D/g, '');
-    if (digits.startsWith('0')) return '+66' + digits.slice(1);
-    if (digits.startsWith('66')) return '+' + digits;
-    return '+' + digits;
-  }
+  // 🌍 ฟังก์ชันเข้าสู่ระบบด้วย Social Media
+  const handleSocialLogin = async (provider: 'line' | 'facebook' | 'google') => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: provider,
+      options: {
+        redirectTo: `${window.location.origin}/services`
+      }
+    });
+    if (error) alert(`เกิดข้อผิดพลาดในการเชื่อมต่อ ${provider}: ` + error.message);
+  };
 
-  async function handleSendOtp(e) {
+  // ✉️📱 ฟังก์ชันเข้าสู่ระบบด้วย อีเมล หรือ เบอร์โทร
+  const handleTraditionalAuth = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setLoading(true);
-    try {
-      const formatted = formatPhone(phone);
-      const { error: otpErr } = await supabase.auth.signInWithOtp({ phone: formatted });
-      if (otpErr) throw otpErr;
-      setStep('otp');
-    } catch (err) {
-      setError(err.message || 'ส่ง OTP ไม่สำเร็จ กรุณาลองใหม่');
-    } finally {
-      setLoading(false);
+    if (!emailOrPhone || !password) {
+      alert('กรุณากรอกข้อมูลให้ครบถ้วนค่ะ');
+      return;
     }
-  }
-
-  async function handleVerifyOtp(e) {
-    e.preventDefault();
-    setError('');
+    
     setLoading(true);
-    try {
-      const formatted = formatPhone(phone);
-      const { error: verifyErr } = await supabase.auth.verifyOtp({
-        phone: formatted,
-        token: otp,
-        type: 'sms',
-      });
-      if (verifyErr) throw verifyErr;
-      router.push('/');
-    } catch (err) {
-      setError(err.message || 'รหัส OTP ไม่ถูกต้อง กรุณาลองใหม่');
-    } finally {
+    alert(`กำลังเข้าสู่ระบบด้วย ${loginMethod === 'phone' ? 'เบอร์โทร' : 'อีเมล'}\n(รอคุณ C เปิดระบบหลังบ้านให้ครบก่อนนะคะ)`);
+    // จำลองการข้ามไปหน้า Services ก่อน
+    setTimeout(() => {
+      router.push('/services');
       setLoading(false);
-    }
-  }
+    }, 1000);
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-yellow-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl shadow-xl w-full max-w-md p-8">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="text-6xl mb-3">🌟</div>
-          <h1 className="text-4xl font-extrabold text-gray-800">จงเจริญ</h1>
-          <p className="text-gray-500 mt-1">ตลาดแรงงานชุมชนประแส</p>
-          <h2 className="text-3xl font-extrabold text-gray-700 mt-4">
-            {step === 'phone' ? 'เข้าสู่ระบบ / ลงทะเบียน' : 'กรอกรหัส OTP'}
-          </h2>
-        </div>
+    <div className="min-h-screen bg-[#F4F6F8] flex flex-col justify-center items-center p-4 selection:bg-orange-200 pb-safe">
+      <div className="bg-white p-6 sm:p-8 rounded-[2rem] shadow-sm border border-gray-100 w-full max-w-sm relative overflow-hidden">
+        
+        {/* แถบตกแต่งด้านบน */}
+        <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-[#F05D40] to-[#FF8769]"></div>
 
-        {/* Error */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-4 mb-4 text-lg font-semibold text-center">
-            ⚠️ {error}
+        {/* ส่วนหัวโลโก้ */}
+        <div className="text-center mb-6 mt-2">
+          <div className="w-16 h-16 bg-orange-50 rounded-full mx-auto flex items-center justify-center text-3xl mb-3 border border-orange-100 shadow-inner">
+            🌟
           </div>
-        )}
-
-        {/* Step 1: กรอกเบอร์โทร */}
-        {step === 'phone' && (
-          <form onSubmit={handleSendOtp} className="space-y-6">
-            <div>
-              <label className="block text-xl font-bold text-gray-700 mb-2">
-                📱 เบอร์โทรศัพท์
-              </label>
-              <input
-                type="tel"
-                value={phone}
-                onChange={e => setPhone(e.target.value)}
-                required
-                placeholder="0XX-XXX-XXXX"
-                className="w-full border-2 border-gray-200 rounded-2xl px-4 py-6 text-4xl text-center tracking-widest focus:outline-none focus:ring-4 focus:ring-orange-300 focus:border-orange-400 font-bold"
-              />
-              <p className="text-gray-400 text-sm text-center mt-2">รองรับเบอร์มือถือไทย 10 หลัก</p>
-            </div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 text-white font-extrabold py-10 rounded-2xl text-4xl shadow-2xl flex flex-col items-center transition"
-            >
-              <span className="text-6xl mb-2">📲</span>
-              {loading ? 'กำลังส่ง...' : 'รับรหัส OTP'}
-            </button>
-          </form>
-        )}
-
-        {/* Step 2: กรอก OTP */}
-        {step === 'otp' && (
-          <form onSubmit={handleVerifyOtp} className="space-y-6">
-            <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-center">
-              <p className="text-blue-700 font-semibold text-lg">
-                ส่งรหัส OTP ไปที่ 📱 <strong>{phone}</strong> แล้ว
-              </p>
-            </div>
-            <div>
-              <label className="block text-xl font-bold text-gray-700 mb-2">
-                🔐 รหัส OTP 6 หลัก
-              </label>
-              <input
-                type="text"
-                value={otp}
-                onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                required
-                maxLength={6}
-                placeholder="------"
-                className="w-full border-2 border-gray-200 rounded-2xl px-4 py-6 text-4xl text-center tracking-widest font-bold focus:outline-none focus:ring-4 focus:ring-green-300 focus:border-green-400 letter-spacing-widest"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={loading || otp.length < 6}
-              className="w-full bg-green-600 hover:bg-green-700 active:bg-green-800 disabled:opacity-50 text-white font-extrabold py-12 rounded-2xl text-4xl shadow-2xl flex flex-col items-center transition"
-            >
-              <span className="text-6xl mb-2">✅</span>
-              {loading ? 'กำลังยืนยัน...' : 'ยืนยันเข้าสู่ระบบ'}
-            </button>
-            <button
-              type="button"
-              onClick={() => { setStep('phone'); setOtp(''); setError(''); }}
-              className="w-full text-gray-500 border border-gray-200 py-4 rounded-2xl text-lg font-medium hover:bg-gray-50 transition"
-            >
-              🔄 เปลี่ยนเบอร์โทรศัพท์
-            </button>
-          </form>
-        )}
-
-        <div className="mt-8 p-4 bg-orange-50 rounded-2xl border border-orange-100">
-          <p className="text-sm text-orange-700 text-center">
-            🎯 <strong>บัญชีเดียว</strong> — ไม่ต้องจำรหัสผ่าน ใช้เบอร์มือถือเข้าสู่ระบบได้เลย
-          </p>
+          <h1 className="text-2xl font-black text-gray-800 tracking-tight">เข้าสู่ระบบ</h1>
+          <p className="text-xs font-medium text-gray-500 mt-1">แอปพลิเคชันชุมชนจงเจริญ</p>
         </div>
-      </div>
-    </div>
-  );
-}
+
+        {/* 🌍 โซเชียลล็อกอิน (Social Login Buttons) */}
+        <div className="flex justify-center gap-4 mb-6">
+          {/* ปุ่ม LINE */}
+          <button onClick={() => handleSocialLogin('line')} className="w-14 h-14 bg-[#00B900] hover:bg-[#00A000] rounded-full flex items-center justify-center text-white active:scale-95 transition-all shadow-md shadow-green-200">
+            <svg className="w-7 h-7" viewBox="0 0 24 24" fill="currentColor"><path d="M24 10.304c0-5.369-5.383-9.738-12-9.738-6.616 0-12 4.369-12 9.738 0 4.814 4.269 8.846 10.036 9.608.391.084.922.258 1.057.592.114.277.073.71.035 1.011-.052.404-.336 2.016-.407 2.455-.088.546.402.766.866.495.342-.2 1.839-1.082 3.385-1.954 3.73-2.107 9.028-5.304 9.028-12.207z"/></svg>
+          </button>
+          {/* ปุ่ม Facebook */}
+          <button onClick={() => handleSocialLogin('facebook')} className="w-14 h-14 bg-[#1877F2] hover:bg-[#166FE5] rounded-full flex items-center justify-center text-white active:scale-95 transition-all shadow-md shadow-blue-200">
+            <svg className="w-7 h-7" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.469h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.469h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+          </button>
+          {/* ปุ่ม Google */}
+          <button onClick={() => handleSocialLogin('google')} className="w-14 h-14 bg-white border border-gray-200 hover:bg-gray-50 rounded-full flex items-center justify-center active:scale-95 transition-all shadow-sm">
+            <svg className="w-6 h-6" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+          </button>
+        </div>
+
+        {/* เส้นแบ่ง "หรือ" */}
+        <div className="flex items-center gap-3 mb-5">
+          <div className="h-px bg-gray-200 flex-1"></div>
+          <span className="text-[11px] font-bold text-gray-400">หรือล็อกอินด้วย</span>
+          <div className="h-px bg-gray-200 flex-1"></div>
+        </div>
+
+        {/* 📱✉️ สลับแท็บ เบอร์โทร / อีเมล */}
+        <div className="flex bg-gray-100 p-1 rounded-xl mb-4">
+          <button 
+            onClick={() => setLoginMethod('phone')}
+            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${loginMethod === 'phone' ? 'bg-white text-[#F05D40] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+          >
+            เบอร์โทรศัพท์
+          </button>
+          <button 
+            onClick={() => setLoginMethod('email')}
+            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${loginMethod === 'email' ? 'bg-white text-[#
