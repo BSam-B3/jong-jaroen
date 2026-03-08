@@ -1,226 +1,152 @@
 'use client';
-import { useState, useRef } from 'react';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
-// ── Types ──────────────────────────────────────────────────────
-interface ServiceCategory {
-  id: string;
-  title: string;
-  icon: string;
-  bgColor: string;
-  customLink?: string; 
-}
-
-// ── Soft Shopee Palette ─────────────────────────────────────────
-const themePalette = {
-  primaryOrange: '#F05D40', 
-  lightOrange: '#FF8769',   
-  bgGray: '#F9FAFB',        
-  textDark: '#1F2937',      
-};
-
-// 🌟 หมวดหมู่บริการ (ถอดข่าวชุมชนออก เพราะย้ายไปเมนูด้านล่างแล้ว) 🌟
-const categories: ServiceCategory[] = [
-  { id: 'electrician', title: 'ช่างไฟฟ้า', icon: '⚡', bgColor: 'bg-gradient-to-br from-yellow-100 to-orange-100 border border-orange-200' },
-  { id: 'cleaning', title: 'แม่บ้าน', icon: '🧹', bgColor: 'bg-gradient-to-br from-blue-100 to-cyan-100 border border-blue-200' },
-  { id: 'aircon', title: 'ล้างแอร์', icon: '❄️', bgColor: 'bg-gradient-to-br from-sky-100 to-blue-100 border border-sky-200' },
-  { id: 'plumbing', title: 'ช่างประปา', icon: '💧', bgColor: 'bg-gradient-to-br from-cyan-100 to-teal-100 border border-cyan-200' },
-  { id: 'mechanic', title: 'ช่างยนต์', icon: '🛠️', bgColor: 'bg-gradient-to-br from-gray-100 to-slate-200 border border-gray-300' },
-  { id: 'construction', title: 'ก่อสร้าง', icon: '🏗️', bgColor: 'bg-gradient-to-br from-amber-100 to-orange-100 border border-amber-200' },
-  { id: 'haircut', title: 'ตัดผม', icon: '✂️', bgColor: 'bg-gradient-to-br from-purple-100 to-fuchsia-100 border border-purple-200' },
-  { id: 'nails', title: 'ทำเล็บ', icon: '💅', bgColor: 'bg-gradient-to-br from-pink-100 to-rose-100 border border-pink-200' },
-  { id: 'beauty', title: 'เสริมสวย', icon: '💄', bgColor: 'bg-gradient-to-br from-red-100 to-rose-100 border border-red-200' },
-  { id: 'massage', title: 'นวดแผนไทย', icon: '💆', bgColor: 'bg-gradient-to-br from-rose-100 to-pink-100 border border-rose-200' },
-  { id: 'moving', title: 'ย้ายบ้าน', icon: '🏠', bgColor: 'bg-gradient-to-br from-emerald-100 to-green-100 border border-emerald-200' },
-  { id: 'lifting', title: 'ยกของ', icon: '📦', bgColor: 'bg-gradient-to-br from-orange-100 to-amber-100 border border-orange-200' },
-  { id: 'transport', title: 'รถขนส่ง', icon: '🚚', bgColor: 'bg-gradient-to-br from-indigo-100 to-blue-100 border border-indigo-200' },
-  { id: 'tech', title: 'ซ่อมคอม', icon: '💻', bgColor: 'bg-gradient-to-br from-slate-100 to-gray-200 border border-slate-300' },
-  { id: 'others', title: 'อื่นๆ', icon: '✨', bgColor: 'bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-200' },
-];
-
-const recentJobs = [
-  { id: 1, title: 'ต้องการช่างซ่อมหลังคารั่ว ด่วนมาก!', category: 'ก่อสร้าง', location: 'ปากน้ำประแส', budget: 800, time: '15 นาทีที่แล้ว' },
-  { id: 2, title: 'หาแม่บ้านทำความสะอาดบ้าน 2 ชั้น', category: 'แม่บ้าน', location: 'แกลง', budget: 1200, time: '2 ชั่วโมงที่แล้ว' },
-  { id: 3, title: 'แอร์ห้องนอนไม่เย็น มีน้ำหยด', category: 'ช่างไฟฟ้า', location: 'ปากน้ำประแส', budget: 500, time: '5 ชั่วโมงที่แล้ว' },
+// 🌟 หมวดหมู่บริการ 🌟
+const categories = [
+  { id: 'aircon', title: 'ล้างแอร์', icon: '❄️' },
+  { id: 'cleaning', title: 'แม่บ้าน', icon: '🧹' },
+  { id: 'electrician', title: 'ช่างไฟ', icon: '⚡' },
+  { id: 'plumbing', title: 'ประปา', icon: '💧' },
+  { id: 'mechanic', title: 'ซ่อมรถ', icon: '🛠️' },
+  { id: 'transport', title: 'ขนส่ง', icon: '🚚' },
+  { id: 'moving', title: 'ย้ายบ้าน', icon: '📦' },
+  { id: 'others', title: 'อื่นๆ', icon: '✨' },
 ];
 
 export default function HomePage() {
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
-  const [isSearching, setIsSearching] = useState(false);
-  
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  const handleSearch = () => {
-    if (searchQuery.trim().length < 3) return; 
-    setIsSearching(true);
-    console.log("AI กำลังวิเคราะห์คำว่า:", searchQuery);
-    setTimeout(() => {
-      setIsSearching(false);
-    }, 2000); 
-  };
-
-  const scroll = (direction: 'left' | 'right') => {
-    if (scrollContainerRef.current) {
-      const scrollAmount = direction === 'left' ? -200 : 200;
-      scrollContainerRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      router.push(`/services?q=${searchQuery}`);
     }
   };
 
   return (
-    <div className="min-h-screen pb-24" style={{ backgroundColor: themePalette.bgGray }}>
+    <div className="min-h-screen pb-28 max-w-md mx-auto bg-[#F4F6F8] relative selection:bg-orange-200">
       
-      <style dangerouslySetInnerHTML={{__html: `
-        .hide-scrollbar::-webkit-scrollbar { display: none; }
-        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-      `}} />
-
-      {/* ── Hero Section ── */}
-      <section className="pt-8 pb-16 px-4 shadow-md relative overflow-hidden"
-        style={{ background: `linear-gradient(180deg, ${themePalette.primaryOrange} 0%, ${themePalette.lightOrange} 100%)` }}>
-        
-        <div className="max-w-xl mx-auto text-center relative z-10 space-y-6">
-          <div className="flex flex-col items-center justify-center space-y-3">
-            <div className="bg-white/95 p-1.5 rounded-[30px] shadow-2xl inline-block border-2 border-white/20 transform hover:scale-105 transition-transform duration-300">
-               <img 
-                 src="/logo.png" 
-                 alt="จงเจริญ โลโก้" 
-                 className="h-48 sm:h-56 w-auto object-contain drop-shadow-lg" 
-                 onError={(e) => {
-                   e.currentTarget.src = "/logo.jpg";
-                 }}
-               />
-            </div>
-            <p className="text-white text-xs sm:text-sm font-bold tracking-wide drop-shadow-sm opacity-90">
-              จงเจริญไปด้วยกัน • ผู้เชี่ยวชาญใกล้คุณ
-            </p>
+      {/* ── Header & Hero Section ── */}
+      <div className="bg-gradient-to-b from-[#F05D40] to-[#FF8769] px-5 pt-12 pb-7 rounded-b-[32px] shadow-sm relative z-10">
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h1 className="text-2xl font-black text-white drop-shadow-sm tracking-wide">จงเจริญ 🌟</h1>
+            <p className="text-white/90 text-sm font-medium mt-1">แอปพลิเคชันคู่ชุมชนปากน้ำประแส</p>
           </div>
+          <button 
+            onClick={() => router.push('/profile')} 
+            className="w-11 h-11 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center text-xl backdrop-blur-md border border-white/30 transition-colors"
+          >
+            👤
+          </button>
+        </div>
 
-          <div className="relative max-w-md mx-auto mt-1">
-            <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
-              <span className="text-lg animate-pulse">✨</span>
+        {/* Search Box */}
+        <form onSubmit={handleSearch} className="relative">
+          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg">🔍</span>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="หาช่างแอร์, แม่บ้าน, คนช่วยยกของ..."
+            className="w-full pl-12 pr-4 py-3.5 rounded-2xl text-gray-800 text-sm font-medium focus:outline-none shadow-lg border-2 border-transparent focus:border-white bg-white/95 backdrop-blur-sm transition-all"
+          />
+        </form>
+      </div>
+
+      <main className="px-4 mt-6 space-y-5">
+        
+        {/* ── Quick Banners (ทางลัดหลัก) ── */}
+        <div className="grid grid-cols-2 gap-3">
+          <div
+            onClick={() => router.push('/services')}
+            className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col gap-2 cursor-pointer active:scale-95 transition-transform hover:shadow-md hover:border-orange-200"
+          >
+            <div className="w-10 h-10 bg-orange-50 rounded-full flex items-center justify-center text-xl mb-1">🛠️</div>
+            <div>
+              <h3 className="text-[15px] font-bold text-gray-800">จ้างช่าง/แม่บ้าน</h3>
+              <p className="text-[11px] text-gray-500 font-medium">ค้นหาบริการมืออาชีพ</p>
             </div>
-            <input 
-              type="text" 
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="บอก AI ว่าต้องการให้ช่วยอะไร..." 
-              className="w-full py-4 pl-12 pr-24 rounded-lg shadow-inner focus:outline-none text-gray-800 text-sm border-2 border-transparent focus:border-white bg-white/95 backdrop-blur-sm"
-            />
-            <button 
-              onClick={handleSearch}
-              disabled={searchQuery.trim().length < 3 || isSearching}
-              className={`absolute right-1.5 top-1.5 bottom-1.5 px-4 rounded-md text-white text-xs font-bold shadow-sm transition-all 
-                ${searchQuery.trim().length < 3 || isSearching ? 'bg-orange-300/50 cursor-not-allowed' : 'bg-[#F05D40] hover:bg-[#D95339] hover:scale-105'}`}
-            >
-              {isSearching ? '⏳...' : 'ค้นหา'}
-            </button>
+          </div>
+          
+          <div
+            onClick={() => router.push('/jobs')}
+            className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col gap-2 cursor-pointer active:scale-95 transition-transform hover:shadow-md hover:border-blue-200"
+          >
+            <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center text-xl mb-1">🛵</div>
+            <div>
+              <h3 className="text-[15px] font-bold text-gray-800">งานด่วน/ฝากซื้อ</h3>
+              <p className="text-[11px] text-gray-500 font-medium">หาคนช่วยวิ่งธุระ</p>
+            </div>
           </div>
         </div>
-      </section>
 
-      <main className="max-w-xl mx-auto px-2 space-y-5 -mt-4 relative z-20">
-        
-        {/* ── Categories Slider ── */}
-        <section className="bg-white rounded-xl py-6 shadow-sm border border-gray-100 relative group overflow-hidden">
-          <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-white to-transparent z-10 pointer-events-none"></div>
-          <button onClick={() => scroll('right')} className="absolute right-1 top-1/2 -translate-y-1/2 z-20 w-8 h-8 bg-white rounded-full shadow-md border border-gray-100 flex items-center justify-center text-gray-500 hover:text-[#F05D40] hover:scale-110 transition-all opacity-90 hover:opacity-100">❯</button>
-          <button onClick={() => scroll('left')} className="absolute left-1 top-1/2 -translate-y-1/2 z-20 w-8 h-8 bg-white rounded-full shadow-md border border-gray-100 flex items-center justify-center text-gray-500 hover:text-[#F05D40] hover:scale-110 transition-all opacity-0 group-hover:opacity-90">❮</button>
-
-          <div ref={scrollContainerRef} className="flex overflow-x-auto px-5 gap-4 pb-4 snap-x snap-mandatory scroll-smooth hide-scrollbar relative z-0 pr-12 pt-2">
+        {/* ── Categories Grid ── */}
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+          <div className="flex justify-between items-end mb-4">
+            <h3 className="text-[15px] font-bold text-gray-800 border-l-4 border-[#F05D40] pl-2">หมวดหมู่บริการ</h3>
+            <span onClick={() => router.push('/services')} className="text-[11px] font-bold text-[#F05D40] cursor-pointer hover:underline">ดูทั้งหมด</span>
+          </div>
+          
+          <div className="grid grid-cols-4 gap-y-5 gap-x-2">
             {categories.map((cat) => (
-              <Link 
-                key={cat.id} 
-                href={cat.customLink || `/services?cat=${cat.id}`} 
-                className="flex flex-col items-center gap-2.5 min-w-[72px] snap-start group cursor-pointer"
+              <div
+                key={cat.id}
+                onClick={() => router.push(`/services?cat=${cat.id}`)}
+                className="flex flex-col items-center gap-2 cursor-pointer group"
               >
-                <div className={`w-16 h-16 flex items-center justify-center text-3xl group-hover:scale-110 group-hover:-translate-y-1 transition-all duration-300 rounded-[20px] shadow-sm group-hover:shadow-md ${cat.bgColor}`}>
-                  {cat.icon}
+                <div className="w-12 h-12 bg-gray-50 group-hover:bg-orange-50 rounded-2xl flex items-center justify-center text-2xl transition-colors shadow-sm border border-gray-100 group-hover:border-[#F05D40]">
+                  <span className="group-hover:scale-110 transition-transform">{cat.icon}</span>
                 </div>
-                <span className="text-[11px] font-bold text-gray-700 whitespace-nowrap group-hover:text-[#F05D40] transition-colors">{cat.title}</span>
-              </Link>
+                <span className="text-[11px] font-semibold text-gray-600 group-hover:text-[#F05D40] text-center">
+                  {cat.title}
+                </span>
+              </div>
             ))}
           </div>
-        </section>
+        </div>
 
-        {/* ── Job Board Preview ── */}
-        <section className="space-y-3">
-          <div className="flex items-center justify-between px-2 bg-white py-3 border-b border-gray-100 rounded-t-xl">
-            <h2 className="text-sm font-bold uppercase tracking-wider flex items-center gap-2" style={{ color: themePalette.primaryOrange }}>
-              <span className="text-lg">📢</span> ประกาศงานล่าสุด
-            </h2>
-            <Link href="/jobs" className="text-xs font-medium text-gray-400 hover:text-orange-500 transition-colors">ดูทั้งหมด {' >'}</Link>
+        {/* ── Banner Promo (ชวนคนมาสมัครรับงาน) ── */}
+        <div 
+          className="bg-gradient-to-r from-blue-600 to-cyan-500 rounded-2xl p-5 shadow-sm text-white flex justify-between items-center cursor-pointer active:scale-95 transition-transform" 
+          onClick={() => router.push('/services/new')}
+        >
+          <div>
+            <h3 className="text-[15px] font-bold mb-1 drop-shadow-sm">มีฝีมือ? อยากรับงาน?</h3>
+            <p className="text-xs text-blue-100 font-medium">ลงประกาศฟรี ไม่มีค่าใช้จ่าย</p>
           </div>
-
-          <div className="space-y-2.5">
-            {recentJobs.map((job) => (
-              <Link href="/jobs" key={job.id} className="block bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:border-[#F05D40] hover:shadow-md transition-all group relative overflow-hidden">
-                <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-orange-300 to-orange-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                
-                <div className="flex justify-between items-start mb-1.5">
-                  <span className="bg-orange-50 text-[#F05D40] px-2 py-0.5 rounded text-[10px] font-bold">
-                    {job.category}
-                  </span>
-                  <span className="text-[10px] text-gray-400">{job.time}</span>
-                </div>
-                
-                <h3 className="text-sm font-bold text-gray-800 mb-2 group-hover:text-[#F05D40] transition-colors line-clamp-1">
-                  {job.title}
-                </h3>
-                
-                <div className="flex items-center justify-between mt-1">
-                  <div className="flex items-center gap-1 text-[11px] text-gray-500 font-medium">
-                    <span>📍 {job.location}</span>
-                  </div>
-                  <div className="text-sm font-black" style={{ color: themePalette.primaryOrange }}>
-                    ฿{job.budget.toLocaleString()}
-                  </div>
-                </div>
-              </Link>
-            ))}
+          <div className="bg-white text-blue-600 font-bold px-4 py-2 rounded-xl text-xs shadow-sm whitespace-nowrap">
+            เริ่มเลย 🚀
           </div>
-
-          <Link href="/jobs" 
-            className="block w-full py-3.5 mt-2 text-center rounded-xl text-[#F05D40] text-xs font-bold bg-orange-50 hover:bg-orange-100 transition-colors border border-orange-100 flex items-center justify-center gap-2">
-            <span>ดูกระดานงานทั้งหมด</span>
-            <span className="text-base leading-none">🚀</span>
-          </Link>
-        </section>
+        </div>
 
       </main>
 
-      {/* 🛠️ Bottom Nav (อัปเดตใหม่: เอาข่าวสารมาแทนที่ค้นหา) 🛠️ */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 flex justify-around py-2 z-[100] shadow-[0_-5px_20px_rgba(0,0,0,0.05)] pb-safe">
-        
-        {/* 1. หน้าแรก */}
-        <Link href="/" className="flex flex-col items-center gap-0.5 font-bold" style={{ color: themePalette.primaryOrange }}>
-          <span className="text-xl">🏠</span>
-          <span className="text-[10px]">หน้าแรก</span>
+      {/* ── Bottom Navigation Bar ── */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 flex justify-around py-2 z-50 shadow-[0_-5px_20px_rgba(0,0,0,0.05)] pb-safe">
+        <Link href="/" className="flex flex-col items-center gap-1 text-[#F05D40]">
+          <span className="text-[22px]">🏠</span>
+          <span className="text-[10px] font-bold">หน้าแรก</span>
         </Link>
-        
-        {/* 2. ข่าวสาร (🌟 ย้ายมาตรงนี้ 🌟) */}
-        <Link href="/news" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-orange-400 transition-colors">
-          <span className="text-xl">📰</span>
-          <span className="text-[10px]">ข่าวสาร</span>
+        <Link href="/services" className="flex flex-col items-center gap-1 text-gray-400 hover:text-[#F05D40] transition-colors">
+          <span className="text-[22px]">🛠️</span>
+          <span className="text-[10px] font-medium">บริการ</span>
         </Link>
-        
-        {/* 3. รางวัล */}
-        <Link href="/coupons" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-orange-400 transition-colors">
-          <span className="text-xl">🎟️</span>
-          <span className="text-[10px]">รางวัล</span>
+        <Link href="/jobs" className="flex flex-col items-center gap-1 text-gray-400 hover:text-[#F05D40] transition-colors">
+          <span className="text-[22px]">📋</span>
+          <span className="text-[10px] font-medium">งานด่วน</span>
         </Link>
-        
-        {/* 4. งาน */}
-        <Link href="/jobs" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-orange-400 transition-colors">
-          <span className="text-xl">📋</span>
-          <span className="text-[10px]">งาน</span>
+        <Link href="/history" className="flex flex-col items-center gap-1 text-gray-400 hover:text-[#F05D40] transition-colors">
+          <span className="text-[22px]">🧾</span>
+          <span className="text-[10px] font-medium">ประวัติ</span>
         </Link>
-        
-        {/* 5. ฉัน */}
-        <Link href="/profile" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-orange-400 transition-colors">
-          <span className="text-xl">👤</span>
-          <span className="text-[10px]">ฉัน</span>
+        <Link href="/profile" className="flex flex-col items-center gap-1 text-gray-400 hover:text-[#F05D40] transition-colors">
+          <span className="text-[22px]">👤</span>
+          <span className="text-[10px] font-medium">ฉัน</span>
         </Link>
-        
       </nav>
     </div>
   );
