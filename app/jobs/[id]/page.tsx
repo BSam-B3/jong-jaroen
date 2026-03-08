@@ -1,8 +1,10 @@
 'use client';
+
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
+// 1. กำหนดโครงสร้างข้อมูลให้ชัดเจนที่สุด
 interface JobRequest {
   id: string;
   job_type: string;
@@ -12,23 +14,30 @@ interface JobRequest {
   provider_id?: string | null;
 }
 
-// ✅ ตรงนี้แหละค่ะที่มี : string แล้ว Vercel จะได้เลิกบ่น
-function timeAgo(dateStr: string) {
+// 2. ฟังก์ชันคำนวณเวลาที่แก้จุด Error บรรทัดที่ 20 แบบถาวร
+// เจมเพิ่มการเช็คค่าว่างและระบุชนิดข้อมูลแบบเจาะจงลงไปค่ะ
+const timeAgo = (dateStr: string | null | undefined): string => {
   if (!dateStr) return 'ไม่ระบุเวลา';
-  const diff = (Date.now() - new Date(dateStr).getTime()) / 1000;
+  
+  const time = new Date(dateStr).getTime();
+  if (isNaN(time)) return 'เวลาไม่ถูกต้อง';
+
+  const diff = (Date.now() - time) / 1000;
+  
   if (diff < 60) return 'เมื่อกี้';
   if (diff < 3600) return 'เมื่อ ' + Math.floor(diff / 60) + ' นาทีที่แล้ว';
   return 'เมื่อนานมาแล้ว';
-}
+};
 
 export default function JobBoardPage() {
   const [jobs, setJobs] = useState<JobRequest[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(true);
   const router = useRouter();
 
   useEffect(() => {
     fetchJobs();
 
+    // ระบบ Realtime ดึงงานใหม่เข้ากระดานทันที
     const channel = supabase
       .channel('public:job_requests')
       .on('postgres_changes', { 
@@ -36,8 +45,9 @@ export default function JobBoardPage() {
         schema: 'public', 
         table: 'job_requests' 
       }, (payload) => {
-        if (payload.new.status === 'looking_for_provider') {
-          setJobs((prev) => [payload.new as JobRequest, ...prev]);
+        const newJob = payload.new as JobRequest;
+        if (newJob.status === 'looking_for_provider') {
+          setJobs((prev) => [newJob, ...prev]);
         }
       })
       .subscribe();
@@ -55,7 +65,9 @@ export default function JobBoardPage() {
       .eq('status', 'looking_for_provider')
       .order('created_at', { ascending: false });
     
-    if (!error) setJobs(data || []);
+    if (!error && data) {
+      setJobs(data as JobRequest[]);
+    }
     setLoading(false);
   }
 
