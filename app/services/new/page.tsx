@@ -2,68 +2,112 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
+// ── Soft Shopee Palette ─────────────────────────────────────────
+const themePalette = {
+  primaryOrange: '#F05D40', 
+  bgGray: '#F9FAFB',        
+};
+
 export default function NewServicePage() {
   const [title, setTitle] = useState('');
   const [desc, setDesc] = useState('');
   const [price, setPrice] = useState('');
+  const [category, setCategory] = useState('aircon');
   const router = useRouter();
 
-  // ฟังก์ชันนี้เดี๋ยวคุณ C จะมาเขียนต่อให้เชื่อม Supabase ค่ะ
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    alert('เจมจำลองการกดส่งข้อมูลค่ะ! เดี๋ยวรอคุณ C มาต่อท่อ Supabase ให้นะคะ');
+    alert('เจมจำลองการกดบันทึกข้อมูลค่ะ! (รอคุณ C มาต่อท่อเข้าฐานข้อมูลนะคะ)');
+    router.push('/services');
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6 max-w-md mx-auto">
-      <div className="flex items-center gap-4 mb-8">
-        <button onClick={() => router.back()} className="text-3xl font-bold text-gray-600">←</button>
-        <h1 className="text-3xl font-extrabold text-blue-700">ลงประกาศรับงาน ✨</h1>
-      </div>
+    <div className="min-h-screen pb-24 max-w-md mx-auto relative" style={{ backgroundColor: themePalette.bgGray }}>
       
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
-          <label className="block text-2xl font-bold text-gray-800 mb-3">คุณรับทำอะไร?</label>
-          <input 
-            type="text" 
-            placeholder="เช่น รับซ่อมแอร์, รับตัดหญ้า"
-            className="w-full p-5 text-2xl border-2 border-gray-200 rounded-2xl focus:border-blue-500 outline-none"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            required
-          />
-        </div>
-
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
-          <label className="block text-2xl font-bold text-gray-800 mb-3">รายละเอียดงาน</label>
-          <textarea 
-            rows={4}
-            placeholder="อธิบายสิ่งที่คุณถนัด หรือเงื่อนไขต่างๆ..."
-            className="w-full p-5 text-xl border-2 border-gray-200 rounded-2xl focus:border-blue-500 outline-none"
-            value={desc}
-            onChange={(e) => setDesc(e.target.value)}
-          />
-        </div>
-
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
-          <label className="block text-2xl font-bold text-gray-800 mb-3">ราคาเริ่มต้น (บาท)</label>
-          <input 
-            type="number" 
-            placeholder="0"
-            className="w-full p-5 text-3xl font-bold border-2 border-gray-200 rounded-2xl focus:border-blue-500 outline-none text-blue-600"
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
-            required
-          />
-        </div>
-
-        <button 
-          type="submit" 
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white text-3xl font-extrabold py-8 rounded-3xl shadow-xl transition-transform active:scale-95 mt-4"
-        >
-          ลงประกาศเลย! 🚀
+      {/* ── Header ── */}
+      <div className="bg-white px-4 py-4 sticky top-0 z-10 border-b border-gray-100 flex items-center gap-3 shadow-sm">
+        <button onClick={() => router.back()} className="p-1 hover:bg-orange-50 rounded-full transition text-gray-700 hover:text-[#F05D40]">
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
         </button>
-      </form>
+        <h1 className="text-base font-bold text-gray-800">ลงประกาศรับงาน</h1>
+      </div>
+
+      {/* ── Form Section ── */}
+      <div className="p-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          
+          {/* หมวดหมู่ */}
+          <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+            <label className="block text-sm font-bold text-gray-700 mb-2">หมวดหมู่บริการ</label>
+            <div className="relative">
+              <select 
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className="w-full p-3 text-sm font-medium border border-gray-200 rounded-xl focus:border-[#F05D40] focus:ring-1 focus:ring-[#F05D40] outline-none bg-gray-50 appearance-none"
+              >
+                <option value="aircon">❄️ ล้างแอร์/ซ่อมแอร์</option>
+                <option value="electrician">⚡ ช่างไฟฟ้า</option>
+                <option value="plumbing">💧 ช่างประปา</option>
+                <option value="cleaning">🧹 แม่บ้าน/ทำความสะอาด</option>
+                <option value="transport">🚚 รถรับจ้าง/ขนส่ง</option>
+                <option value="others">✨ ทั่วไป</option>
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-500">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+              </div>
+            </div>
+          </div>
+
+          {/* ชื่อบริการ */}
+          <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+            <label className="block text-sm font-bold text-gray-700 mb-2">ชื่อบริการที่ท่านรับทำ</label>
+            <input 
+              type="text" 
+              placeholder="เช่น รับซ่อมแอร์บ้าน, รับตัดหญ้า"
+              className="w-full p-3 text-sm border border-gray-200 rounded-xl focus:border-[#F05D40] focus:ring-1 focus:ring-[#F05D40] outline-none bg-gray-50"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              required
+            />
+          </div>
+
+          {/* รายละเอียด */}
+          <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+            <label className="block text-sm font-bold text-gray-700 mb-2">รายละเอียดงาน</label>
+            <textarea 
+              rows={4}
+              placeholder="อธิบายสิ่งที่คุณถนัด เงื่อนไข หรือพื้นที่รับงานในปากน้ำประแส..."
+              className="w-full p-3 text-sm border border-gray-200 rounded-xl focus:border-[#F05D40] focus:ring-1 focus:ring-[#F05D40] outline-none bg-gray-50"
+              value={desc}
+              onChange={(e) => setDesc(e.target.value)}
+            />
+          </div>
+
+          {/* ราคา */}
+          <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+            <label className="block text-sm font-bold text-gray-700 mb-2">ราคาเริ่มต้น (บาท)</label>
+            <input 
+              type="number" 
+              placeholder="0"
+              className="w-full p-3 text-xl font-black border border-gray-200 rounded-xl focus:border-[#F05D40] focus:ring-1 focus:ring-[#F05D40] outline-none bg-gray-50 text-[#F05D40]"
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              required
+            />
+          </div>
+
+          {/* ปุ่ม Submit */}
+          <div className="pt-2">
+            <button 
+              type="submit" 
+              className="w-full bg-[#F05D40] hover:bg-[#E04D30] text-white text-base font-bold py-3.5 rounded-xl shadow-md shadow-orange-200 active:scale-95 transition-all"
+            >
+              บันทึกการลงประกาศ
+            </button>
+          </div>
+          
+        </form>
+      </div>
     </div>
   );
 }
