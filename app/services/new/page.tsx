@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { supabase } from '@/lib/supabase';
 
 // ── Soft Shopee Palette ───────────────────────────────────────────────────────────────────────────────────────
 const themePalette = {
@@ -16,7 +16,6 @@ export default function NewServicePage() {
   const [category, setCategory] = useState('aircon');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const supabase = createClientComponentClient();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
