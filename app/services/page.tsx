@@ -1,4 +1,5 @@
 'use client';
+
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -19,7 +20,7 @@ export default function ServicesMarketplacePage() {
   // กรองข้อมูลตามหมวดหมู่
   const filteredServices = activeCategory === 'ทั้งหมด' 
     ? mockServices 
-    : mockServices.filter(s => s.category === activeCategory);
+    : mockServices.filter((s) => s.category === activeCategory);
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 max-w-md mx-auto pb-24">
@@ -57,3 +58,38 @@ export default function ServicesMarketplacePage() {
           <p className="text-center text-gray-500 text-xl mt-10">ยังไม่มีบริการในหมวดหมู่นี้ค่ะ</p>
         ) : (
           filteredServices.map((service) => (
+            <div key={service.id} className="bg-white rounded-3xl p-6 shadow-xl border border-gray-100 relative overflow-hidden">
+              {/* ป้ายหมวดหมู่ */}
+              <div className="absolute top-0 right-0 bg-blue-100 text-blue-700 px-4 py-2 rounded-bl-2xl font-bold">
+                {service.category}
+              </div>
+
+              <h2 className="text-2xl font-bold text-gray-800 mt-2 pr-16 leading-tight">
+                {service.title}
+              </h2>
+              <p className="text-gray-500 text-lg mt-3 line-clamp-2 leading-relaxed">
+                {service.desc}
+              </p>
+              
+              <div className="flex items-end justify-between mt-6">
+                <div>
+                  <p className="text-sm text-gray-400 font-bold mb-1">เริ่มต้นที่</p>
+                  <p className="text-3xl font-extrabold text-green-600">
+                    {service.price} <span className="text-xl">บาท</span>
+                  </p>
+                </div>
+                
+                <button
+                  onClick={() => router.push(`/services/${service.id}`)}
+                  className="bg-blue-50 text-blue-700 hover:bg-blue-100 font-extrabold py-4 px-6 rounded-2xl text-xl transition-colors"
+                >
+                  ดูโปรไฟล์ →
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
