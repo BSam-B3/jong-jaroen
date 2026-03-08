@@ -430,13 +430,14 @@ export default function KYCPage() {
         <canvas ref={canvasRef} className="hidden" />
 
         {cameraActive && cameraStep === step ? (
-          <div className="space-y-2">
+          <div className="space-y-6">
             {(!isSelfie || !faceApiLoaded) && (
               <button
                 onClick={() => captureFrame(step)}
-                className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold text-sm hover:bg-blue-700 transition"
+                className="w-full bg-yellow-400 hover:bg-yellow-500 active:bg-yellow-600 text-black py-12 rounded-2xl font-extrabold text-4xl shadow-2xl flex flex-col items-center transition"
               >
-                📸 ถ่ายรูปเดี๋ยวนี้
+                <span className="text-7xl mb-2">📸</span>
+                ถ่ายภาพ
               </button>
             )}
             {isSelfie && faceApiLoaded && (
@@ -446,7 +447,7 @@ export default function KYCPage() {
             )}
             <button
               onClick={stopCamera}
-              className="w-full text-gray-500 border border-gray-200 py-2 rounded-xl text-sm hover:bg-gray-50 transition"
+              className="w-full text-gray-500 border border-gray-200 py-6 rounded-2xl text-xl font-bold hover:bg-gray-50 transition"
             >
               ยกเลิก
             </button>
@@ -454,7 +455,7 @@ export default function KYCPage() {
         ) : (
           <button
             onClick={() => startCamera(step)}
-            className={`w-full py-3 rounded-xl font-bold text-sm transition ${
+            className={`w-full py-10 rounded-2xl font-extrabold text-2xl shadow-xl transition ${
               isSelfie
                 ? 'bg-purple-600 hover:bg-purple-700 text-white'
                 : 'bg-blue-600 hover:bg-blue-700 text-white'
@@ -568,7 +569,7 @@ export default function KYCPage() {
 
             {idCardBlob && selfieBlob && (
               <button type="submit" disabled={submitting}
-                className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-blue-700 transition disabled:opacity-50">
+                className="w-full bg-blue-600 text-white py-12 rounded-2xl font-extrabold text-4xl shadow-2xl hover:bg-blue-700 transition disabled:opacity-50 flex flex-col items-center">
                 {submitting ? '⏳ กำลังส่งข้อมูล...' : '📤 ส่งข้อมูลยืนยันตัวตน'}
               </button>
             )}
