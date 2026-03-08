@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
-// ✅ กำหนด Interface ให้ชัดเจนป้องกัน Error
 interface JobRequest {
   id: string;
   job_type: string;
@@ -13,7 +12,7 @@ interface JobRequest {
   provider_id?: string | null;
 }
 
-// ✅ แก้ไขจุดตาย: ระบุประเภท : string ให้ dateStr ตามที่ Vercel ฟ้องเป๊ะๆ
+// ✅ ตรงนี้แหละค่ะที่มี : string แล้ว Vercel จะได้เลิกบ่น
 function timeAgo(dateStr: string) {
   if (!dateStr) return 'ไม่ระบุเวลา';
   const diff = (Date.now() - new Date(dateStr).getTime()) / 1000;
@@ -30,7 +29,6 @@ export default function JobBoardPage() {
   useEffect(() => {
     fetchJobs();
 
-    // ระบบ Realtime ดึงงานใหม่เข้ากระดานทันที
     const channel = supabase
       .channel('public:job_requests')
       .on('postgres_changes', { 
@@ -68,7 +66,6 @@ export default function JobBoardPage() {
       return;
     }
 
-    // อัปเดตสถานะงานเป็น 'in_progress' พร้อมผูก ID ผู้ช่วย
     const { error } = await supabase
       .from('job_requests')
       .update({ 
