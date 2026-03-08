@@ -2,7 +2,7 @@
 import { useState, Suspense, useMemo, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { supabase } from '@/lib/supabase';
 
 // ── Soft Shopee Palette ───────────────────────────────────────────────────────
 const themePalette = {
@@ -33,16 +33,6 @@ type Service = {
   profiles: { full_name: string | null; location: string | null } | null;
 };
 
-function StarDisplay({ rating }: { rating: number }) {
-  const r = Math.round(rating || 0);
-  return (
-    <span className="text-yellow-400 text-sm">
-      {'★'.repeat(r)}{'☆'.repeat(5 - r)}
-      <span className="text-gray-400 text-xs ml-1">{(rating || 0).toFixed(1)}</span>
-    </span>
-  );
-}
-
 function ServicesContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -52,7 +42,6 @@ function ServicesContent() {
   const [sortBy, setSortBy] = useState('rating');
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
-  const supabase = createClientComponentClient();
 
   useEffect(() => {
     if (searchParams.get('cat')) {
@@ -172,7 +161,7 @@ function ServicesContent() {
         <div className="space-y-3">
           {loading ? (
             <div className="bg-white rounded-3xl p-10 flex flex-col items-center justify-center text-center shadow-sm border border-gray-100 mt-6">
-              <span className="text-4xl mb-4 animate-spin">⚙️</span>
+              <span className="text-4xl mb-4">⏳</span>
               <p className="text-gray-500 text-sm font-medium">กำลังโหลด...</p>
             </div>
           ) : filteredProviders.length === 0 ? (
@@ -207,7 +196,6 @@ function ServicesContent() {
                       📍 {service.profiles?.location || 'ปากน้ำประแส'}
                     </span>
                   </div>
-                  {/* Rating & Action */}
                   <div className="mt-2">
                     <div className="flex items-center justify-between mt-1">
                       <span className="text-xs font-black text-[#F05D40]">
