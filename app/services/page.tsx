@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-// ข้อมูลจำลอง (Mock Data) เอาไว้ดู UI ก่อนเชื่อมหลังบ้าน
+// Mock Data
 const mockServices = [
   { id: '1', title: 'ลุงชม รับซ่อมแอร์/เครื่องใช้ไฟฟ้า', category: 'งานช่าง', price: 500, desc: 'ซ่อมแอร์ ล้างแอร์ ซ่อมพัดลม ตู้เย็น ในเขตปากน้ำประแส' },
   { id: '2', title: 'ป้าศรี รับจ้างทำความสะอาดบ้าน', category: 'งานบ้าน', price: 300, desc: 'กวาด ถู ล้างห้องน้ำ ทำความสะอาดเหมาวัน ราคากันเอง' },
@@ -14,37 +14,35 @@ const mockServices = [
 export default function ServicesMarketplacePage() {
   const router = useRouter();
   const [activeCategory, setActiveCategory] = useState('ทั้งหมด');
-
   const categories = ['ทั้งหมด', 'งานช่าง', 'งานบ้าน', 'ขนส่ง', 'ทั่วไป'];
 
-  // กรองข้อมูลตามหมวดหมู่
   const filteredServices = activeCategory === 'ทั้งหมด' 
     ? mockServices 
     : mockServices.filter((s) => s.category === activeCategory);
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 max-w-md mx-auto pb-24">
+    <div className="min-h-screen bg-gray-50 pb-20 max-w-md mx-auto">
       {/* Header */}
-      <div className="flex justify-between items-center my-6 px-2">
-        <h1 className="text-3xl font-extrabold text-blue-800">หาคนช่วยงาน 🛠️</h1>
+      <div className="bg-white px-4 py-4 shadow-sm sticky top-0 z-10 flex justify-between items-center">
+        <h1 className="text-lg font-bold text-gray-800">บริการทั้งหมด</h1>
         <button 
           onClick={() => router.push('/services/new')}
-          className="bg-orange-500 text-white font-bold py-3 px-5 rounded-2xl shadow-md text-xl active:scale-95"
+          className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-1.5 px-4 rounded-lg text-sm transition"
         >
-          + ลงรับงาน
+          + ลงประกาศ
         </button>
       </div>
 
-      {/* Categories Filter (ปุ่มเลือกหมวดหมู่) */}
-      <div className="flex gap-3 overflow-x-auto pb-4 px-2 snap-x scrollbar-hide">
+      {/* Categories Filter */}
+      <div className="bg-white px-4 py-3 border-b border-gray-100 flex gap-2 overflow-x-auto scrollbar-hide">
         {categories.map((cat) => (
           <button
             key={cat}
             onClick={() => setActiveCategory(cat)}
-            className={`snap-start whitespace-nowrap px-6 py-3 rounded-full text-xl font-bold transition-colors ${
+            className={`whitespace-nowrap px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
               activeCategory === cat 
-                ? 'bg-blue-600 text-white shadow-lg' 
-                : 'bg-white text-gray-600 border border-gray-200'
+                ? 'bg-blue-600 text-white' 
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
             {cat}
@@ -52,39 +50,37 @@ export default function ServicesMarketplacePage() {
         ))}
       </div>
 
-      {/* Service List (รายการผู้รับจ้าง) */}
-      <div className="space-y-6 mt-4">
+      {/* Service List */}
+      <div className="p-4 space-y-3">
         {filteredServices.length === 0 ? (
-          <p className="text-center text-gray-500 text-xl mt-10">ยังไม่มีบริการในหมวดหมู่นี้ค่ะ</p>
+          <div className="text-center py-10">
+            <p className="text-gray-500 text-sm">ยังไม่มีบริการในหมวดหมู่นี้</p>
+          </div>
         ) : (
           filteredServices.map((service) => (
-            <div key={service.id} className="bg-white rounded-3xl p-6 shadow-xl border border-gray-100 relative overflow-hidden">
-              {/* ป้ายหมวดหมู่ */}
-              <div className="absolute top-0 right-0 bg-blue-100 text-blue-700 px-4 py-2 rounded-bl-2xl font-bold">
-                {service.category}
+            <div 
+              key={service.id} 
+              className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex flex-col cursor-pointer hover:shadow-md transition" 
+              onClick={() => router.push(`/services/${service.id}`)}
+            >
+              <div className="flex justify-between items-start mb-2">
+                <span className="bg-blue-50 text-blue-600 text-xs font-semibold px-2.5 py-1 rounded-md">
+                  {service.category}
+                </span>
+                <span className="text-lg font-bold text-green-600">
+                  ฿{service.price}
+                </span>
               </div>
-
-              <h2 className="text-2xl font-bold text-gray-800 mt-2 pr-16 leading-tight">
+              
+              <h2 className="text-base font-semibold text-gray-800 line-clamp-1 mb-1">
                 {service.title}
               </h2>
-              <p className="text-gray-500 text-lg mt-3 line-clamp-2 leading-relaxed">
+              <p className="text-sm text-gray-500 line-clamp-2 mb-3">
                 {service.desc}
               </p>
               
-              <div className="flex items-end justify-between mt-6">
-                <div>
-                  <p className="text-sm text-gray-400 font-bold mb-1">เริ่มต้นที่</p>
-                  <p className="text-3xl font-extrabold text-green-600">
-                    {service.price} <span className="text-xl">บาท</span>
-                  </p>
-                </div>
-                
-                <button
-                  onClick={() => router.push(`/services/${service.id}`)}
-                  className="bg-blue-50 text-blue-700 hover:bg-blue-100 font-extrabold py-4 px-6 rounded-2xl text-xl transition-colors"
-                >
-                  ดูโปรไฟล์ →
-                </button>
+              <div className="flex justify-end">
+                <span className="text-blue-600 text-sm font-medium">ดูรายละเอียด →</span>
               </div>
             </div>
           ))
