@@ -9,7 +9,8 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  const handleSocialLogin = async (provider: 'line' | 'facebook' | 'google') => {
+  // ลบ Typescript ออกแล้วค่ะ
+  const handleSocialLogin = async (provider) => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: provider,
       options: {
@@ -19,7 +20,8 @@ export default function LoginPage() {
     if (error) alert(`เกิดข้อผิดพลาดในการเชื่อมต่อ ${provider}: ` + error.message);
   };
 
-  const handleEmailAuth = async (e: React.FormEvent) => {
+  // ลบ Typescript ออกแล้วค่ะ
+  const handleEmailAuth = async (e) => {
     e.preventDefault();
     if (!email || !password) {
       alert('กรุณากรอกข้อมูลให้ครบถ้วนค่ะ');
@@ -27,7 +29,6 @@ export default function LoginPage() {
     }
     
     setLoading(true);
-    // 💡 ตรงนี้เจมใส่ระบบให้มัน Login หรือ สมัครสมาชิกอัตโนมัติให้เลยค่ะ จะได้เทสต์ง่ายๆ
     let { error } = await supabase.auth.signInWithPassword({ email, password });
     
     if (error && error.message.includes('Invalid login credentials')) {
