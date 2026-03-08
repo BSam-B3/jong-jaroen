@@ -4,13 +4,12 @@ import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
-  const [loginMethod, setLoginMethod] = useState('phone');
-  const [emailOrPhone, setEmailOrPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  const handleSocialLogin = async (provider) => {
+  const handleSocialLogin = async (provider: 'line' | 'facebook' | 'google') => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: provider,
       options: {
@@ -20,19 +19,35 @@ export default function LoginPage() {
     if (error) alert(`เกิดข้อผิดพลาดในการเชื่อมต่อ ${provider}: ` + error.message);
   };
 
-  const handleTraditionalAuth = async (e) => {
+  const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!emailOrPhone || !password) {
+    if (!email || !password) {
       alert('กรุณากรอกข้อมูลให้ครบถ้วนค่ะ');
       return;
     }
     
     setLoading(true);
-    alert(`กำลังเข้าสู่ระบบด้วย ${loginMethod === 'phone' ? 'เบอร์โทร' : 'อีเมล'}\n(จำลองการล็อกอิน รอต่อท่อหลังบ้านค่ะ)`);
-    setTimeout(() => {
+    // 💡 ตรงนี้เจมใส่ระบบให้มัน Login หรือ สมัครสมาชิกอัตโนมัติให้เลยค่ะ จะได้เทสต์ง่ายๆ
+    let { error } = await supabase.auth.signInWithPassword({ email, password });
+    
+    if (error && error.message.includes('Invalid login credentials')) {
+      const { error: signUpError } = await supabase.auth.signUp({ email, password });
+      if (signUpError) {
+         alert('พังค่ะ: ' + signUpError.message);
+         setLoading(false);
+         return;
+      }
+      alert('สร้างบัญชีและล็อกอินสำเร็จ! 🚀');
       router.push('/services');
-      setLoading(false);
-    }, 1000);
+      return;
+    }
+
+    if (error) {
+      alert('เกิดข้อผิดพลาด: ' + error.message);
+    } else {
+      router.push('/services');
+    }
+    setLoading(false);
   };
 
   return (
@@ -61,34 +76,19 @@ export default function LoginPage() {
           </button>
         </div>
 
-        <div className="flex items-center gap-3 mb-5">
+        <div className="flex items-center gap-3 mb-6">
           <div className="h-px bg-gray-200 flex-1"></div>
-          <span className="text-[11px] font-bold text-gray-400">หรือล็อกอินด้วย</span>
+          <span className="text-[11px] font-bold text-gray-400">หรือใช้อีเมลและรหัสผ่าน</span>
           <div className="h-px bg-gray-200 flex-1"></div>
         </div>
 
-        <div className="flex bg-gray-100 p-1 rounded-xl mb-4">
-          <button 
-            onClick={() => setLoginMethod('phone')}
-            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${loginMethod === 'phone' ? 'bg-white text-[#F05D40] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-          >
-            เบอร์โทรศัพท์
-          </button>
-          <button 
-            onClick={() => setLoginMethod('email')}
-            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${loginMethod === 'email' ? 'bg-white text-[#F05D40] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-          >
-            อีเมล
-          </button>
-        </div>
-
-        <form onSubmit={handleTraditionalAuth} className="space-y-3">
+        <form onSubmit={handleEmailAuth} className="space-y-3">
           <div>
             <input 
-              type={loginMethod === 'email' ? 'email' : 'tel'} 
-              placeholder={loginMethod === 'email' ? 'ระบุอีเมล' : 'ระบุเบอร์โทรศัพท์'}
-              value={emailOrPhone} 
-              onChange={e => setEmailOrPhone(e.target.value)} 
+              type="email" 
+              placeholder="อีเมลของคุณ"
+              value={email} 
+              onChange={e => setEmail(e.target.value)} 
               className="w-full bg-gray-50 border border-gray-200 p-3.5 rounded-xl text-sm font-medium text-gray-800 outline-none focus:border-[#F05D40] focus:ring-1 focus:ring-[#F05D40] transition-all" 
               required
             />
@@ -96,7 +96,7 @@ export default function LoginPage() {
           <div>
             <input 
               type="password" 
-              placeholder="รหัสผ่าน"
+              placeholder="รหัสผ่าน (6 ตัวอักษรขึ้นไป)"
               value={password} 
               onChange={e => setPassword(e.target.value)} 
               className="w-full bg-gray-50 border border-gray-200 p-3.5 rounded-xl text-sm font-medium text-gray-800 outline-none focus:border-[#F05D40] focus:ring-1 focus:ring-[#F05D40] transition-all" 
@@ -109,7 +109,7 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full bg-[#F05D40] hover:bg-[#E04D30] disabled:bg-gray-300 text-white font-bold py-3.5 rounded-xl active:scale-95 transition-transform shadow-md shadow-orange-200 mt-2 text-[15px]"
           >
-            {loading ? 'กำลังดำเนินการ...' : 'เข้าสู่ระบบ'}
+            {loading ? 'กำลังดำเนินการ...' : 'เข้าสู่ระบบ / สร้างบัญชีใหม่'}
           </button>
         </form>
 
