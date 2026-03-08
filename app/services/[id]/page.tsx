@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { supabase } from '@/lib/supabase';
 
 // ── Soft Shopee Palette ───────────────────────────────────────────────────────
 const themePalette = {
@@ -32,7 +32,6 @@ export default function ServiceDetailPage() {
   const [service, setService] = useState<ServiceDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingChat, setLoadingChat] = useState(false);
-  const supabase = createClientComponentClient();
 
   useEffect(() => {
     const fetchService = async () => {
@@ -62,7 +61,7 @@ export default function ServiceDetailPage() {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: themePalette.bgGray }}>
         <div className="text-center">
-          <span className="text-4xl animate-spin block mb-3">⚙️</span>
+          <span className="text-4xl block mb-3">⏳</span>
           <p className="text-gray-500 text-sm font-medium">กำลังโหลดข้อมูล...</p>
         </div>
       </div>
