@@ -166,4 +166,13 @@ export default function JobsServicesPage() {
              <span className="text-xl">📋</span><span className="text-[10px] font-bold text-gray-500">ด่วนนน</span>
            </button>
            <button onClick={() => router.push('/history')} className="flex flex-col items-center gap-1 opacity-40">
-             <span className="text-xl">📜</span><span className
+             <span className="text-xl">📜</span><span className="text-[10px] font-bold text-gray-500">ประวัติ</span>
+           </button>
+           <button onClick={() => router.push('/profile')} className="flex flex-col items-center gap-1 opacity-40">
+             <span className="text-xl">👤</span><span className="text-[10px] font-bold text-gray-500">ฉัน</span>
+           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
