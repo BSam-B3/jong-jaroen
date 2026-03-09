@@ -3,63 +3,59 @@ import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
-// ── ค่า EAR threshold สำหรับตรวจกระพริบตา ────────────
-const EAR_THRESHOLD = 0.25; 
-const BLINK_FRAMES  = 2;     
-
-type CameraStep = 'id_card' | 'selfie';
-type StepStatus = 'waiting' | 'scanning' | 'blinking' | 'captured' | 'done';
-
-function calcEAR(eye: number[][]): number {
-  const dist = (a: number[], b: number[]) => Math.sqrt((a[0]-b[0])**2 + (a[1]-b[1])**2);
-  const A = dist(eye[1], eye[5]);
-  const B = dist(eye[2], eye[4]);
-  const C = dist(eye[0], eye[3]);
-  return (A + B) / (2.0 * C);
-}
-
-export default function KYCPage() {
+export default function KYCWizardPage() {
   const router = useRouter();
-  const [loading, setLoading]   = useState(true);
+  
+  // ── States พื้นฐาน ──
+  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [kycStatus, setKycStatus]     = useState<string | null>(null);
-  const [error, setError]   = useState('');
-  const [successMsg, setSuccessMsg] = useState('');
+  const [kycStatus, setKycStatus] = useState<string | null>(null);
+  const [error, setError] = useState('');
+  
+  // ── States สำหรับ Wizard (Step 1-3) ──
+  const [step, setStep] = useState<number>(1);
+  const [isExtracting, setIsExtracting] = useState(false);
 
-  // Bank form
-  const [bankName, setBankName]             = useState('');
-  const [bankAccount, setBankAccount]       = useState('');
+  // ── States ข้อมูลเอกสารและฟอร์ม ──
+  const [idCardBlob, setIdCardBlob] = useState<Blob | null>(null);
+  const [idCardPreview, setIdCardPreview] = useState('');
+  const [selfieBlob, setSelfieBlob] = useState<Blob | null>(null);
+  const [selfiePreview, setSelfiePreview] = useState('');
+  
+  // ข้อมูลจากบัตร (OCR)
+  const [idNumber, setIdNumber] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [address, setAddress] = useState('');
+
+  // ข้อมูลบัญชี
+  const [bankName, setBankName] = useState('');
+  const [bankAccount, setBankAccount] = useState('');
   const [bankAccountName, setBankAccountName] = useState('');
 
-  // Camera state
-  const [cameraStep, setCameraStep]   = useState<CameraStep>('id_card');
-  const [stepStatus, setStepStatus]   = useState<StepStatus>('waiting');
-  const [idCardBlob, setIdCardBlob]   = useState<Blob | File | null>(null);
-  const [selfieBlob, setSelfieBlob]   = useState<Blob | File | null>(null);
-  const [idCardPreview, setIdCardPreview] = useState('');
-  const [selfiePreview, setSelfiePreview] = useState('');
-  const [faceApiLoaded, setFaceApiLoaded] = useState(false);
-  const [cameraActive, setCameraActive]   = useState(false);
-  const [instruction, setInstruction] = useState('');
-  const [blinkCount, setBlinkCount]   = useState(0);
-  const [blinkNeeded] = useState(2); 
-
-  const videoRef   = useRef<HTMLVideoElement>(null);
-  const canvasRef  = useRef<HTMLCanvasElement>(null);
-  const overlayRef = useRef<HTMLCanvasElement>(null);
-  const streamRef  = useRef<MediaStream | null>(null);
-  const rafRef     = useRef<number>(0);
-  const blinkFrames = useRef(0);
-  const wasOpen     = useRef(true);
-  const blinkCountRef = useRef(0);
-  const capturedRef   = useRef(false);
+  // ── Camera Refs ──
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
     loadUserData();
-    loadFaceApi();
-    return () => stopCamera();
   }, []);
+
+  // เปิด-ปิด กล้องอัตโนมัติตาม Step
+  useEffect(() => {
+    if (kycStatus === 'approved' || kycStatus === 'pending') return;
+
+    if (step === 1 && !idCardPreview) {
+      startCamera('environment'); // กล้องหลัง
+    } else if (step === 2 && !selfiePreview) {
+      startCamera('user'); // กล้องหน้า
+    } else {
+      stopCamera();
+    }
+
+    return () => stopCamera();
+  }, [step, idCardPreview, selfiePreview, kycStatus]);
 
   async function loadUserData() {
     setLoading(true);
@@ -69,190 +65,53 @@ export default function KYCPage() {
       setCurrentUser(user);
       const { data: profile } = await supabase
         .from('profiles')
-        .select('kyc_status,bank_name,bank_account_number,bank_account_name')
+        .select('kyc_status, bank_name, bank_account_number, bank_account_name')
         .eq('id', user.id).single();
+      
       if (profile) {
         setKycStatus(profile.kyc_status || null);
-        if (profile.bank_name)           setBankName(profile.bank_name);
+        if (profile.bank_name) setBankName(profile.bank_name);
         if (profile.bank_account_number) setBankAccount(profile.bank_account_number);
-        if (profile.bank_account_name)   setBankAccountName(profile.bank_account_name);
+        if (profile.bank_account_name) setBankAccountName(profile.bank_account_name);
       }
-    } catch (_e) { setError('โหลดข้อมูลไม่สำเร็จ'); }
+    } catch (_e) { 
+      // จัดการ error เงียบๆ
+    }
     setLoading(false);
   }
 
-  async function loadFaceApi() {
-    try {
-      if (!(window as any).faceapi) {
-        await new Promise<void>((res, rej) => {
-          const s = document.createElement('script');
-          s.src = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js';
-          s.onload = () => res();
-          s.onerror = () => rej(new Error('โหลด face-api.js ไม่สำเร็จ'));
-          document.head.appendChild(s);
-        });
-      }
-      const faceapi = (window as any).faceapi;
-      const MODEL_URL = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@0.22.2/weights';
-      await Promise.all([
-        faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-        faceapi.nets.faceLandmark68TinyNet.loadFromUri(MODEL_URL),
-      ]);
-      setFaceApiLoaded(true);
-    } catch (e) {
-      console.warn('face-api load error:', e);
-      setFaceApiLoaded(false); 
-    }
-  }
-
-  // ✅ แก้ไขระบบเปิดกล้องเพื่อป้องกันปัญหา จอดำ (Black Screen)
-  async function startCamera(step: CameraStep) {
+  async function startCamera(facingMode: 'user' | 'environment') {
     stopCamera();
-    setCameraStep(step);
-    setStepStatus('scanning');
-    capturedRef.current = false;
-    blinkCountRef.current = 0;
-    setBlinkCount(0);
-    blinkFrames.current = 0;
-    wasOpen.current = true;
-
-    const facingMode = step === 'selfie' ? 'user' : 'environment';
-    setInstruction('กำลังเตรียมกล้อง...');
-
-    // 1. สั่งเปิด UI ทันที เพื่อให้ React วาดกล่อง <video> ลงในหน้าจอก่อน
-    setCameraActive(true);
-
-    const constraintsList = [
-      { video: { facingMode: { ideal: facingMode }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
-      { video: true, audio: false } 
-    ];
-
-    let stream: MediaStream | null = null;
-    let lastErr: any = null;
-
-    for (const constraints of constraintsList) {
-      try {
-        stream = await navigator.mediaDevices.getUserMedia(constraints);
-        break; 
-      } catch (err: any) {
-        lastErr = err;
-        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') break;
-      }
-    }
-
-    if (!stream) {
-      setError('ไม่สามารถเข้าถึงกล้องได้ กรุณาอนุญาตให้แอปใช้กล้อง หรือใช้วิธี "อัปโหลดรูปภาพ" แทนค่ะ');
-      setStepStatus('waiting');
-      setCameraActive(false); // ปิดกล่องถ้ากล้องพัง
-      return;
-    }
-
-    streamRef.current = stream;
-
-    // 2. หน่วงเวลา 200ms เพื่อให้ชัวร์ว่า React สร้าง <video ref={videoRef}> เสร็จแล้ว ค่อยยัดภาพใส่
-    setTimeout(async () => {
+    setError('');
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: facingMode }, width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false
+      });
+      streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        try {
-          await videoRef.current.play();
-        } catch (e) {
-          console.warn("Video play error:", e);
-        }
-        
-        // 3. เริ่มระบบ AI หลังกล้องติดแล้ว
-        if (step === 'selfie' && faceApiLoaded) {
-          setInstruction('กระพริบตา 2 ครั้งเพื่อยืนยันตัวตน');
-          setStepStatus('blinking');
-          startBlinkDetection();
-        } else if (step === 'selfie' && !faceApiLoaded) {
-          setInstruction('ถ่ายรูปเซลฟี่หน้าตรงพร้อมบัตร');
-          setStepStatus('blinking');
-        } else {
-          setInstruction('จัดบัตรให้ชัดเจนในกรอบ แล้วกดปุ่มถ่ายรูป');
-          setStepStatus('scanning');
-        }
+        await videoRef.current.play();
       }
-    }, 200); 
-  }
-
-  function startBlinkDetection() {
-    const faceapi = (window as any).faceapi;
-    const video = videoRef.current;
-    if (!video || !faceapi) return;
-
-    async function detect() {
-      if (capturedRef.current) return;
-      try {
-        const detection = await faceapi
-          .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ scoreThreshold: 0.4 }))
-          .withFaceLandmarks(true);
-
-        if (detection) {
-          const landmarks = detection.landmarks;
-          const leftEye  = landmarks.getLeftEye().map((p: any) => [p.x, p.y]);
-          const rightEye = landmarks.getRightEye().map((p: any) => [p.x, p.y]);
-          const earLeft  = calcEAR(leftEye);
-          const earRight = calcEAR(rightEye);
-          const ear = (earLeft + earRight) / 2;
-
-          if (ear < EAR_THRESHOLD) {
-            blinkFrames.current++;
-          } else {
-            if (blinkFrames.current >= BLINK_FRAMES && wasOpen.current === false) {
-              blinkCountRef.current++;
-              setBlinkCount(blinkCountRef.current);
-              if (blinkCountRef.current >= blinkNeeded) {
-                setInstruction('ยืนยันสำเร็จ! กำลังถ่ายรูป...');
-                setTimeout(() => captureFrame('selfie'), 300);
-                return;
-              }
-              setInstruction(`กระพริบแล้ว ${blinkCountRef.current}/${blinkNeeded} ครั้ง`);
-            }
-            wasOpen.current = ear >= EAR_THRESHOLD;
-            blinkFrames.current = 0;
-          }
-          if (ear < EAR_THRESHOLD) wasOpen.current = false;
-          drawOverlay(detection);
-        } else {
-          setInstruction('ไม่พบใบหน้า กรุณาวางหน้าในกรอบ');
-          clearOverlay();
-        }
-      } catch (_e) {}
-      rafRef.current = requestAnimationFrame(detect);
+    } catch (err: any) {
+      console.error(err);
+      setError('ไม่สามารถเปิดกล้องได้ กรุณาตรวจสอบสิทธิ์การเข้าถึงกล้องของเบราว์เซอร์ค่ะ');
     }
-    rafRef.current = requestAnimationFrame(detect);
   }
 
-  function drawOverlay(detection: any) {
-    const canvas = overlayRef.current;
+  function stopCamera() {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+    }
+  }
+
+  function captureFrame(type: 'id_card' | 'selfie') {
     const video = videoRef.current;
-    if (!canvas || !video) return;
-    canvas.width  = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d')!;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const box = detection.detection.box;
-    ctx.strokeStyle = '#22c55e';
-    ctx.lineWidth   = 3;
-    ctx.strokeRect(box.x, box.y, box.width, box.height);
-  }
-
-  function clearOverlay() {
-    const canvas = overlayRef.current;
-    if (!canvas) return;
-    canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height);
-  }
-
-  function captureFrame(step: CameraStep) {
-    if (capturedRef.current) return;
-    capturedRef.current = true;
-    cancelAnimationFrame(rafRef.current);
-
-    const video  = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas) return;
 
-    canvas.width  = video.videoWidth  || 1280;
+    canvas.width = video.videoWidth || 1280;
     canvas.height = video.videoHeight || 720;
     const ctx = canvas.getContext('2d')!;
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
@@ -260,293 +119,270 @@ export default function KYCPage() {
     canvas.toBlob(blob => {
       if (!blob) return;
       const url = URL.createObjectURL(blob);
-      if (step === 'id_card') {
+      if (type === 'id_card') {
         setIdCardBlob(blob);
         setIdCardPreview(url);
       } else {
         setSelfieBlob(blob);
         setSelfiePreview(url);
       }
-      setStepStatus('captured');
-      setInstruction('');
       stopCamera();
-    }, 'image/jpeg', 0.92);
+    }, 'image/jpeg', 0.90);
   }
 
-  function stopCamera() {
-    cancelAnimationFrame(rafRef.current);
-    streamRef.current?.getTracks().forEach(t => t.stop());
-    streamRef.current = null;
-    setCameraActive(false);
-  }
-
-  function retake(step: CameraStep) {
-    if (step === 'id_card') { setIdCardBlob(null); setIdCardPreview(''); }
-    else                    { setSelfieBlob(null);  setSelfiePreview('');  }
-    setStepStatus('waiting');
-    setBlinkCount(0);
-    capturedRef.current = false;
-  }
-
-  // อัปโหลดไฟล์แทนกล้อง (Fallback)
-  function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>, step: CameraStep) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const url = URL.createObjectURL(file);
-    if (step === 'id_card') {
-      setIdCardBlob(file);
-      setIdCardPreview(url);
+  function retake(type: 'id_card' | 'selfie') {
+    if (type === 'id_card') {
+      setIdCardBlob(null);
+      setIdCardPreview('');
     } else {
-      setSelfieBlob(file);
-      setSelfiePreview(url);
+      setSelfieBlob(null);
+      setSelfiePreview('');
     }
-    setStepStatus('captured');
-    setError(''); 
   }
 
-  async function uploadBlob(blob: Blob | File, folder: string): Promise<string | null> {
-    try {
-      const filePath = `${folder}/${currentUser.id}_${Date.now()}.jpg`;
-      const { error: upErr } = await supabase.storage
-        .from('kyc-documents')
-        .upload(filePath, blob, { upsert: true, contentType: blob.type || 'image/jpeg' });
-      if (upErr) return null;
-      const { data } = supabase.storage.from('kyc-documents').getPublicUrl(filePath);
-      return data.publicUrl;
-    } catch (_e) { return null; }
-  }
+  // ── จำลองระบบ AI อ่านบัตร (OCR) ──
+  const handleNextFromStep1 = () => {
+    setIsExtracting(true);
+    
+    // จำลองเวลาโหลดประมวลผล 1.5 วินาที
+    setTimeout(() => {
+      // ตรงนี้ในอนาคตสามารถยิง API ส่งรูป idCardBlob ไปอ่านข้อความจริงๆ ได้
+      setIdNumber('1-2345-67890-12-3');
+      setFullName('นาย จงเจริญ รักประแส');
+      setAddress('123 ม.4 ต.ปากน้ำประแส อ.แกลง จ.ระยอง 21170');
+      
+      setIsExtracting(false);
+      setStep(2);
+    }, 1500);
+  };
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!currentUser) return;
-    if (!idCardBlob)  { setError('กรุณาถ่ายรูปหรืออัปโหลดรูปบัตรประชาชน'); return; }
-    if (!selfieBlob)  { setError('กรุณาถ่ายรูปหรืออัปโหลดรูปเซลฟี่พร้อมบัตร'); return; }
-    if (!bankAccount) { setError('กรุณากรอกเลขบัญชีธนาคาร'); return; }
+    if (!currentUser || !idCardBlob || !selfieBlob) return;
 
-    setSubmitting(true); setError('');
+    setSubmitting(true);
+    setError('');
+
     try {
-      const updates: Record<string, any> = {
+      // 1. อัปโหลดรูปภาพ
+      const idPath = `id-cards/${currentUser.id}_${Date.now()}.jpg`;
+      const selPath = `selfies/${currentUser.id}_${Date.now()}.jpg`;
+
+      await supabase.storage.from('kyc-documents').upload(idPath, idCardBlob, { upsert: true, contentType: 'image/jpeg' });
+      await supabase.storage.from('kyc-documents').upload(selPath, selfieBlob, { upsert: true, contentType: 'image/jpeg' });
+
+      const { data: idData } = supabase.storage.from('kyc-documents').getPublicUrl(idPath);
+      const { data: selData } = supabase.storage.from('kyc-documents').getPublicUrl(selPath);
+
+      // 2. อัปเดตฐานข้อมูล (บันทึกข้อมูล OCR และบัญชี)
+      const updates = {
         kyc_status: 'pending',
+        id_card_url: idData.publicUrl,
+        selfie_with_id_url: selData.publicUrl,
+        id_card_number: idNumber, // ถ้ามีคอลัมน์นี้ใน db
+        full_name: fullName,      // ถ้ามีคอลัมน์นี้ใน db
+        address: address,         // ถ้ามีคอลัมน์นี้ใน db
         bank_name: bankName,
         bank_account_number: bankAccount,
         bank_account_name: bankAccountName,
       };
-      const idUrl  = await uploadBlob(idCardBlob, 'id-cards');
-      const selUrl = await uploadBlob(selfieBlob, 'selfies');
-      if (idUrl)  updates.id_card_url = idUrl;
-      if (selUrl) updates.selfie_with_id_url = selUrl;
 
       const { error: updateErr } = await supabase.from('profiles').update(updates).eq('id', currentUser.id);
-      if (updateErr) { setError(updateErr.message); }
-      else { setSuccessMsg('ส่งข้อมูล KYC เรียบร้อยแล้ว! Admin จะตรวจสอบภายใน 24 ชั่วโมง'); setKycStatus('pending'); }
-    } catch (_e) { setError('เกิดข้อผิดพลาด กรุณาลองใหม่'); }
+      if (updateErr) throw updateErr;
+
+      setKycStatus('pending');
+    } catch (_err) {
+      setError('เกิดข้อผิดพลาดในการส่งข้อมูล กรุณาลองใหม่อีกครั้งค่ะ');
+    }
     setSubmitting(false);
   }
 
+  // ── Render Loading & Status ──
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="text-gray-500 text-center"><div className="text-4xl animate-bounce mb-2">🔍</div><p>กำลังโหลด...</p></div>
+      <div className="text-[#EE4D2D] text-center"><div className="text-4xl animate-bounce mb-2">🔍</div><p className="font-bold">กำลังโหลดข้อมูล...</p></div>
     </div>
   );
 
-  // ✅ ปรับแก้ให้เรนเดอร์ UI กล้องแบบตรงๆ เพื่อป้องกันการ Re-render ทับของเดิม
-  const renderCameraCapture = (step: CameraStep) => {
-    const isSelfie = step === 'selfie';
-    const preview  = isSelfie ? selfiePreview : idCardPreview;
-    const hasCapture = isSelfie ? !!selfieBlob : !!idCardBlob;
-
-    if (hasCapture && preview) {
-      return (
-        <div className="bg-white rounded-2xl shadow-sm p-4 border border-gray-100 mb-4">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-green-500 text-lg">✅</span>
-            <h3 className="font-semibold text-gray-800 text-sm">
-              {isSelfie ? 'รูปเซลฟี่พร้อมบัตร' : 'รูปบัตรประชาชน'}
-            </h3>
-          </div>
-          <img src={preview} alt="preview" className="w-full max-h-48 object-cover rounded-xl mb-3" />
-          <button
-            onClick={() => retake(step)}
-            className="w-full text-sm text-[#EE4D2D] border border-orange-200 rounded-xl py-2 hover:bg-orange-50 transition"
-          >
-            🔄 ถ่ายใหม่
+  if (kycStatus === 'approved' || kycStatus === 'pending') {
+    return (
+      <div className="min-h-screen bg-gray-50 pb-24 flex flex-col items-center justify-center p-6">
+        <div className={`w-full max-w-md rounded-[2rem] p-8 text-center shadow-xl border ${kycStatus === 'approved' ? 'bg-green-50 border-green-200' : 'bg-orange-50 border-orange-200'}`}>
+          <div className="text-6xl mb-4">{kycStatus === 'approved' ? '✅' : '⏳'}</div>
+          <h1 className="font-black text-2xl text-gray-800 mb-2">
+            {kycStatus === 'approved' ? 'ยืนยันตัวตนสำเร็จ!' : 'รอการตรวจสอบจากแอดมิน'}
+          </h1>
+          <p className="text-gray-600 mb-8 font-medium">
+            {kycStatus === 'approved' ? 'คุณสามารถใช้งานระบบรับงานได้เต็มรูปแบบแล้ว' : 'ข้อมูลของคุณกำลังอยู่ในขั้นตอนการพิจารณา จะใช้เวลาไม่เกิน 24 ชั่วโมงค่ะ'}
+          </p>
+          <button onClick={() => router.push('/profile')} className="w-full bg-[#EE4D2D] text-white py-4 rounded-full font-bold text-lg shadow-md hover:bg-[#D74022] active:scale-95 transition-all">
+            กลับสู่หน้าโปรไฟล์
           </button>
         </div>
-      );
-    }
-
-    return (
-      <div className="bg-white rounded-2xl shadow-sm p-4 border border-gray-100 mb-4">
-        <div className="mb-3">
-          <h3 className="font-bold text-[#EE4D2D] text-sm mb-0.5">
-            {isSelfie ? '🤳 ถ่ายเซลฟี่พร้อมบัตรประชาชน' : '🪪 ถ่ายรูปบัตรประชาชน'}
-          </h3>
-          <p className="text-[10px] text-gray-500">
-            {isSelfie
-              ? 'ถือบัตรประชาชนให้เห็นชัด แล้วกระพริบตา 2 ครั้งเพื่อยืนยัน'
-              : 'วางบัตรประชาชนให้ชัดเจน ระบบจะถ่ายให้อัตโนมัติ'}
-          </p>
-        </div>
-
-        {cameraActive && cameraStep === step ? (
-          <div className="relative rounded-xl overflow-hidden bg-black aspect-video mb-3 shadow-inner">
-            <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
-            <canvas ref={overlayRef} className="absolute inset-0 w-full h-full" style={{ pointerEvents: 'none' }} />
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              {isSelfie ? (
-                <div className="w-48 h-60 border-4 border-[#EE4D2D] rounded-full opacity-70" />
-              ) : (
-                <div className="w-72 h-44 border-4 border-[#EE4D2D] rounded-xl opacity-70" />
-              )}
-            </div>
-            <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-4 py-3">
-              <p className="text-white text-sm text-center font-medium">{instruction}</p>
-              {isSelfie && faceApiLoaded && (
-                <p className="text-orange-300 text-xs text-center mt-0.5">
-                  กระพริบ {blinkCount}/{blinkNeeded} ครั้ง
-                </p>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div className="aspect-video bg-gray-50 border border-dashed border-gray-300 rounded-xl flex items-center justify-center mb-3">
-            <div className="text-center p-4">
-              <div className="text-4xl mb-2 opacity-50">{isSelfie ? '🤳' : '🪪'}</div>
-              <p className="text-gray-500 text-xs">กดปุ่มด้านล่างเพื่อเปิดกล้อง</p>
-              {!faceApiLoaded && isSelfie && (
-                <p className="text-[9px] text-[#EE4D2D] mt-1">⏳ กำลังเตรียมระบบ AI...</p>
-              )}
-            </div>
-          </div>
-        )}
-
-        <canvas ref={canvasRef} className="hidden" />
-
-        {cameraActive && cameraStep === step ? (
-          <div className="space-y-3 mt-2">
-            {(!isSelfie || !faceApiLoaded) && (
-              <button
-                type="button"
-                onClick={() => captureFrame(step)}
-                className="w-full bg-[#EE4D2D] hover:bg-[#D74022] active:bg-[#C2351A] text-white py-4 rounded-xl font-bold text-lg shadow-md flex items-center justify-center gap-2 transition"
-              >
-                <span className="text-xl">📸</span> ถ่ายภาพ
-              </button>
-            )}
-            {isSelfie && faceApiLoaded && (
-              <p className="text-center text-[10px] text-[#EE4D2D] font-bold py-1 bg-orange-50 rounded-lg border border-orange-100">
-                🔍 กระพริบตา {blinkCount}/{blinkNeeded} ครั้ง เพื่อถ่ายอัตโนมัติ
-              </p>
-            )}
-            <button
-              type="button"
-              onClick={stopCamera}
-              className="w-full text-gray-500 border border-gray-200 py-3 rounded-xl text-xs font-bold hover:bg-gray-50 transition"
-            >
-              ยกเลิก
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-3 mt-2">
-            <button
-              type="button"
-              onClick={() => startCamera(step)}
-              className={`w-full py-4 rounded-xl font-bold text-sm shadow-md transition flex items-center justify-center gap-2 ${
-                isSelfie
-                  ? 'bg-[#FF7337] hover:bg-[#EE4D2D] text-white'
-                  : 'bg-[#EE4D2D] hover:bg-[#D74022] text-white'
-              }`}
-            >
-              <span className="text-lg">📷</span> {isSelfie ? 'เปิดกล้องหน้า' : 'เปิดกล้องถ่ายบัตร'}
-            </button>
-            
-            <div className="text-center relative">
-               <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-200"></div></div>
-               <div className="relative flex justify-center"><span className="bg-white px-2 text-[10px] text-gray-400">หรือ</span></div>
-            </div>
-            <label className="w-full border border-gray-300 text-gray-600 bg-gray-50 py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 cursor-pointer hover:bg-gray-100 transition active:scale-[0.98]">
-              <span className="text-base">📁</span> เลือกรูปภาพจากในเครื่องแทน
-              <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, step)} />
-            </label>
-          </div>
-        )}
       </div>
     );
-  };
+  }
 
   return (
     <div className="min-h-screen bg-gray-100 flex justify-center pb-24">
-      <div className="w-full sm:max-w-2xl md:max-w-3xl bg-[#F4F6F8] min-h-screen relative flex flex-col">
+      <div className="w-full sm:max-w-2xl md:max-w-3xl bg-white min-h-screen relative flex flex-col shadow-xl">
         
-        {/* Header โทนสีส้มทอง */}
-        <div className="bg-gradient-to-br from-[#EE4D2D] to-[#FF7337] rounded-b-[2.5rem] p-6 pt-12 shadow-sm relative z-10 flex items-center gap-3">
-          <button onClick={() => router.back()} className="text-white font-bold flex items-center gap-1 text-sm">← กลับ</button>
-          <h1 className="font-black text-xl text-white tracking-tight">ยืนยันตัวตน (KYC)</h1>
-          {faceApiLoaded && <span className="ml-auto text-[9px] bg-white text-[#EE4D2D] font-black px-2 py-1 rounded-full shadow-sm">🧠 AI ACTIVE</span>}
+        {/* Header แบบมี Progress Bar */}
+        <div className="bg-white p-5 pt-10 sticky top-0 z-50 border-b border-gray-100 shadow-sm">
+          <div className="flex items-center gap-3 mb-4">
+            <button onClick={() => { step > 1 ? setStep(step - 1) : router.back() }} className="text-gray-500 font-bold text-xl">←</button>
+            <h1 className="font-black text-xl text-gray-800 tracking-tight">ยืนยันตัวตน</h1>
+            <span className="ml-auto text-sm font-bold text-[#EE4D2D] bg-orange-50 px-3 py-1 rounded-full">ขั้นตอน {step}/3</span>
+          </div>
+          
+          <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+            <div className="bg-[#EE4D2D] h-full transition-all duration-500" style={{ width: `${(step / 3) * 100}%` }}></div>
+          </div>
         </div>
 
-        <div className="p-4 space-y-4 -mt-2 relative z-20">
-          
-          {/* Status Badge */}
-          {kycStatus && (
-            <div className={`rounded-[1.5rem] p-4 text-center shadow-sm ${
-              kycStatus === 'approved' ? 'bg-green-50 border border-green-200'
-              : kycStatus === 'pending' ? 'bg-orange-50 border border-orange-200'
-              : 'bg-red-50 border border-red-200'
-            }`}>
-              <div className="text-2xl mb-1">
-                {kycStatus === 'approved' ? '✅' : kycStatus === 'pending' ? '⏳' : '❌'}
+        <div className="p-5 flex-1 relative flex flex-col">
+          {error && <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 text-xs font-bold mb-4 flex items-center gap-2"><span>⚠️</span> {error}</div>}
+          <canvas ref={canvasRef} className="hidden" />
+
+          {/* ────────────────────────────────────────────────────────
+              STEP 1: ถ่ายบัตรประชาชน
+          ──────────────────────────────────────────────────────── */}
+          {step === 1 && (
+            <div className="flex flex-col h-full animate-fade-in">
+              <div className="mb-4">
+                <h2 className="text-lg font-black text-[#EE4D2D] mb-1">1. ถ่ายรูปบัตรประชาชน</h2>
+                <p className="text-xs text-gray-500 font-medium">วางบัตรประชาชนให้อยู่ในกรอบ และเห็นตัวหนังสือชัดเจน</p>
               </div>
-              <p className="font-bold text-gray-800 text-sm">
-                {kycStatus === 'approved' ? 'ยืนยันตัวตนสำเร็จ!'
-                : kycStatus === 'pending' ? 'รอการตรวจสอบจาก Admin'
-                : 'ไม่ผ่านการตรวจสอบ กรุณาส่งใหม่'}
-              </p>
+
+              {!idCardPreview ? (
+                <div className="flex-1 flex flex-col justify-center">
+                  <div className="relative w-full aspect-[3/4] sm:aspect-video bg-black rounded-3xl overflow-hidden shadow-inner flex items-center justify-center">
+                    <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover" />
+                    {/* กรอบสี่เหลี่ยมผืนผ้า (บัตร ปชช) */}
+                    <div className="w-[85%] aspect-[1.6/1] border-[3px] border-white/80 rounded-2xl relative z-10 shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
+                      <div className="absolute inset-0 border-[3px] border-[#EE4D2D] rounded-2xl animate-pulse"></div>
+                    </div>
+                  </div>
+                  <button onClick={() => captureFrame('id_card')} className="mt-8 bg-[#EE4D2D] text-white w-20 h-20 rounded-full mx-auto flex items-center justify-center text-3xl shadow-[0_0_0_6px_rgba(238,77,45,0.3)] active:scale-90 transition-transform">
+                    📸
+                  </button>
+                </div>
+              ) : (
+                <div className="flex-1 flex flex-col">
+                  <div className="w-full aspect-[4/3] bg-gray-100 rounded-3xl overflow-hidden border border-gray-200 relative">
+                    <img src={idCardPreview} alt="ID Preview" className="w-full h-full object-cover" />
+                    <div className="absolute top-4 right-4 bg-green-500 text-white p-2 rounded-full shadow-lg">✅</div>
+                  </div>
+                  <div className="mt-auto pt-6 space-y-3">
+                    <button onClick={handleNextFromStep1} disabled={isExtracting} className="w-full bg-[#EE4D2D] text-white py-4 rounded-full font-black text-lg shadow-md hover:bg-[#D74022] active:scale-95 transition-all disabled:opacity-70 flex justify-center items-center gap-2">
+                      {isExtracting ? '⏳ กำลังดึงข้อมูลจากบัตร...' : 'ถัดไป ➡️'}
+                    </button>
+                    <button onClick={() => retake('id_card')} disabled={isExtracting} className="w-full text-gray-500 py-3 font-bold text-sm hover:text-gray-800 transition-colors">
+                      🔄 ถ่ายใหม่
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
-          {successMsg && <div className="bg-green-50 border border-green-200 text-green-700 rounded-xl p-3 text-sm font-bold shadow-sm">{successMsg}</div>}
-          {error && <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 text-[11px] font-bold shadow-sm flex items-start gap-2"><span>⚠️</span> {error}</div>}
+          {/* ────────────────────────────────────────────────────────
+              STEP 2: ถ่ายเซลฟี่
+          ──────────────────────────────────────────────────────── */}
+          {step === 2 && (
+            <div className="flex flex-col h-full animate-fade-in">
+              <div className="mb-4">
+                <h2 className="text-lg font-black text-[#EE4D2D] mb-1">2. ถ่ายรูปใบหน้าตรง</h2>
+                <p className="text-xs text-gray-500 font-medium">วางใบหน้าให้อยู่ในกรอบวงรี ถอดแว่นและหมวก</p>
+              </div>
 
-          {/* Info */}
-          <div className="bg-orange-50 border border-orange-100 rounded-2xl p-4 shadow-sm">
-            <h3 className="font-bold text-[#EE4D2D] mb-2 text-sm flex items-center gap-1.5">📋 ขั้นตอน KYC</h3>
-            <div className="space-y-2.5 text-xs text-gray-700 font-medium">
-              <div className="flex items-center gap-2.5">
-                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-bold shadow-sm ${idCardBlob ? 'bg-green-500' : 'bg-[#EE4D2D]'}`}>
-                  {idCardBlob ? '✓' : '1'}
-                </span>
-                <span>ถ่ายรูปบัตรประชาชน (กล้องหลัง)</span>
-              </div>
-              <div className="flex items-center gap-2.5">
-                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-bold shadow-sm ${selfieBlob ? 'bg-green-500' : 'bg-[#EE4D2D]'}`}>
-                  {selfieBlob ? '✓' : '2'}
-                </span>
-                <span>เซลฟี่พร้อมบัตร + กระพริบตา 2 ครั้ง (AI สแกนสด)</span>
-              </div>
-              <div className="flex items-center gap-2.5">
-                <span className="w-5 h-5 rounded-full bg-[#EE4D2D] flex items-center justify-center text-white text-[10px] font-bold shadow-sm">3</span>
-                <span className="text-[#EE4D2D] font-bold">กรอกข้อมูลบัญชีธนาคาร ( เพื่อใช้สำหรับรับเงิน )</span>
-              </div>
+              {!selfiePreview ? (
+                <div className="flex-1 flex flex-col justify-center">
+                  <div className="relative w-full aspect-[3/4] sm:aspect-video bg-black rounded-3xl overflow-hidden shadow-inner flex items-center justify-center">
+                    <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover" />
+                    {/* กรอบวงรี (ใบหน้า) */}
+                    <div className="w-[65%] aspect-[3/4] border-[3px] border-white/80 rounded-[100%] relative z-10 shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
+                      <div className="absolute inset-0 border-[3px] border-[#EE4D2D] rounded-[100%] animate-pulse"></div>
+                    </div>
+                  </div>
+                  <button onClick={() => captureFrame('selfie')} className="mt-8 bg-[#EE4D2D] text-white w-20 h-20 rounded-full mx-auto flex items-center justify-center text-3xl shadow-[0_0_0_6px_rgba(238,77,45,0.3)] active:scale-90 transition-transform">
+                    📸
+                  </button>
+                </div>
+              ) : (
+                <div className="flex-1 flex flex-col">
+                  <div className="w-full aspect-[3/4] bg-gray-100 rounded-3xl overflow-hidden border border-gray-200 relative">
+                    <img src={selfiePreview} alt="Selfie Preview" className="w-full h-full object-cover" />
+                    <div className="absolute top-4 right-4 bg-green-500 text-white p-2 rounded-full shadow-lg">✅</div>
+                  </div>
+                  <div className="mt-auto pt-6 space-y-3">
+                    <button onClick={() => setStep(3)} className="w-full bg-[#EE4D2D] text-white py-4 rounded-full font-black text-lg shadow-md hover:bg-[#D74022] active:scale-95 transition-all flex justify-center items-center gap-2">
+                      ถัดไป ➡️
+                    </button>
+                    <button onClick={() => retake('selfie')} className="w-full text-gray-500 py-3 font-bold text-sm hover:text-gray-800 transition-colors">
+                      🔄 ถ่ายใหม่
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
+          )}
 
-          {kycStatus !== 'approved' && (
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Step 1: ID Card */}
-              {renderCameraCapture('id_card')}
+          {/* ────────────────────────────────────────────────────────
+              STEP 3: ตรวจสอบข้อมูล + บัญชีธนาคาร
+          ──────────────────────────────────────────────────────── */}
+          {step === 3 && (
+            <div className="flex flex-col h-full animate-fade-in overflow-y-auto pb-10">
+              <div className="mb-6">
+                <h2 className="text-lg font-black text-[#EE4D2D] mb-1">3. ตรวจสอบและบัญชีรับเงิน</h2>
+                <p className="text-xs text-gray-500 font-medium">กรุณาตรวจสอบข้อมูลที่อ่านได้จากบัตร และกรอกบัญชีธนาคาร</p>
+              </div>
 
-              {/* Step 2: Selfie */}
-              {idCardBlob && renderCameraCapture('selfie')}
+              <form onSubmit={handleSubmit} className="space-y-6">
+                
+                {/* พรีวิวรูปที่ถ่าย */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="relative rounded-2xl overflow-hidden border-2 border-green-400 aspect-[4/3]">
+                    <img src={idCardPreview} className="w-full h-full object-cover opacity-80" alt="ID" />
+                    <div className="absolute inset-0 flex items-center justify-center text-white font-black text-sm drop-shadow-md">บัตรประชาชน ✅</div>
+                  </div>
+                  <div className="relative rounded-2xl overflow-hidden border-2 border-green-400 aspect-[4/3]">
+                    <img src={selfiePreview} className="w-full h-full object-cover opacity-80" alt="Selfie" />
+                    <div className="absolute inset-0 flex items-center justify-center text-white font-black text-sm drop-shadow-md">รูปใบหน้า ✅</div>
+                  </div>
+                </div>
 
-              {/* Step 3: Bank */}
-              {idCardBlob && selfieBlob && (
-                <div className="bg-white rounded-[1.5rem] shadow-sm p-5 border border-gray-100 space-y-4 animate-fade-in">
-                  <h3 className="font-bold text-[#EE4D2D] flex items-center gap-1.5 text-sm">🏦 ข้อมูลบัญชีธนาคาร <span className="text-[10px] font-normal text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">เพื่อใช้สำหรับรับเงิน</span></h3>
+                {/* ข้อมูลที่อ่านจากบัตร (แก้ไขได้) */}
+                <div className="bg-orange-50 p-5 rounded-[1.5rem] border border-orange-100 space-y-4">
+                  <h3 className="font-bold text-[#EE4D2D] text-sm flex items-center gap-2">
+                    <span>✨</span> ข้อมูลจากบัตร (โปรดตรวจสอบ)
+                  </h3>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-500 mb-1 ml-1">เลขประจำตัวประชาชน</label>
+                    <input type="text" value={idNumber} onChange={e => setIdNumber(e.target.value)}
+                      className="w-full bg-white border border-gray-200 rounded-xl p-3 text-sm font-bold text-gray-800 outline-none focus:border-[#EE4D2D]" required />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-500 mb-1 ml-1">ชื่อ-นามสกุล (ภาษาไทย)</label>
+                    <input type="text" value={fullName} onChange={e => setFullName(e.target.value)}
+                      className="w-full bg-white border border-gray-200 rounded-xl p-3 text-sm font-bold text-gray-800 outline-none focus:border-[#EE4D2D]" required />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-500 mb-1 ml-1">ที่อยู่ตามบัตรประชาชน</label>
+                    <textarea value={address} onChange={e => setAddress(e.target.value)} rows={2}
+                      className="w-full bg-white border border-gray-200 rounded-xl p-3 text-sm font-bold text-gray-800 outline-none focus:border-[#EE4D2D]" required />
+                  </div>
+                </div>
+
+                {/* บัญชีธนาคาร */}
+                <div className="bg-gray-50 p-5 rounded-[1.5rem] border border-gray-200 space-y-4">
+                  <h3 className="font-bold text-gray-800 text-sm flex items-center gap-2">
+                    <span>🏦</span> บัญชีรับเงิน
+                  </h3>
                   <div>
                     <label className="block text-[11px] font-bold text-gray-500 mb-1 ml-1">ธนาคาร</label>
                     <select value={bankName} onChange={e => setBankName(e.target.value)}
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3.5 text-sm outline-none focus:border-[#EE4D2D] focus:ring-1 focus:ring-[#EE4D2D]/50 transition-all font-medium text-gray-700" required>
+                      className="w-full bg-white border border-gray-200 rounded-xl p-3.5 text-sm font-medium text-gray-800 outline-none focus:border-[#EE4D2D]" required>
                       <option value="">-- เลือกธนาคาร --</option>
                       <option value="กสิกรไทย">กสิกรไทย (KBANK)</option>
                       <option value="ไทยพาณิชย์">ไทยพาณิชย์ (SCB)</option>
@@ -557,52 +393,27 @@ export default function KYCPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-[11px] font-bold text-gray-500 mb-1 ml-1">ชื่อบัญชี</label>
+                    <label className="block text-[11px] font-bold text-gray-500 mb-1 ml-1">ชื่อบัญชี (ต้องตรงกับชื่อในบัตร)</label>
                     <input type="text" value={bankAccountName} onChange={e => setBankAccountName(e.target.value)}
-                      placeholder="ชื่อ-นามสกุล ตามสมุดบัญชี"
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3.5 text-sm outline-none focus:border-[#EE4D2D] focus:ring-1 focus:ring-[#EE4D2D]/50 transition-all font-medium text-gray-700" required />
+                      className="w-full bg-white border border-gray-200 rounded-xl p-3.5 text-sm font-medium text-gray-800 outline-none focus:border-[#EE4D2D]" required />
                   </div>
                   <div>
                     <label className="block text-[11px] font-bold text-gray-500 mb-1 ml-1">เลขบัญชี</label>
-                    <input type="text" value={bankAccount}
-                      onChange={e => setBankAccount(e.target.value.replace(/\D/g,'').slice(0,15))}
+                    <input type="text" value={bankAccount} onChange={e => setBankAccount(e.target.value.replace(/\D/g,'').slice(0,15))}
                       placeholder="ไม่ต้องใส่ขีด (-)"
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3.5 text-sm outline-none focus:border-[#EE4D2D] focus:ring-1 focus:ring-[#EE4D2D]/50 transition-all font-medium text-gray-700 tracking-wider" required />
+                      className="w-full bg-white border border-gray-200 rounded-xl p-3.5 text-sm font-medium text-gray-800 outline-none focus:border-[#EE4D2D] tracking-widest" required />
                   </div>
                 </div>
-              )}
 
-              {idCardBlob && selfieBlob && (
                 <button type="submit" disabled={submitting}
-                  className="w-full bg-[#EE4D2D] text-white py-4 rounded-[1.5rem] font-black text-sm shadow-lg hover:bg-[#D74022] active:scale-[0.98] transition-all disabled:opacity-50 mt-4 tracking-wide">
-                  {submitting ? '⏳ กำลังส่งข้อมูล...' : '📤 ยืนยันข้อมูลและส่งตรวจสอบ'}
+                  className="w-full bg-[#EE4D2D] text-white py-4 rounded-full font-black text-lg shadow-lg hover:bg-[#D74022] active:scale-[0.98] transition-all disabled:opacity-50 mt-4">
+                  {submitting ? '⏳ กำลังส่งข้อมูล...' : '📤 บันทึกและส่งให้ Admin ตรวจสอบ'}
                 </button>
-              )}
-              <p className="text-[10px] text-center text-gray-400 font-medium">ข้อมูลของท่านจะถูกเข้ารหัสและดูแลความปลอดภัยอย่างเคร่งครัด</p>
-            </form>
-          )}
-
-          {kycStatus === 'approved' && (
-            <div className="bg-white rounded-[1.5rem] shadow-sm p-8 text-center border border-gray-100 mt-4">
-              <div className="text-5xl mb-4">🎉</div>
-              <p className="font-black text-xl text-gray-800 mb-2">ยืนยันตัวตนสำเร็จแล้ว!</p>
-              <p className="text-xs text-gray-500 mb-6 leading-relaxed">บัญชีของคุณได้รับตราสัญลักษณ์ ✅ ยืนยันแล้ว<br/>สามารถกดรับงานได้เต็มรูปแบบเลยค่ะ</p>
-              <button onClick={() => router.push('/profile')} className="bg-[#EE4D2D] text-white px-8 py-3.5 rounded-full font-bold text-sm hover:bg-[#D74022] transition-colors shadow-md active:scale-95">
-                กลับสู่หน้าโปรไฟล์
-              </button>
+              </form>
             </div>
           )}
-        </div>
 
-        {/* 🧭 Bottom Nav */}
-        <div className="fixed bottom-0 w-full sm:max-w-2xl md:max-w-3xl bg-white/95 backdrop-blur-md border-t border-gray-100 px-8 py-4 flex justify-between items-center shadow-[0_-4px_25px_rgba(0,0,0,0.06)] rounded-t-[2.5rem] z-50">
-           <button onClick={() => router.push('/')} className="flex flex-col items-center gap-1 opacity-40"><span className="text-xl">🏠</span><span className="text-[10px] font-bold text-gray-500">หน้าแรก</span></button>
-           <button onClick={() => router.push('/services')} className="flex flex-col items-center gap-1 opacity-40"><span className="text-xl">🛠️</span><span className="text-[10px] font-bold text-gray-500">บริการ</span></button>
-           <button onClick={() => router.push('/win-online')} className="flex flex-col items-center gap-1 opacity-40"><span className="text-xl">📋</span><span className="text-[10px] font-bold text-gray-500">ด่วนนน</span></button>
-           <button onClick={() => router.push('/history')} className="flex flex-col items-center gap-1 opacity-40"><span className="text-xl">📜</span><span className="text-[10px] font-bold text-gray-500">ประวัติ</span></button>
-           <div className="flex flex-col items-center gap-1 scale-110"><span className="text-xl">👤</span><span className="text-[10px] font-bold text-[#EE4D2D]">ฉัน</span><div className="w-1.5 h-1.5 bg-[#EE4D2D] rounded-full shadow-sm"></div></div>
         </div>
-
       </div>
     </div>
   );
