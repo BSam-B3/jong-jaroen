@@ -35,8 +35,8 @@ export default function KYCPage() {
   // Camera state
   const [cameraStep, setCameraStep]   = useState<CameraStep>('id_card');
   const [stepStatus, setStepStatus]   = useState<StepStatus>('waiting');
-  const [idCardBlob, setIdCardBlob]   = useState<Blob | null>(null);
-  const [selfieBlob, setSelfieBlob]   = useState<Blob | null>(null);
+  const [idCardBlob, setIdCardBlob]   = useState<Blob | File | null>(null);
+  const [selfieBlob, setSelfieBlob]   = useState<Blob | File | null>(null);
   const [idCardPreview, setIdCardPreview] = useState('');
   const [selfiePreview, setSelfiePreview] = useState('');
   const [faceApiLoaded, setFaceApiLoaded] = useState(false);
@@ -65,7 +65,7 @@ export default function KYCPage() {
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push('/login'); return; } // แก้พาทเป็น /login
+      if (!user) { router.push('/login'); return; } 
       setCurrentUser(user);
       const { data: profile } = await supabase
         .from('profiles')
@@ -105,6 +105,7 @@ export default function KYCPage() {
     }
   }
 
+  // ✅ ปรับเงื่อนไขกล้องให้ยืดหยุ่นขึ้น ป้องกัน Error บน PC
   async function startCamera(step: CameraStep) {
     stopCamera();
     setCameraStep(step);
@@ -119,8 +120,8 @@ export default function KYCPage() {
     setInstruction(step === 'id_card' ? 'วางบัตรประชาชนให้อยู่ในกรอบ' : 'วางหน้าในกรอบ');
 
     const constraintsList = [
-      { video: { facingMode: { exact: facingMode }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
-      { video: { facingMode: facingMode, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
+      { video: { facingMode: { ideal: facingMode }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
+      { video: true, audio: false } // Fallback สุดท้ายถ้าหา facingMode ไม่เจอ (เช่น บนคอม)
     ];
 
     let stream: MediaStream | null = null;
@@ -137,12 +138,7 @@ export default function KYCPage() {
     }
 
     if (!stream) {
-      const errMsg = lastErr?.name === 'NotAllowedError' || lastErr?.name === 'PermissionDeniedError'
-        ? 'กรุณาอนุญาตให้แอปใช้กล้อง แล้วลองใหม่'
-        : step === 'id_card'
-          ? 'ไม่พบกล้องหลัง กรุณาใช้มือถือที่มีกล้องหลัง'
-          : 'ไม่พบกล้องหน้า กรุณาใช้มือถือที่มีกล้องหน้า';
-      setError(errMsg);
+      setError('ไม่สามารถเข้าถึงกล้องได้ กรุณาอนุญาตให้แอปใช้กล้อง หรือใช้วิธี "อัปโหลดรูปภาพ" แทนค่ะ');
       setStepStatus('waiting');
       return;
     }
@@ -159,7 +155,7 @@ export default function KYCPage() {
       setStepStatus('blinking');
       startBlinkDetection();
     } else if (step === 'selfie' && !faceApiLoaded) {
-      setInstruction('กระพริบตาหน้ากล้อง แล้วกดปุ่มถ่ายรูป');
+      setInstruction('ถ่ายรูปเซลฟี่หน้าตรงพร้อมบัตร');
       setStepStatus('blinking');
     } else {
       setInstruction('จัดบัตรให้ชัดเจนในกรอบ แล้วกดปุ่มถ่ายรูป');
@@ -280,12 +276,28 @@ export default function KYCPage() {
     capturedRef.current = false;
   }
 
-  async function uploadBlob(blob: Blob, folder: string): Promise<string | null> {
+  // ✅ ฟังก์ชันเสริม: จัดการอัปโหลดไฟล์ (Fallback ถ้ากล้องพัง)
+  function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>, step: CameraStep) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    if (step === 'id_card') {
+      setIdCardBlob(file);
+      setIdCardPreview(url);
+    } else {
+      setSelfieBlob(file);
+      setSelfiePreview(url);
+    }
+    setStepStatus('captured');
+    setError(''); // ลบ error ออกถ้ามี
+  }
+
+  async function uploadBlob(blob: Blob | File, folder: string): Promise<string | null> {
     try {
       const filePath = `${folder}/${currentUser.id}_${Date.now()}.jpg`;
       const { error: upErr } = await supabase.storage
         .from('kyc-documents')
-        .upload(filePath, blob, { upsert: true, contentType: 'image/jpeg' });
+        .upload(filePath, blob, { upsert: true, contentType: blob.type || 'image/jpeg' });
       if (upErr) return null;
       const { data } = supabase.storage.from('kyc-documents').getPublicUrl(filePath);
       return data.publicUrl;
@@ -295,8 +307,8 @@ export default function KYCPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!currentUser) return;
-    if (!idCardBlob)  { setError('กรุณาถ่ายรูปบัตรประชาชน'); return; }
-    if (!selfieBlob)  { setError('กรุณาถ่ายรูปเซลฟี่พร้อมบัตร'); return; }
+    if (!idCardBlob)  { setError('กรุณาถ่ายรูปหรืออัปโหลดรูปบัตรประชาชน'); return; }
+    if (!selfieBlob)  { setError('กรุณาถ่ายรูปหรืออัปโหลดรูปเซลฟี่พร้อมบัตร'); return; }
     if (!bankAccount) { setError('กรุณากรอกเลขบัญชีธนาคาร'); return; }
 
     setSubmitting(true); setError('');
@@ -354,9 +366,9 @@ export default function KYCPage() {
       <div className="bg-white rounded-2xl shadow-sm p-4 border border-gray-100">
         <div className="mb-3">
           <h3 className="font-bold text-[#EE4D2D] text-sm mb-0.5">
-            {isSelfie ? '🤳 ถ่ายเซลฟี่พร้อมบัตรประชาชน' : '🪪 ถ่ายบัตรประชาชน'}
+            {isSelfie ? '🤳 ถ่ายเซลฟี่พร้อมบัตรประชาชน' : '🪪 ถ่ายรูปบัตรประชาชน'}
           </h3>
-          <p className="text-xs text-gray-500">
+          <p className="text-[10px] text-gray-500">
             {isSelfie
               ? 'ถือบัตรประชาชนให้เห็นชัด แล้วกระพริบตา 2 ครั้งเพื่อยืนยัน'
               : 'วางบัตรประชาชนให้ชัดเจน ระบบจะถ่ายให้อัตโนมัติ'}
@@ -384,12 +396,12 @@ export default function KYCPage() {
             </div>
           </div>
         ) : (
-          <div className="aspect-video bg-gray-50 border border-dashed border-gray-200 rounded-xl flex items-center justify-center mb-3">
-            <div className="text-center">
-              <div className="text-4xl mb-2">{isSelfie ? '🤳' : '🪪'}</div>
-              <p className="text-gray-500 text-sm">กดปุ่มด้านล่างเพื่อเปิดกล้อง</p>
+          <div className="aspect-video bg-gray-50 border border-dashed border-gray-300 rounded-xl flex items-center justify-center mb-3">
+            <div className="text-center p-4">
+              <div className="text-4xl mb-2 opacity-50">{isSelfie ? '🤳' : '🪪'}</div>
+              <p className="text-gray-500 text-xs">กดปุ่มด้านล่างเพื่อเปิดกล้อง</p>
               {!faceApiLoaded && isSelfie && (
-                <p className="text-xs text-[#EE4D2D] mt-1">⏳ กำลังโหลด AI...</p>
+                <p className="text-[9px] text-[#EE4D2D] mt-1">⏳ กำลังเตรียมระบบ AI...</p>
               )}
             </div>
           </div>
@@ -398,9 +410,10 @@ export default function KYCPage() {
         <canvas ref={canvasRef} className="hidden" />
 
         {cameraActive && cameraStep === step ? (
-          <div className="space-y-4 mt-2">
+          <div className="space-y-3 mt-2">
             {(!isSelfie || !faceApiLoaded) && (
               <button
+                type="button"
                 onClick={() => captureFrame(step)}
                 className="w-full bg-[#EE4D2D] hover:bg-[#D74022] active:bg-[#C2351A] text-white py-4 rounded-xl font-bold text-lg shadow-md flex items-center justify-center gap-2 transition"
               >
@@ -408,28 +421,42 @@ export default function KYCPage() {
               </button>
             )}
             {isSelfie && faceApiLoaded && (
-              <p className="text-center text-xs text-[#EE4D2D] font-medium py-1 bg-orange-50 rounded-lg">
+              <p className="text-center text-[10px] text-[#EE4D2D] font-bold py-1 bg-orange-50 rounded-lg border border-orange-100">
                 🔍 กระพริบตา {blinkCount}/{blinkNeeded} ครั้ง เพื่อถ่ายอัตโนมัติ
               </p>
             )}
             <button
+              type="button"
               onClick={stopCamera}
-              className="w-full text-gray-500 border border-gray-200 py-3 rounded-xl text-sm font-bold hover:bg-gray-50 transition"
+              className="w-full text-gray-500 border border-gray-200 py-3 rounded-xl text-xs font-bold hover:bg-gray-50 transition"
             >
               ยกเลิก
             </button>
           </div>
         ) : (
-          <button
-            onClick={() => startCamera(step)}
-            className={`w-full py-4 rounded-xl font-bold text-sm shadow-md transition ${
-              isSelfie
-                ? 'bg-[#FF7337] hover:bg-[#EE4D2D] text-white'
-                : 'bg-[#EE4D2D] hover:bg-[#D74022] text-white'
-            }`}
-          >
-            {isSelfie ? '📷 เปิดกล้องหน้า + ตรวจจับกระพริบตา' : '📷 เปิดกล้องถ่ายบัตร'}
-          </button>
+          <div className="space-y-3 mt-2">
+            <button
+              type="button"
+              onClick={() => startCamera(step)}
+              className={`w-full py-4 rounded-xl font-bold text-sm shadow-md transition flex items-center justify-center gap-2 ${
+                isSelfie
+                  ? 'bg-[#FF7337] hover:bg-[#EE4D2D] text-white'
+                  : 'bg-[#EE4D2D] hover:bg-[#D74022] text-white'
+              }`}
+            >
+              <span className="text-lg">📷</span> {isSelfie ? 'เปิดกล้องหน้า' : 'เปิดกล้องถ่ายบัตร'}
+            </button>
+            
+            {/* ✅ ปุ่มอัปโหลดรูปภาพ (Fallback) */}
+            <div className="text-center relative">
+               <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-200"></div></div>
+               <div className="relative flex justify-center"><span className="bg-white px-2 text-[10px] text-gray-400">หรือ</span></div>
+            </div>
+            <label className="w-full border border-gray-300 text-gray-600 bg-gray-50 py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 cursor-pointer hover:bg-gray-100 transition active:scale-[0.98]">
+              <span className="text-base">📁</span> เลือกรูปภาพจากในเครื่องแทน
+              <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, step)} />
+            </label>
+          </div>
         )}
       </div>
     );
@@ -441,16 +468,16 @@ export default function KYCPage() {
         
         {/* Header โทนสีส้มทอง */}
         <div className="bg-gradient-to-br from-[#EE4D2D] to-[#FF7337] rounded-b-[2.5rem] p-6 pt-12 shadow-sm relative z-10 flex items-center gap-3">
-          <button onClick={() => router.back()} className="text-white font-bold flex items-center gap-1">← กลับ</button>
-          <h1 className="font-black text-xl text-white">ยืนยันตัวตน (KYC)</h1>
-          {faceApiLoaded && <span className="ml-auto text-[10px] bg-white text-[#EE4D2D] font-bold px-2 py-1 rounded-full shadow-sm">🧠 AI พร้อม</span>}
+          <button onClick={() => router.back()} className="text-white font-bold flex items-center gap-1 text-sm">← กลับ</button>
+          <h1 className="font-black text-xl text-white tracking-tight">ยืนยันตัวตน (KYC)</h1>
+          {faceApiLoaded && <span className="ml-auto text-[9px] bg-white text-[#EE4D2D] font-black px-2 py-1 rounded-full shadow-sm">🧠 AI ACTIVE</span>}
         </div>
 
         <div className="p-4 space-y-4 -mt-2 relative z-20">
           
           {/* Status Badge */}
           {kycStatus && (
-            <div className={`rounded-2xl p-4 text-center shadow-sm ${
+            <div className={`rounded-[1.5rem] p-4 text-center shadow-sm ${
               kycStatus === 'approved' ? 'bg-green-50 border border-green-200'
               : kycStatus === 'pending' ? 'bg-orange-50 border border-orange-200'
               : 'bg-red-50 border border-red-200'
@@ -458,7 +485,7 @@ export default function KYCPage() {
               <div className="text-2xl mb-1">
                 {kycStatus === 'approved' ? '✅' : kycStatus === 'pending' ? '⏳' : '❌'}
               </div>
-              <p className="font-bold text-gray-700 text-sm">
+              <p className="font-bold text-gray-800 text-sm">
                 {kycStatus === 'approved' ? 'ยืนยันตัวตนสำเร็จ!'
                 : kycStatus === 'pending' ? 'รอการตรวจสอบจาก Admin'
                 : 'ไม่ผ่านการตรวจสอบ กรุณาส่งใหม่'}
@@ -467,27 +494,28 @@ export default function KYCPage() {
           )}
 
           {successMsg && <div className="bg-green-50 border border-green-200 text-green-700 rounded-xl p-3 text-sm font-bold shadow-sm">{successMsg}</div>}
-          {error && <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 text-sm font-bold shadow-sm">{error}</div>}
+          {error && <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 text-[11px] font-bold shadow-sm flex items-start gap-2"><span>⚠️</span> {error}</div>}
 
           {/* Info */}
           <div className="bg-orange-50 border border-orange-100 rounded-2xl p-4 shadow-sm">
-            <h3 className="font-bold text-[#EE4D2D] mb-2 text-sm flex items-center gap-1">📋 ขั้นตอน KYC</h3>
-            <div className="space-y-2 text-xs text-gray-700 font-medium">
-              <div className="flex items-center gap-2">
-                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-bold ${idCardBlob ? 'bg-green-500' : 'bg-[#EE4D2D]'}`}>
+            <h3 className="font-bold text-[#EE4D2D] mb-2 text-sm flex items-center gap-1.5">📋 ขั้นตอน KYC</h3>
+            <div className="space-y-2.5 text-xs text-gray-700 font-medium">
+              <div className="flex items-center gap-2.5">
+                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-bold shadow-sm ${idCardBlob ? 'bg-green-500' : 'bg-[#EE4D2D]'}`}>
                   {idCardBlob ? '✓' : '1'}
                 </span>
                 <span>ถ่ายรูปบัตรประชาชน (กล้องหลัง)</span>
               </div>
-              <div className="flex items-center gap-2">
-                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-bold ${selfieBlob ? 'bg-green-500' : 'bg-[#EE4D2D]'}`}>
+              <div className="flex items-center gap-2.5">
+                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-bold shadow-sm ${selfieBlob ? 'bg-green-500' : 'bg-[#EE4D2D]'}`}>
                   {selfieBlob ? '✓' : '2'}
                 </span>
                 <span>เซลฟี่พร้อมบัตร + กระพริบตา 2 ครั้ง (AI สแกนสด)</span>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="w-5 h-5 rounded-full bg-[#EE4D2D] flex items-center justify-center text-white text-[10px] font-bold">3</span>
-                <span>กรอกข้อมูลบัญชีธนาคาร</span>
+              <div className="flex items-center gap-2.5">
+                <span className="w-5 h-5 rounded-full bg-[#EE4D2D] flex items-center justify-center text-white text-[10px] font-bold shadow-sm">3</span>
+                {/* ✅ แก้ไขข้อความ Step 3 ตามคำสั่ง */}
+                <span className="text-[#EE4D2D] font-bold">กรอกข้อมูลบัญชีธนาคาร ( เพื่อใช้สำหรับรับเงิน )</span>
               </div>
             </div>
           </div>
@@ -502,12 +530,12 @@ export default function KYCPage() {
 
               {/* Step 3: Bank */}
               {idCardBlob && selfieBlob && (
-                <div className="bg-white rounded-[1.5rem] shadow-sm p-5 border border-gray-100 space-y-4">
-                  <h3 className="font-bold text-[#EE4D2D] flex items-center gap-1">🏦 ข้อมูลบัญชีธนาคาร</h3>
+                <div className="bg-white rounded-[1.5rem] shadow-sm p-5 border border-gray-100 space-y-4 animate-fade-in">
+                  <h3 className="font-bold text-[#EE4D2D] flex items-center gap-1.5 text-sm">🏦 ข้อมูลบัญชีธนาคาร <span className="text-[10px] font-normal text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">เพื่อใช้สำหรับรับเงิน</span></h3>
                   <div>
-                    <label className="block text-xs font-bold text-gray-500 mb-1 ml-1">ธนาคาร</label>
+                    <label className="block text-[11px] font-bold text-gray-500 mb-1 ml-1">ธนาคาร</label>
                     <select value={bankName} onChange={e => setBankName(e.target.value)}
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm outline-none focus:border-[#EE4D2D] focus:ring-1 focus:ring-[#EE4D2D]/50 transition-all" required>
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3.5 text-sm outline-none focus:border-[#EE4D2D] focus:ring-1 focus:ring-[#EE4D2D]/50 transition-all font-medium text-gray-700" required>
                       <option value="">-- เลือกธนาคาร --</option>
                       <option value="กสิกรไทย">กสิกรไทย (KBANK)</option>
                       <option value="ไทยพาณิชย์">ไทยพาณิชย์ (SCB)</option>
@@ -518,53 +546,32 @@ export default function KYCPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-gray-500 mb-1 ml-1">ชื่อบัญชี</label>
+                    <label className="block text-[11px] font-bold text-gray-500 mb-1 ml-1">ชื่อบัญชี</label>
                     <input type="text" value={bankAccountName} onChange={e => setBankAccountName(e.target.value)}
-                      placeholder="ชื่อ-นามสกุล ตามบัญชี"
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm outline-none focus:border-[#EE4D2D] focus:ring-1 focus:ring-[#EE4D2D]/50 transition-all" required />
+                      placeholder="ชื่อ-นามสกุล ตามสมุดบัญชี"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3.5 text-sm outline-none focus:border-[#EE4D2D] focus:ring-1 focus:ring-[#EE4D2D]/50 transition-all font-medium text-gray-700" required />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-gray-500 mb-1 ml-1">เลขบัญชี</label>
+                    <label className="block text-[11px] font-bold text-gray-500 mb-1 ml-1">เลขบัญชี</label>
                     <input type="text" value={bankAccount}
                       onChange={e => setBankAccount(e.target.value.replace(/\D/g,'').slice(0,15))}
-                      placeholder="xxxxxxxxxx"
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm outline-none focus:border-[#EE4D2D] focus:ring-1 focus:ring-[#EE4D2D]/50 transition-all" required />
+                      placeholder="ไม่ต้องใส่ขีด (-)"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3.5 text-sm outline-none focus:border-[#EE4D2D] focus:ring-1 focus:ring-[#EE4D2D]/50 transition-all font-medium text-gray-700 tracking-wider" required />
                   </div>
                 </div>
               )}
 
               {idCardBlob && selfieBlob && (
                 <button type="submit" disabled={submitting}
-                  className="w-full bg-[#EE4D2D] text-white py-4 rounded-full font-black text-sm shadow-md hover:bg-[#D74022] active:scale-95 transition-all disabled:opacity-50 mt-2">
-                  {submitting ? '⏳ กำลังส่งข้อมูล...' : '📤 ส่งข้อมูลยืนยันตัวตน'}
+                  className="w-full bg-[#EE4D2D] text-white py-4 rounded-[1.5rem] font-black text-sm shadow-lg hover:bg-[#D74022] active:scale-[0.98] transition-all disabled:opacity-50 mt-4 tracking-wide">
+                  {submitting ? '⏳ กำลังส่งข้อมูล...' : '📤 ยืนยันข้อมูลและส่งตรวจสอบ'}
                 </button>
               )}
-              <p className="text-[10px] text-center text-gray-400 font-medium">ข้อมูลของคุณจะถูกเก็บเป็นความลับอย่างเคร่งครัด</p>
+              <p className="text-[10px] text-center text-gray-400 font-medium">ข้อมูลของท่านจะถูกเข้ารหัสและดูแลความปลอดภัยอย่างเคร่งครัด</p>
             </form>
           )}
 
           {kycStatus === 'approved' && (
-            <div className="bg-white rounded-[1.5rem] shadow-sm p-6 text-center border border-gray-100">
-              <div className="text-4xl mb-3">🎉</div>
-              <p className="font-black text-gray-800 mb-1">ยืนยันตัวตนสำเร็จแล้ว!</p>
-              <p className="text-xs text-gray-500 mb-4">บัญชีของคุณได้รับตราสัญลักษณ์ ✅ ยืนยันแล้ว</p>
-              <button onClick={() => router.push('/profile')} className="bg-[#EE4D2D] text-white px-6 py-3 rounded-full font-bold text-sm hover:bg-[#D74022] transition-colors shadow-sm">
-                กลับสู่หน้าโปรไฟล์
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* 🧭 Bottom Nav (อัปเดตให้ตรงกับระบบ 5 หน้าหลัก) */}
-        <div className="fixed bottom-0 w-full sm:max-w-2xl md:max-w-3xl bg-white/95 backdrop-blur-md border-t border-gray-100 px-8 py-4 flex justify-between items-center shadow-[0_-4px_25px_rgba(0,0,0,0.06)] rounded-t-[2.5rem] z-50">
-           <button onClick={() => router.push('/')} className="flex flex-col items-center gap-1 opacity-40"><span className="text-xl">🏠</span><span className="text-[10px] font-bold text-gray-500">หน้าแรก</span></button>
-           <button onClick={() => router.push('/services')} className="flex flex-col items-center gap-1 opacity-40"><span className="text-xl">🛠️</span><span className="text-[10px] font-bold text-gray-500">บริการ</span></button>
-           <button onClick={() => router.push('/win-online')} className="flex flex-col items-center gap-1 opacity-40"><span className="text-xl">📋</span><span className="text-[10px] font-bold text-gray-500">ด่วนนน</span></button>
-           <button onClick={() => router.push('/history')} className="flex flex-col items-center gap-1 opacity-40"><span className="text-xl">📜</span><span className="text-[10px] font-bold text-gray-500">ประวัติ</span></button>
-           <div className="flex flex-col items-center gap-1 scale-110"><span className="text-xl">👤</span><span className="text-[10px] font-bold text-[#EE4D2D]">ฉัน</span><div className="w-1.5 h-1.5 bg-[#EE4D2D] rounded-full shadow-sm"></div></div>
-        </div>
-
-      </div>
-    </div>
-  );
-}
+            <div className="bg-white rounded-[1.5rem] shadow-sm p-8 text-center border border-gray-100 mt-4">
+              <div className="text-5xl mb-4">🎉</div>
+              <p className="font-black text-xl text-gray-8
