@@ -47,17 +47,21 @@ export default function JobBoardPage() {
       {/* 🧩 ตัวแอป Container */}
       <div className="w-full sm:max-w-2xl md:max-w-3xl bg-[#F4F6F8] min-h-screen pb-28 shadow-xl relative flex flex-col">
         
-        {/* 🔵 Header (ธีมสีน้ำเงินให้เข้ากับ Banner หน้าแรก) */}
-        <div className="bg-gradient-to-br from-[#0082FA] to-[#00A3FF] rounded-b-[2.5rem] p-5 pt-12 shadow-sm relative z-10 overflow-hidden">
+        {/* 🟠 Header (ธีมสีส้มทอง Shopee) */}
+        <div className="bg-gradient-to-br from-[#EE4D2D] to-[#FF7337] rounded-b-[2.5rem] p-5 pt-12 shadow-sm relative z-10 overflow-hidden">
           {/* ของตกแต่ง Header */}
           <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-2xl"></div>
           
-          <div className="flex justify-between items-center mb-4 px-2 relative z-10">
-            <button onClick={() => router.push('/')} className="text-white text-sm font-bold flex items-center gap-1">
+          <div className="flex justify-between items-start mb-4 px-2 relative z-10">
+            <button onClick={() => router.push('/')} className="text-white text-sm font-bold flex items-center gap-1 mt-1">
               ← กลับ
             </button>
-            <h1 className="text-xl font-black text-white tracking-tight">กระดานหางาน 💼</h1>
-            <div className="w-10"></div>
+            
+            {/* ✅ ปรับหัวข้อเป็น 2 บรรทัดตามคำสั่ง */}
+            <div className="text-center flex-1 mr-8">
+              <h1 className="text-2xl font-black text-white tracking-tight leading-none mb-1">Jobboard</h1>
+              <h2 className="text-sm font-bold text-white/90">กระดานหางาน</h2>
+            </div>
           </div>
 
           {/* 🔍 Search Bar */}
@@ -78,7 +82,7 @@ export default function JobBoardPage() {
                 onClick={() => setActiveFilter(filter)}
                 className={`whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
                   activeFilter === filter 
-                  ? 'bg-white text-[#0082FA] shadow-sm' 
+                  ? 'bg-white text-[#EE4D2D] shadow-sm' 
                   : 'bg-white/20 text-white hover:bg-white/30'
                 }`}
               >
@@ -91,10 +95,10 @@ export default function JobBoardPage() {
         {/* 📋 รายการประกาศงาน */}
         <div className="p-4 space-y-4 relative z-0 mt-2">
           
-          {/* 🚀 Banner สำหรับนายจ้าง */}
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-blue-100 flex justify-between items-center mb-2">
+          {/* 🚀 Banner สำหรับนายจ้าง (ปรับโทนส้ม) */}
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-orange-100 flex justify-between items-center mb-2">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center text-2xl">
+              <div className="w-12 h-12 bg-orange-50 rounded-full flex items-center justify-center text-2xl">
                 📢
               </div>
               <div>
@@ -102,7 +106,7 @@ export default function JobBoardPage() {
                 <p className="text-[10px] text-gray-500 mt-0.5">ลงประกาศรับสมัครงานในชุมชน</p>
               </div>
             </div>
-            <button className="bg-[#0082FA] text-white text-[10px] font-black px-4 py-2.5 rounded-full shadow-md active:scale-95 transition-transform">
+            <button className="bg-[#EE4D2D] text-white text-[10px] font-black px-4 py-2.5 rounded-full shadow-md active:scale-95 transition-transform">
               ลงประกาศ 📝
             </button>
           </div>
@@ -123,7 +127,8 @@ export default function JobBoardPage() {
                   <h3 className="font-black text-gray-800 text-base leading-tight pr-4">
                     {job.title}
                   </h3>
-                  <span className="bg-blue-50 text-blue-600 text-[9px] font-bold px-2 py-1 rounded-md whitespace-nowrap">
+                  {/* ✅ ปรับสีป้ายประเภทงาน */}
+                  <span className="bg-orange-50 text-[#EE4D2D] text-[9px] font-bold px-2 py-1 rounded-md whitespace-nowrap">
                     {job.type}
                   </span>
                 </div>
@@ -136,7 +141,8 @@ export default function JobBoardPage() {
                   <div className="flex items-center gap-2 text-[11px] text-gray-600 font-medium">
                     <span>📍</span> {job.location}
                   </div>
-                  <div className="flex items-center gap-2 text-[11px] text-[#F05D40] font-black">
+                  {/* ✅ ปรับสีไอคอนเงิน */}
+                  <div className="flex items-center gap-2 text-[11px] text-[#EE4D2D] font-black">
                     <span>💰</span> {job.wage}
                   </div>
                 </div>
