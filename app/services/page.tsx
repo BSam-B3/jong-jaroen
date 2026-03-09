@@ -1,249 +1,178 @@
 'use client';
-import { useState, Suspense, useMemo, useEffect } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { supabase } from '@/lib/supabase';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
-// ── Soft Shopee Palette ───────────────────────────────────────────────────────
-const themePalette = {
-  primaryOrange: '#F05D40',
-  lightOrange: '#FF8769',
-  bgGray: '#F9FAFB',
-};
-
-// 🌟 หมวดหมู่บริการ 🌟
-const categories = [
-  { id: 'all', title: 'ทั้งหมด', icon: '🌟' },
-  { id: 'aircon', title: 'ล้างแอร์/ซ่อมแอร์', icon: '❄️' },
-  { id: 'cleaning', title: 'แม่บ้าน', icon: '🧹' },
-  { id: 'transport', title: 'รถขนส่ง', icon: '🚚' },
-  { id: 'others', title: 'ทั่วไป', icon: '✨' },
-];
-
-type Service = {
-  id: string;
-  title: string;
-  description: string;
-  category: string;
-  price_start: number;
-  rating: number;
-  reviews_count: number;
-  provider_id: string;
-  created_at: string;
-  profiles: { full_name: string | null; location: string | null } | null;
-};
-
-function ServicesContent() {
+export default function JobsServicesPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const defaultCat = searchParams.get('cat') || 'all';
-  const [activeCategory, setActiveCategory] = useState(defaultCat);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState('rating');
-  const [services, setServices] = useState<Service[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [activeCategory, setActiveCategory] = useState('ทั้งหมด');
 
-  useEffect(() => {
-    if (searchParams.get('cat')) {
-      setActiveCategory(searchParams.get('cat') as string);
+  // จำลองข้อมูลผู้รับจ้าง (สไตล์ Fastwork)
+  const services = [
+    {
+      id: 1,
+      providerName: 'ช่างเอก ประแส',
+      avatar: 'https://via.placeholder.com/100',
+      title: 'รับล้างแอร์บ้าน ซ่อมแอร์ เติมน้ำยาแอร์ (งานจบ งบไม่บาน)',
+      category: 'ล้างแอร์',
+      rating: 4.9,
+      reviews: 34,
+      startPrice: 500,
+      coverImg: 'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?auto=format&fit=crop&q=80&w=500'
+    },
+    {
+      id: 2,
+      providerName: 'พี่สมศรี คลีนนิ่ง',
+      avatar: 'https://via.placeholder.com/100',
+      title: 'บริการแม่บ้านทำความสะอาด รายวัน/รายสัปดาห์ สะอาดกริบ',
+      category: 'แม่บ้าน',
+      rating: 4.8,
+      reviews: 56,
+      startPrice: 450,
+      coverImg: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?auto=format&fit=crop&q=80&w=500'
+    },
+    {
+      id: 3,
+      providerName: 'ช่างดำ การไฟฟ้า',
+      avatar: 'https://via.placeholder.com/100',
+      title: 'เดินสายไฟ ซ่อมไฟช็อต ติดตั้งกล้องวงจรปิด',
+      category: 'ช่างไฟ',
+      rating: 5.0,
+      reviews: 12,
+      startPrice: 300,
+      coverImg: 'https://images.unsplash.com/photo-1621905252507-b35492cc74b4?auto=format&fit=crop&q=80&w=500'
     }
-  }, [searchParams]);
+  ];
 
-  useEffect(() => {
-    const fetchServices = async () => {
-      setLoading(true);
-      let query = supabase
-        .from('provider_services')
-        .select(`*, profiles(full_name, location)`)
-        .order('created_at', { ascending: false });
-
-      if (activeCategory !== 'all') {
-        query = query.eq('category', activeCategory);
-      }
-
-      const { data, error } = await query;
-      if (!error && data) setServices(data as Service[]);
-      setLoading(false);
-    };
-    fetchServices();
-  }, [activeCategory]);
-
-  const filteredProviders = useMemo(() => {
-    let result = [...services];
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      result = result.filter(s =>
-        s.title.toLowerCase().includes(q) ||
-        (s.profiles?.full_name || '').toLowerCase().includes(q) ||
-        (s.profiles?.location || '').toLowerCase().includes(q)
-      );
-    }
-    if (sortBy === 'rating') result.sort((a, b) => b.rating - a.rating);
-    else if (sortBy === 'price_asc') result.sort((a, b) => a.price_start - b.price_start);
-    else if (sortBy === 'price_desc') result.sort((a, b) => b.price_start - a.price_start);
-    else if (sortBy === 'reviews') result.sort((a, b) => b.reviews_count - a.reviews_count);
-    return result;
-  }, [services, searchQuery, sortBy]);
+  const categories = ['ทั้งหมด', 'ล้างแอร์', 'แม่บ้าน', 'ช่างไฟ', 'ประปา', 'ซ่อมรถ'];
 
   return (
-    <div className="min-h-screen pb-24" style={{ backgroundColor: themePalette.bgGray }}>
-      <style dangerouslySetInnerHTML={{__html: `
-        .hide-scrollbar::-webkit-scrollbar { display: none; }
-        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-      `}} />
-      {/* ── Header ── */}
-      <header className="pt-10 pb-6 px-4 shadow-sm relative overflow-hidden rounded-b-[32px]" style={{ background: `linear-gradient(180deg, ${themePalette.primaryOrange} 0%, ${themePalette.lightOrange} 100%)` }}>
-        <div className="max-w-xl mx-auto space-y-4 relative z-10">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <button onClick={() => router.back()} className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center text-white backdrop-blur-sm hover:bg-white/30 transition-colors">
-                ❮
-              </button>
-              <h1 className="text-white text-xl font-black drop-shadow-md tracking-tight flex items-center gap-2">
-                จงเจริญ 🌟
-              </h1>
-            </div>
-            <button onClick={() => router.push('/services/new')} className="bg-white text-[#F05D40] text-xs font-bold px-3 py-2 rounded-full shadow-md active:scale-95 transition-transform">
-              + ลงประกาศ
+    <div className="min-h-screen bg-gray-100 flex justify-center">
+      {/* 🧩 ตัวแอป Container */}
+      <div className="w-full sm:max-w-2xl md:max-w-3xl bg-[#F4F6F8] min-h-screen pb-28 shadow-xl relative flex flex-col">
+        
+        {/* 🟠 Header */}
+        <div className="bg-[#F05D40] rounded-b-[2.5rem] p-5 pt-12 shadow-sm relative z-10">
+          <div className="flex justify-between items-center mb-4 px-2">
+            <button onClick={() => router.push('/')} className="text-white text-sm font-bold flex items-center gap-1">
+              ← กลับ
             </button>
+            <h1 className="text-xl font-black text-white tracking-tight">บริการชุมชน 🛠️</h1>
+            <div className="w-10"></div> {/* Spacer */}
           </div>
-          {/* Search Box */}
-          <div className="relative">
-            <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
-              <span className="text-gray-400">🔍</span>
-            </div>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="ค้นหา ช่างไฟ, แม่บ้าน, บริเวณใกล้เคียง..."
-              className="w-full py-3 pl-12 pr-4 rounded-xl shadow-inner focus:outline-none text-gray-800 text-sm border-2 border-transparent focus:border-white bg-white/95 backdrop-blur-sm"
+
+          {/* 🔍 Search Bar */}
+          <div className="bg-white rounded-2xl p-3 flex items-center shadow-md mx-2 mb-2">
+            <span className="text-xl mr-2">🔍</span>
+            <input 
+              type="text" 
+              placeholder="ค้นหาบริการ, ชื่อช่าง..." 
+              className="w-full bg-transparent outline-none text-sm text-gray-700 placeholder-gray-400"
             />
           </div>
-          {/* Promo Banner */}
-          <p className="text-white/90 text-xs font-medium text-center bg-white/10 py-2 rounded-lg backdrop-blur-md border border-white/20">
-            ✅ จ้างผ่านเรา ปลอดภัย 100% พร้อมลุ้นรางวัลทุกงวด!
-          </p>
-        </div>
-      </header>
 
-      <main className="max-w-xl mx-auto px-3 mt-4 space-y-4">
-        {/* ── Category Pills ── */}
-        <div className="flex overflow-x-auto gap-2 pb-2 snap-x snap-mandatory scroll-smooth hide-scrollbar px-1">
-          {categories.map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => setActiveCategory(cat.id)}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap snap-start transition-all shadow-sm border ${activeCategory === cat.id ? 'bg-[#F05D40] text-white border-[#F05D40] shadow-orange-200' : 'bg-white text-gray-600 border-gray-100 hover:bg-orange-50 hover:text-orange-500'}`}
-            >
-              <span className="text-sm">{cat.icon}</span>
-              {cat.title}
-            </button>
-          ))}
-        </div>
-
-        {/* ── Filter / Sort Bar ── */}
-        <div className="flex justify-between items-center px-1">
-          <span className="text-xs font-bold text-gray-500">พบ {filteredProviders.length} บริการ</span>
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            className="text-xs font-bold text-gray-700 bg-white border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-[#F05D40] shadow-sm"
-          >
-            <option value="rating">⭐ คะแนนสูงสุด</option>
-            <option value="reviews">🏆 รีวิวมากสุด</option>
-            <option value="price_asc">฿ ราคาต่ำ-สูง</option>
-            <option value="price_desc">฿ ราคาสูง-ต่ำ</option>
-          </select>
-        </div>
-
-        {/* ── Providers List ── */}
-        <div className="space-y-3">
-          {loading ? (
-            <div className="bg-white rounded-3xl p-10 flex flex-col items-center justify-center text-center shadow-sm border border-gray-100 mt-6">
-              <span className="text-4xl mb-4">⏳</span>
-              <p className="text-gray-500 text-sm font-medium">กำลังโหลด...</p>
-            </div>
-          ) : filteredProviders.length === 0 ? (
-            <div className="bg-white rounded-3xl p-10 flex flex-col items-center justify-center text-center shadow-sm border border-gray-100 mt-6">
-              <span className="text-6xl mb-4 opacity-50">🔍</span>
-              <h3 className="text-gray-800 font-bold mb-1">ไม่พบผู้ให้บริการ</h3>
-              <p className="text-xs text-gray-400">ลองเปลี่ยนหมวดหมู่หรือคำค้นหาดูนะคะ</p>
-            </div>
-          ) : (
-            filteredProviders.map((service) => (
-              <div
-                key={service.id}
-                onClick={() => router.push(`/services/${service.id}`)}
-                className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex gap-4 hover:border-orange-300 hover:shadow-md transition-all group cursor-pointer"
+          {/* 🏷️ Filter Categories (เลื่อนซ้ายขวาได้) */}
+          <div className="flex gap-2 overflow-x-auto scrollbar-hide px-2 pb-2 pt-1 mt-3">
+            {categories.map((cat) => (
+              <button 
+                key={cat}
+                onClick={() => setActiveCategory(cat)}
+                className={`whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
+                  activeCategory === cat 
+                  ? 'bg-white text-[#F05D40] shadow-sm' 
+                  : 'bg-white/20 text-white hover:bg-white/30'
+                }`}
               >
-                {/* Avatar */}
-                <div className="w-16 h-16 bg-gradient-to-br from-orange-50 to-orange-100 rounded-2xl flex items-center justify-center text-3xl border border-orange-200 shrink-0 relative">
-                  👷
+                {cat}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* 📋 รายการผู้ให้บริการ (Freelance Cards) */}
+        <div className="p-4 space-y-4 relative z-0 mt-2">
+          
+          {/* 🚀 Banner สำหรับชวนคนมาลงรับงาน */}
+          <div className="bg-gradient-to-r from-blue-500 to-blue-400 rounded-2xl p-4 shadow-sm flex justify-between items-center text-white mb-2">
+            <div>
+              <h3 className="font-bold text-sm">มีฝีมือ? อยากรับงาน?</h3>
+              <p className="text-[10px] text-blue-100 mt-0.5">ลงประกาศบริการของคุณฟรี ไม่มีค่าใช้จ่าย</p>
+            </div>
+            <button className="bg-white text-blue-500 text-[10px] font-black px-4 py-2 rounded-full shadow-sm hover:scale-105 transition-transform">
+              ลงประกาศ 📝
+            </button>
+          </div>
+
+          <div className="flex justify-between items-center px-1 mb-1">
+            <h2 className="font-bold text-gray-800 text-sm">บริการแนะนำ</h2>
+            <span className="text-[10px] text-gray-500">ทั้งหมด {services.length} รายการ</span>
+          </div>
+
+          {/* Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {services.map((service) => (
+              <div 
+                key={service.id} 
+                className="bg-white rounded-[1.5rem] shadow-sm border border-gray-100 overflow-hidden cursor-pointer active:scale-[0.98] transition-all hover:shadow-md"
+              >
+                {/* Cover Image */}
+                <div className="h-32 bg-gray-200 relative">
+                  <img src={service.coverImg} alt={service.title} className="w-full h-full object-cover" />
+                  <div className="absolute top-2 left-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-lg text-[9px] font-bold text-gray-700 shadow-sm flex items-center gap-1">
+                    <span>⭐ {service.rating}</span>
+                    <span className="text-gray-400 font-medium">({service.reviews})</span>
+                  </div>
                 </div>
-                {/* Info */}
-                <div className="flex-1 flex flex-col justify-center space-y-1.5">
-                  <h3 className="text-sm font-bold text-gray-800 leading-tight group-hover:text-[#F05D40] transition-colors">
-                    {service.profiles?.full_name || 'ผู้ให้บริการ'}
-                  </h3>
-                  <p className="text-xs text-gray-600 leading-snug line-clamp-1">{service.title}</p>
-                  <div className="flex items-center gap-3 text-[10px] font-medium text-gray-500">
-                    <span className="flex items-center gap-0.5 text-amber-500">
-                      ⭐ {service.rating}
-                      <span className="text-gray-400">({service.reviews_count})</span>
-                    </span>
-                    <span className="flex items-center gap-0.5">
-                      📍 {service.profiles?.location || 'ปากน้ำประแส'}
+
+                <div className="p-4">
+                  {/* Provider Info */}
+                  <div className="flex items-center gap-2 mb-2 -mt-8 relative z-10">
+                    <img src={service.avatar} alt="avatar" className="w-10 h-10 rounded-full border-2 border-white shadow-sm bg-white" />
+                    <span className="text-xs font-bold text-gray-800 bg-white/90 px-2 py-0.5 rounded-full shadow-sm backdrop-blur-sm mt-4">
+                      {service.providerName}
                     </span>
                   </div>
-                  <div className="mt-2">
-                    <div className="flex items-center justify-between mt-1">
-                      <span className="text-xs font-black text-[#F05D40]">
-                        เริ่มต้น ฿{service.price_start.toLocaleString()}
-                      </span>
-                      <button className="bg-orange-50 text-[#F05D40] text-[10px] font-bold px-3 py-1.5 rounded-lg hover:bg-[#F05D40] hover:text-white transition-colors">
-                        จ้างงาน
-                      </button>
+
+                  {/* Service Title */}
+                  <h3 className="font-bold text-gray-800 text-sm leading-tight mb-3 line-clamp-2">
+                    {service.title}
+                  </h3>
+
+                  {/* Price & Action */}
+                  <div className="flex justify-between items-end border-t border-gray-50 pt-3">
+                    <div>
+                      <p className="text-[9px] text-gray-400 font-medium uppercase tracking-wider mb-0.5">เริ่มต้นที่</p>
+                      <p className="text-[#F05D40] font-black text-base">฿{service.startPrice}</p>
                     </div>
+                    <button className="bg-gray-100 text-gray-800 text-[10px] font-black px-4 py-2 rounded-xl hover:bg-[#F05D40] hover:text-white transition-colors">
+                      ดูรายละเอียด
+                    </button>
                   </div>
                 </div>
               </div>
-            ))
-          )}
+            ))}
+          </div>
         </div>
-      </main>
 
-      {/* 🛠️ Bottom Nav 🛠️ */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 flex justify-around py-2 z-[100] shadow-[0_-5px_20px_rgba(0,0,0,0.05)] pb-safe">
-        <Link href="/" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-orange-400 transition-colors">
-          <span className="text-xl">🏠</span>
-          <span className="text-[10px]">หน้าแรก</span>
-        </Link>
-        <Link href="/news" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-orange-400 transition-colors">
-          <span className="text-xl">📰</span>
-          <span className="text-[10px]">ข่าวสาร</span>
-        </Link>
-        <Link href="/coupons" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-orange-400 transition-colors">
-          <span className="text-xl">🎟️</span>
-          <span className="text-[10px]">รางวัล</span>
-        </Link>
-        <Link href="/jobs" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-orange-400 transition-colors">
-          <span className="text-xl">📋</span>
-          <span className="text-[10px]">งาน</span>
-        </Link>
-        <Link href="/profile" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-orange-400 transition-colors">
-          <span className="text-xl">👤</span>
-          <span className="text-[10px]">ฉัน</span>
-        </Link>
-      </nav>
+        {/* 🧭 Bottom Nav (จำลอง) */}
+        <div className="fixed bottom-0 w-full sm:max-w-2xl md:max-w-3xl bg-white/95 backdrop-blur-md border-t border-gray-100 px-8 py-4 flex justify-between items-center shadow-[0_-4px_25px_rgba(0,0,0,0.06)] rounded-t-[2.5rem] z-50">
+           <button onClick={() => router.push('/')} className="flex flex-col items-center gap-1 opacity-40">
+             <span className="text-xl">🏠</span><span className="text-[10px] font-bold text-gray-500">หน้าแรก</span>
+           </button>
+           <div className="flex flex-col items-center gap-1 scale-110">
+             <span className="text-xl">🛠️</span><span className="text-[10px] font-bold text-[#F05D40]">บริการ</span>
+             <div className="w-1.5 h-1.5 bg-[#F05D40] rounded-full shadow-sm"></div>
+           </div>
+           <button onClick={() => router.push('/win-online')} className="flex flex-col items-center gap-1 opacity-40">
+             <span className="text-xl">📋</span><span className="text-[10px] font-bold text-gray-500">ด่วนนน</span>
+           </button>
+           <button onClick={() => router.push('/history')} className="flex flex-col items-center gap-1 opacity-40">
+             <span className="text-xl">📜</span><span className="text-[10px] font-bold text-gray-500">ประวัติ</span>
+           </button>
+           <button onClick={() => router.push('/profile')} className="flex flex-col items-center gap-1 opacity-40">
+             <span className="text-xl">👤</span><span className="text-[10px] font-bold text-gray-500">ฉัน</span>
+           </button>
+        </div>
+      </div>
     </div>
-  );
-}
-
-export default function ServicesPage() {
-  return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-[#F05D40] font-bold">กำลังโหลดข้อมูล...</div>}>
-      <ServicesContent />
-    </Suspense>
   );
 }
