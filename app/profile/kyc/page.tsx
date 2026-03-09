@@ -105,7 +105,7 @@ export default function KYCPage() {
     }
   }
 
-  // ✅ ปรับเงื่อนไขกล้องให้ยืดหยุ่นขึ้น ป้องกัน Error บน PC
+  // ✅ แก้ไขระบบเปิดกล้องเพื่อป้องกันปัญหา จอดำ (Black Screen)
   async function startCamera(step: CameraStep) {
     stopCamera();
     setCameraStep(step);
@@ -117,11 +117,14 @@ export default function KYCPage() {
     wasOpen.current = true;
 
     const facingMode = step === 'selfie' ? 'user' : 'environment';
-    setInstruction(step === 'id_card' ? 'วางบัตรประชาชนให้อยู่ในกรอบ' : 'วางหน้าในกรอบ');
+    setInstruction('กำลังเตรียมกล้อง...');
+
+    // 1. สั่งเปิด UI ทันที เพื่อให้ React วาดกล่อง <video> ลงในหน้าจอก่อน
+    setCameraActive(true);
 
     const constraintsList = [
       { video: { facingMode: { ideal: facingMode }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
-      { video: true, audio: false } // Fallback สุดท้ายถ้าหา facingMode ไม่เจอ (เช่น บนคอม)
+      { video: true, audio: false } 
     ];
 
     let stream: MediaStream | null = null;
@@ -140,27 +143,36 @@ export default function KYCPage() {
     if (!stream) {
       setError('ไม่สามารถเข้าถึงกล้องได้ กรุณาอนุญาตให้แอปใช้กล้อง หรือใช้วิธี "อัปโหลดรูปภาพ" แทนค่ะ');
       setStepStatus('waiting');
+      setCameraActive(false); // ปิดกล่องถ้ากล้องพัง
       return;
     }
 
     streamRef.current = stream;
-    if (videoRef.current) {
-      videoRef.current.srcObject = stream;
-      await videoRef.current.play();
-    }
-    setCameraActive(true);
 
-    if (step === 'selfie' && faceApiLoaded) {
-      setInstruction('กระพริบตา 2 ครั้งเพื่อยืนยันตัวตน');
-      setStepStatus('blinking');
-      startBlinkDetection();
-    } else if (step === 'selfie' && !faceApiLoaded) {
-      setInstruction('ถ่ายรูปเซลฟี่หน้าตรงพร้อมบัตร');
-      setStepStatus('blinking');
-    } else {
-      setInstruction('จัดบัตรให้ชัดเจนในกรอบ แล้วกดปุ่มถ่ายรูป');
-      setStepStatus('scanning');
-    }
+    // 2. หน่วงเวลา 200ms เพื่อให้ชัวร์ว่า React สร้าง <video ref={videoRef}> เสร็จแล้ว ค่อยยัดภาพใส่
+    setTimeout(async () => {
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        try {
+          await videoRef.current.play();
+        } catch (e) {
+          console.warn("Video play error:", e);
+        }
+        
+        // 3. เริ่มระบบ AI หลังกล้องติดแล้ว
+        if (step === 'selfie' && faceApiLoaded) {
+          setInstruction('กระพริบตา 2 ครั้งเพื่อยืนยันตัวตน');
+          setStepStatus('blinking');
+          startBlinkDetection();
+        } else if (step === 'selfie' && !faceApiLoaded) {
+          setInstruction('ถ่ายรูปเซลฟี่หน้าตรงพร้อมบัตร');
+          setStepStatus('blinking');
+        } else {
+          setInstruction('จัดบัตรให้ชัดเจนในกรอบ แล้วกดปุ่มถ่ายรูป');
+          setStepStatus('scanning');
+        }
+      }
+    }, 200); 
   }
 
   function startBlinkDetection() {
@@ -276,7 +288,7 @@ export default function KYCPage() {
     capturedRef.current = false;
   }
 
-  // ✅ ฟังก์ชันเสริม: จัดการอัปโหลดไฟล์ (Fallback ถ้ากล้องพัง)
+  // อัปโหลดไฟล์แทนกล้อง (Fallback)
   function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>, step: CameraStep) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -289,7 +301,7 @@ export default function KYCPage() {
       setSelfiePreview(url);
     }
     setStepStatus('captured');
-    setError(''); // ลบ error ออกถ้ามี
+    setError(''); 
   }
 
   async function uploadBlob(blob: Blob | File, folder: string): Promise<string | null> {
@@ -337,14 +349,15 @@ export default function KYCPage() {
     </div>
   );
 
-  function CameraCapture({ step }: { step: CameraStep }) {
+  // ✅ ปรับแก้ให้เรนเดอร์ UI กล้องแบบตรงๆ เพื่อป้องกันการ Re-render ทับของเดิม
+  const renderCameraCapture = (step: CameraStep) => {
     const isSelfie = step === 'selfie';
     const preview  = isSelfie ? selfiePreview : idCardPreview;
     const hasCapture = isSelfie ? !!selfieBlob : !!idCardBlob;
 
     if (hasCapture && preview) {
       return (
-        <div className="bg-white rounded-2xl shadow-sm p-4 border border-gray-100">
+        <div className="bg-white rounded-2xl shadow-sm p-4 border border-gray-100 mb-4">
           <div className="flex items-center gap-2 mb-3">
             <span className="text-green-500 text-lg">✅</span>
             <h3 className="font-semibold text-gray-800 text-sm">
@@ -363,7 +376,7 @@ export default function KYCPage() {
     }
 
     return (
-      <div className="bg-white rounded-2xl shadow-sm p-4 border border-gray-100">
+      <div className="bg-white rounded-2xl shadow-sm p-4 border border-gray-100 mb-4">
         <div className="mb-3">
           <h3 className="font-bold text-[#EE4D2D] text-sm mb-0.5">
             {isSelfie ? '🤳 ถ่ายเซลฟี่พร้อมบัตรประชาชน' : '🪪 ถ่ายรูปบัตรประชาชน'}
@@ -447,7 +460,6 @@ export default function KYCPage() {
               <span className="text-lg">📷</span> {isSelfie ? 'เปิดกล้องหน้า' : 'เปิดกล้องถ่ายบัตร'}
             </button>
             
-            {/* ✅ ปุ่มอัปโหลดรูปภาพ (Fallback) */}
             <div className="text-center relative">
                <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-200"></div></div>
                <div className="relative flex justify-center"><span className="bg-white px-2 text-[10px] text-gray-400">หรือ</span></div>
@@ -460,7 +472,7 @@ export default function KYCPage() {
         )}
       </div>
     );
-  }
+  };
 
   return (
     <div className="min-h-screen bg-gray-100 flex justify-center pb-24">
@@ -514,7 +526,6 @@ export default function KYCPage() {
               </div>
               <div className="flex items-center gap-2.5">
                 <span className="w-5 h-5 rounded-full bg-[#EE4D2D] flex items-center justify-center text-white text-[10px] font-bold shadow-sm">3</span>
-                {/* ✅ แก้ไขข้อความ Step 3 ตามคำสั่ง */}
                 <span className="text-[#EE4D2D] font-bold">กรอกข้อมูลบัญชีธนาคาร ( เพื่อใช้สำหรับรับเงิน )</span>
               </div>
             </div>
@@ -523,10 +534,10 @@ export default function KYCPage() {
           {kycStatus !== 'approved' && (
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Step 1: ID Card */}
-              <CameraCapture step="id_card" />
+              {renderCameraCapture('id_card')}
 
               {/* Step 2: Selfie */}
-              {idCardBlob && <CameraCapture step="selfie" />}
+              {idCardBlob && renderCameraCapture('selfie')}
 
               {/* Step 3: Bank */}
               {idCardBlob && selfieBlob && (
@@ -574,4 +585,25 @@ export default function KYCPage() {
           {kycStatus === 'approved' && (
             <div className="bg-white rounded-[1.5rem] shadow-sm p-8 text-center border border-gray-100 mt-4">
               <div className="text-5xl mb-4">🎉</div>
-              <p className="font-black text-xl text-gray-8
+              <p className="font-black text-xl text-gray-800 mb-2">ยืนยันตัวตนสำเร็จแล้ว!</p>
+              <p className="text-xs text-gray-500 mb-6 leading-relaxed">บัญชีของคุณได้รับตราสัญลักษณ์ ✅ ยืนยันแล้ว<br/>สามารถกดรับงานได้เต็มรูปแบบเลยค่ะ</p>
+              <button onClick={() => router.push('/profile')} className="bg-[#EE4D2D] text-white px-8 py-3.5 rounded-full font-bold text-sm hover:bg-[#D74022] transition-colors shadow-md active:scale-95">
+                กลับสู่หน้าโปรไฟล์
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* 🧭 Bottom Nav */}
+        <div className="fixed bottom-0 w-full sm:max-w-2xl md:max-w-3xl bg-white/95 backdrop-blur-md border-t border-gray-100 px-8 py-4 flex justify-between items-center shadow-[0_-4px_25px_rgba(0,0,0,0.06)] rounded-t-[2.5rem] z-50">
+           <button onClick={() => router.push('/')} className="flex flex-col items-center gap-1 opacity-40"><span className="text-xl">🏠</span><span className="text-[10px] font-bold text-gray-500">หน้าแรก</span></button>
+           <button onClick={() => router.push('/services')} className="flex flex-col items-center gap-1 opacity-40"><span className="text-xl">🛠️</span><span className="text-[10px] font-bold text-gray-500">บริการ</span></button>
+           <button onClick={() => router.push('/win-online')} className="flex flex-col items-center gap-1 opacity-40"><span className="text-xl">📋</span><span className="text-[10px] font-bold text-gray-500">ด่วนนน</span></button>
+           <button onClick={() => router.push('/history')} className="flex flex-col items-center gap-1 opacity-40"><span className="text-xl">📜</span><span className="text-[10px] font-bold text-gray-500">ประวัติ</span></button>
+           <div className="flex flex-col items-center gap-1 scale-110"><span className="text-xl">👤</span><span className="text-[10px] font-bold text-[#EE4D2D]">ฉัน</span><div className="w-1.5 h-1.5 bg-[#EE4D2D] rounded-full shadow-sm"></div></div>
+        </div>
+
+      </div>
+    </div>
+  );
+}
