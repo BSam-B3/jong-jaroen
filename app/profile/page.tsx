@@ -9,8 +9,8 @@ export default function ProfilePage() {
     name: 'สุรพงษ์ วีรวัฒน์พงศ์',
     initial: 'ส',
     phone: '081-234-5678',
-    role: 'ผู้ให้บริการยืนยันตัวตนแล้ว',
-    kyc_status: 'approved', // จำลองสถานะ KYC
+    email: 'surapong.b3@example.com',
+    role: 'ผู้ใช้งานทั่วไป',
     points: 1250,
   };
 
@@ -34,16 +34,18 @@ export default function ProfilePage() {
           {/* รูปโปรไฟล์ */}
           <div className="w-24 h-24 bg-white rounded-full mx-auto border-4 border-white/20 shadow-lg flex items-center justify-center text-4xl font-black text-[#EE4D2D] relative">
             {user.initial}
-            {user.kyc_status === 'approved' && (
-              <div className="absolute bottom-0 right-0 bg-green-500 border-2 border-white rounded-full p-1 shadow-sm">
-                <span className="text-[10px] text-white font-black block">✓</span>
-              </div>
-            )}
+            <button 
+              onClick={() => router.push('/profile/edit')}
+              className="absolute bottom-0 right-0 bg-gray-100 border-2 border-white rounded-full p-1.5 shadow-sm active:scale-90 transition-transform cursor-pointer"
+            >
+              <span className="text-[10px]">✏️</span>
+            </button>
           </div>
 
           <h1 className="text-2xl font-black text-white mt-4 tracking-tight">{user.name}</h1>
           <p className="text-white/80 text-xs mt-1 font-medium">{user.phone}</p>
           
+          {/* ป้ายสถานะ */}
           <div className="mt-3 inline-block bg-white/20 backdrop-blur-sm px-4 py-1.5 rounded-full border border-white/30">
             <span className="text-white text-[10px] font-bold tracking-wide">🏷️ {user.role}</span>
           </div>
@@ -68,49 +70,42 @@ export default function ProfilePage() {
             </button>
           </div>
 
-          {/* 🛡️ หมวด: ความน่าเชื่อถือและเอกสาร */}
+          {/* 🪪 ข้อมูลส่วนตัวและเอกสาร (เพิ่มใหม่ตามคำสั่ง) */}
           <div className="bg-white rounded-[1.5rem] shadow-sm border border-gray-100 overflow-hidden">
-            <div className="px-5 py-4 bg-gray-50 border-b border-gray-100 flex justify-between items-center">
-              <h3 className="font-bold text-gray-800 text-xs uppercase tracking-widest flex items-center gap-2">
-                <span className="text-[#EE4D2D]">🛡️</span> ยืนยันตัวตนและเอกสาร
-              </h3>
-            </div>
-            
-            <MenuRow 
-              icon="🔍" 
-              title="ยืนยันตัวตน (KYC)" 
-              subtitle="สแกนใบหน้าและบัตรประชาชน"
-              status={user.kyc_status === 'approved' ? '✅ ผ่านแล้ว' : '⏳ รอยืนยัน'}
-              onClick={() => router.push('/profile/kyc')} 
-            />
             <MenuRow 
               icon="🪪" 
-              title="ใบอนุญาต & ใบขับขี่" 
-              subtitle="จัดการเอกสารสำหรับรับงาน"
-              onClick={() => router.push('/profile/licenses')} 
+              title="จัดการข้อมูลส่วนตัวและเอกสาร" 
+              subtitle="เพิ่ม/แก้ไข ประวัติ, ใบขับขี่, ใบประกาศนียบัตร"
+              onClick={() => router.push('/profile/edit')} 
+              isHighlight={true}
             />
           </div>
 
-          {/* 🏆 หมวด: ผลงานและใบรับรอง */}
+          {/* 🛠️ เมนูการจัดการ (สำหรับคนรับงาน) */}
           <div className="bg-white rounded-[1.5rem] shadow-sm border border-gray-100 overflow-hidden">
-            <div className="px-5 py-4 bg-gray-50 border-b border-gray-100 flex justify-between items-center">
-              <h3 className="font-bold text-gray-800 text-xs uppercase tracking-widest flex items-center gap-2">
-                <span className="text-[#EE4D2D]">🏆</span> ผลงานและใบรับรอง
-              </h3>
+            <div className="px-5 py-4 bg-gray-50 border-b border-gray-100">
+              <h3 className="font-bold text-gray-800 text-xs uppercase tracking-widest">สำหรับผู้ให้บริการ</h3>
             </div>
             
             <MenuRow 
-              icon="📄" 
-              title="ใบรับรองฝีมือ (Certificate)" 
-              subtitle="ออกใบรับรองโดยจงเจริญ (PDF)"
-              onClick={() => router.push('/profile/certificate')} 
+              icon="🛵" 
+              title="สมัครเปิดคิวรถ (Fast Delivery)" 
+              subtitle="ลงทะเบียนรถและยืนยันตัวตน"
+              onClick={() => router.push('/driver-register')} 
             />
             <MenuRow 
-              icon="📋" 
-              title="เรซูเม่และประวัติงาน (Portfolio)" 
-              subtitle="ดาวน์โหลดประวัติการทำงาน (PDF)"
-              onClick={() => router.push('/profile/portfolio')} 
+              icon="📝" 
+              title="จัดการประกาศรับงานของฉัน" 
+              subtitle="แก้ไขบริการช่าง / แม่บ้าน"
+              onClick={() => alert('ฟีเจอร์กำลังพัฒนาค่ะ')} 
             />
+          </div>
+
+          {/* ⚙️ เมนูทั่วไป */}
+          <div className="bg-white rounded-[1.5rem] shadow-sm border border-gray-100 overflow-hidden">
+             <MenuRow icon="📜" title="ประวัติการใช้งานแอป" onClick={() => router.push('/history')} />
+             <MenuRow icon="❤️" title="บริการที่บันทึกไว้ (Favorites)" onClick={() => alert('ฟีเจอร์กำลังพัฒนาค่ะ')} />
+             <MenuRow icon="🎧" title="ศูนย์ช่วยเหลือ / ติดต่อแอดมิน" onClick={() => alert('ฟีเจอร์กำลังพัฒนาค่ะ')} />
           </div>
 
           {/* 🚪 ปุ่มออกจากระบบ */}
@@ -120,9 +115,14 @@ export default function ProfilePage() {
           >
             ออกจากระบบ
           </button>
+          
+          {/* Version App */}
+          <p className="text-center text-gray-400 text-[10px] font-medium mt-6 pb-4">
+            Jong Jaroen App Version 1.0.0
+          </p>
         </div>
 
-        {/* 🧭 Bottom Nav (อัปเดตให้ตรงกับระบบปัจจุบัน) */}
+        {/* 🧭 Bottom Nav */}
         <div className="fixed bottom-0 w-full sm:max-w-2xl md:max-w-3xl bg-white/95 backdrop-blur-md border-t border-gray-100 px-8 py-4 flex justify-between items-center shadow-[0_-4px_25px_rgba(0,0,0,0.06)] rounded-t-[2.5rem] z-50">
            <button onClick={() => router.push('/')} className="flex flex-col items-center gap-1 opacity-40">
              <span className="text-xl">🏠</span><span className="text-[10px] font-bold text-gray-500">หน้าแรก</span>
@@ -136,6 +136,8 @@ export default function ProfilePage() {
            <button onClick={() => router.push('/history')} className="flex flex-col items-center gap-1 opacity-40">
              <span className="text-xl">📜</span><span className="text-[10px] font-bold text-gray-500">ประวัติ</span>
            </button>
+           
+           {/* ✅ Active Tab "ฉัน" */}
            <div className="flex flex-col items-center gap-1 scale-110">
              <span className="text-xl">👤</span>
              <span className="text-[10px] font-bold text-[#EE4D2D]">ฉัน</span>
@@ -149,7 +151,7 @@ export default function ProfilePage() {
 }
 
 // คอมโพเนนต์ย่อยสำหรับแถวเมนู
-function MenuRow({ icon, title, subtitle, onClick, status }: any) {
+function MenuRow({ icon, title, subtitle, onClick, isHighlight = false }: any) {
   return (
     <div 
       onClick={onClick}
@@ -160,14 +162,11 @@ function MenuRow({ icon, title, subtitle, onClick, status }: any) {
           {icon}
         </div>
         <div>
-          <h4 className="text-sm font-bold text-gray-800">{title}</h4>
+          <h4 className={`text-sm font-bold ${isHighlight ? 'text-[#EE4D2D]' : 'text-gray-800'}`}>{title}</h4>
           {subtitle && <p className="text-[10px] text-gray-500 mt-0.5">{subtitle}</p>}
         </div>
       </div>
-      <div className="flex items-center gap-2">
-        {status && <span className="text-[9px] font-bold bg-gray-100 px-2 py-1 rounded-md">{status}</span>}
-        <span className="text-gray-300">›</span>
-      </div>
+      <span className="text-gray-300">›</span>
     </div>
   );
 }
