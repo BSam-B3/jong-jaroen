@@ -1,11 +1,10 @@
 'use client';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
 
 export default function ProfilePage() {
   const router = useRouter();
 
-  // จำลองข้อมูลผู้ใช้ (ของจริงดึงจาก Supabase)
+  // จำลองข้อมูลผู้ใช้
   const user = {
     name: 'สุรพงษ์ วีรวัฒน์พงศ์',
     initial: 'ส',
@@ -16,7 +15,6 @@ export default function ProfilePage() {
   };
 
   const handleLogout = async () => {
-    // await supabase.auth.signOut();
     alert('ออกจากระบบเรียบร้อยแล้ว');
     router.push('/login');
   };
@@ -36,9 +34,12 @@ export default function ProfilePage() {
           {/* รูปโปรไฟล์ */}
           <div className="w-24 h-24 bg-white rounded-full mx-auto border-4 border-white/20 shadow-lg flex items-center justify-center text-4xl font-black text-[#EE4D2D] relative">
             {user.initial}
-            <div className="absolute bottom-0 right-0 bg-gray-100 border-2 border-white rounded-full p-1.5 shadow-sm">
+            <button 
+              onClick={() => router.push('/profile/edit')}
+              className="absolute bottom-0 right-0 bg-gray-100 border-2 border-white rounded-full p-1.5 shadow-sm active:scale-90 transition-transform cursor-pointer"
+            >
               <span className="text-[10px]">✏️</span>
-            </div>
+            </button>
           </div>
 
           <h1 className="text-2xl font-black text-white mt-4 tracking-tight">{user.name}</h1>
@@ -69,6 +70,17 @@ export default function ProfilePage() {
             </button>
           </div>
 
+          {/* 🪪 ข้อมูลส่วนตัวและเอกสาร (เพิ่มใหม่ตามคำสั่ง) */}
+          <div className="bg-white rounded-[1.5rem] shadow-sm border border-gray-100 overflow-hidden">
+            <MenuRow 
+              icon="🪪" 
+              title="จัดการข้อมูลส่วนตัวและเอกสาร" 
+              subtitle="เพิ่ม/แก้ไข ประวัติ, ใบขับขี่, ใบประกาศนียบัตร"
+              onClick={() => router.push('/profile/edit')} 
+              isHighlight={true}
+            />
+          </div>
+
           {/* 🛠️ เมนูการจัดการ (สำหรับคนรับงาน) */}
           <div className="bg-white rounded-[1.5rem] shadow-sm border border-gray-100 overflow-hidden">
             <div className="px-5 py-4 bg-gray-50 border-b border-gray-100">
@@ -77,10 +89,9 @@ export default function ProfilePage() {
             
             <MenuRow 
               icon="🛵" 
-              title="สมัครเป็นผู้ให้บริการ (รับ-ส่ง ด่วน)" 
-              subtitle="ลงทะเบียนรถและใบขับขี่"
+              title="สมัครเปิดคิวรถ (Fast Delivery)" 
+              subtitle="ลงทะเบียนรถและยืนยันตัวตน"
               onClick={() => router.push('/driver-register')} 
-              isHighlight
             />
             <MenuRow 
               icon="📝" 
@@ -92,7 +103,7 @@ export default function ProfilePage() {
 
           {/* ⚙️ เมนูทั่วไป */}
           <div className="bg-white rounded-[1.5rem] shadow-sm border border-gray-100 overflow-hidden">
-             <MenuRow icon="📜" title="ประวัติการจ้างงาน/เรียกวิน" onClick={() => router.push('/history')} />
+             <MenuRow icon="📜" title="ประวัติการใช้งานแอป" onClick={() => router.push('/history')} />
              <MenuRow icon="❤️" title="บริการที่บันทึกไว้ (Favorites)" onClick={() => alert('ฟีเจอร์กำลังพัฒนาค่ะ')} />
              <MenuRow icon="🎧" title="ศูนย์ช่วยเหลือ / ติดต่อแอดมิน" onClick={() => alert('ฟีเจอร์กำลังพัฒนาค่ะ')} />
           </div>
