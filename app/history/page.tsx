@@ -155,9 +155,9 @@ export default function HistoryPage() {
                     </div>
                   </div>
                   <div className="text-right flex-shrink-0">
-                    {/* ✅ ปรับสีรายจ่ายเป็นสีดำ (gray-800) ตามสั่ง */}
+                    {/* ✅ นำเครื่องหมายลบ (-) ออก เหลือแค่ตัวเลขและสีดำสำหรับจ้างงาน */}
                     <p className={`font-black text-sm ${activeRole === 'provider' ? 'text-green-600' : 'text-gray-800'}`}>
-                      {activeRole === 'provider' ? '+' : '-'}฿{item.price}
+                      {activeRole === 'provider' ? '+' : ''}฿{item.price.toLocaleString()}
                     </p>
                   </div>
                 </div>
@@ -224,7 +224,8 @@ export default function HistoryPage() {
               </div>
               <div className="bg-gray-50 rounded-2xl p-4 border border-gray-200">
                 <p className="text-[10px] text-gray-600 font-bold mb-1">รายจ่ายทั้งหมด (🛒 จ้างงาน)</p>
-                <h3 className="text-xl font-black text-gray-800">-฿1,420</h3>
+                {/* ✅ นำเครื่องหมายลบ (-) ออกจากสรุปรายจ่าย */}
+                <h3 className="text-xl font-black text-gray-800">฿1,420</h3>
               </div>
             </div>
 
