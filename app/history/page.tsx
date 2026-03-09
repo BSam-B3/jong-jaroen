@@ -4,15 +4,19 @@ import { useRouter } from 'next/navigation';
 
 export default function HistoryPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState('ongoing'); // 'ongoing' หรือ 'completed'
+  // State สำหรับแยกหมวดหมู่ จ้างงาน (customer) / รับงาน (provider)
+  const [activeRole, setActiveRole] = useState('customer'); 
+  // State สำหรับตัวกรองสถานะ
+  const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'ongoing', 'completed'
 
-  // จำลองข้อมูลประวัติ (ผสมทั้งเรียกวิน และ จ้างช่าง)
+  // จำลองข้อมูลประวัติ (เพิ่ม role เพื่อแยกว่าเราเป็นคนจ้าง หรือคนรับงาน)
   const histories = [
     {
       id: 'JOB-2026-001',
+      role: 'customer',
       type: 'delivery',
       title: 'Fast Delivery (มอเตอร์ไซค์)',
-      provider: 'พี่สมชาย สายซิ่ง',
+      person: 'พี่สมชาย สายซิ่ง (ผู้ขับขี่)',
       status: 'ongoing',
       statusText: 'กำลังเดินทางไปรับของ',
       date: 'วันนี้, 14:30 น.',
@@ -21,41 +25,48 @@ export default function HistoryPage() {
     },
     {
       id: 'JOB-2026-002',
-      type: 'service',
-      title: 'บริการล้างแอร์บ้าน',
-      provider: 'ช่างเอก ประแส',
-      status: 'ongoing',
-      statusText: 'นัดหมายพรุ่งนี้ 10:00 น.',
-      date: 'พรุ่งนี้, 10:00 น.',
-      price: 500,
-      icon: '❄️',
-    },
-    {
-      id: 'JOB-2026-003',
-      type: 'delivery',
-      title: 'Fast Delivery (รถเก๋ง)',
-      provider: 'น้าจัน ใจดี',
-      status: 'completed',
-      statusText: 'จัดส่งสำเร็จ',
-      date: 'เมื่อวาน, 09:15 น.',
-      price: 120,
-      icon: '🚗',
-    },
-    {
-      id: 'JOB-2026-004',
+      role: 'customer',
       type: 'service',
       title: 'บริการแม่บ้านทำความสะอาด',
-      provider: 'พี่สมศรี คลีนนิ่ง',
+      person: 'พี่สมศรี คลีนนิ่ง (แม่บ้าน)',
       status: 'completed',
       statusText: 'งานเสร็จสิ้น',
       date: '3 มี.ค. 2026',
       price: 450,
       icon: '🧹',
+    },
+    {
+      id: 'JOB-2026-003',
+      role: 'provider',
+      type: 'delivery',
+      title: 'รับ-ส่งของ ด่วน (คุณเป็นคนขับ)',
+      person: 'คุณวิชัย ใจดี (ลูกค้า)',
+      status: 'ongoing',
+      statusText: 'กำลังดำเนินการจัดส่ง',
+      date: 'วันนี้, 15:00 น.',
+      price: 60,
+      icon: '📦',
+    },
+    {
+      id: 'JOB-2026-004',
+      role: 'provider',
+      type: 'service',
+      title: 'รับล้างแอร์ (คุณเป็นช่าง)',
+      person: 'คุณสมปอง บ้านริมน้ำ (ลูกค้า)',
+      status: 'completed',
+      statusText: 'ส่งมอบงานแล้ว',
+      date: 'เมื่อวาน, 11:00 น.',
+      price: 500,
+      icon: '❄️',
     }
   ];
 
-  // กรองข้อมูลตาม Tab ที่เลือก
-  const filteredHistories = histories.filter(h => h.status === activeTab);
+  // กรองข้อมูลตาม Role และ Status ที่เลือก
+  const filteredHistories = histories.filter(h => {
+    const matchRole = h.role === activeRole;
+    const matchStatus = statusFilter === 'all' ? true : h.status === statusFilter;
+    return matchRole && matchStatus;
+  });
 
   return (
     <div className="min-h-screen bg-gray-100 flex justify-center">
@@ -66,44 +77,64 @@ export default function HistoryPage() {
         <div className="bg-gradient-to-br from-[#EE4D2D] to-[#FF7337] rounded-b-[2.5rem] p-6 pt-12 shadow-sm relative z-10">
           <div className="flex justify-between items-center mb-4">
             <h1 className="text-2xl font-black text-white tracking-tight">ประวัติการใช้งาน 📜</h1>
-            <div className="bg-white/20 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/30">
-              <span className="text-white text-[10px] font-bold">อัปเดตล่าสุด: สดๆ ร้อนๆ</span>
-            </div>
           </div>
 
-          {/* 🗂️ แถบสลับหน้า (Tabs) */}
-          <div className="flex bg-black/10 p-1 rounded-2xl backdrop-blur-sm relative z-10 mt-2">
+          {/* 🗂️ แถบสลับหน้าหลัก (Tabs: จ้างงาน / รับงาน) */}
+          <div className="flex bg-black/10 p-1.5 rounded-2xl backdrop-blur-sm relative z-10 mt-2">
             <button 
-              onClick={() => setActiveTab('ongoing')}
-              className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${
-                activeTab === 'ongoing' 
+              onClick={() => { setActiveRole('customer'); setStatusFilter('all'); }}
+              className={`flex-1 py-2.5 text-sm font-bold rounded-xl transition-all flex items-center justify-center gap-2 ${
+                activeRole === 'customer' 
                 ? 'bg-white text-[#EE4D2D] shadow-sm' 
                 : 'text-white/80 hover:text-white'
               }`}
             >
-              กำลังดำเนินการ ⏳
+              🛒 จ้างงาน
             </button>
             <button 
-              onClick={() => setActiveTab('completed')}
-              className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${
-                activeTab === 'completed' 
+              onClick={() => { setActiveRole('provider'); setStatusFilter('all'); }}
+              className={`flex-1 py-2.5 text-sm font-bold rounded-xl transition-all flex items-center justify-center gap-2 ${
+                activeRole === 'provider' 
                 ? 'bg-white text-[#EE4D2D] shadow-sm' 
                 : 'text-white/80 hover:text-white'
               }`}
             >
-              เสร็จสิ้นแล้ว ✅
+              🛠️ รับงาน
             </button>
           </div>
+        </div>
+
+        {/* 🏷️ ตัวกรองสถานะ (Status Filters) */}
+        <div className="bg-white border-b border-gray-100 px-4 py-3 flex gap-2 overflow-x-auto scrollbar-hide shadow-sm sticky top-0 z-20">
+          {[
+            { id: 'all', label: 'ทั้งหมด' },
+            { id: 'ongoing', label: 'กำลังดำเนินการ ⏳' },
+            { id: 'completed', label: 'เสร็จสิ้นแล้ว ✅' }
+          ].map((filter) => (
+            <button 
+              key={filter.id}
+              onClick={() => setStatusFilter(filter.id)}
+              className={`whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-bold transition-all border ${
+                statusFilter === filter.id 
+                ? 'bg-[#EE4D2D] text-white border-[#EE4D2D] shadow-sm' 
+                : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+              }`}
+            >
+              {filter.label}
+            </button>
+          ))}
         </div>
 
         {/* 📋 รายการประวัติ */}
         <div className="p-4 space-y-3 relative z-0 mt-2">
           
           {filteredHistories.length === 0 ? (
-            <div className="text-center py-10">
+            <div className="text-center py-12 bg-white rounded-3xl border border-dashed border-gray-200">
               <div className="text-5xl mb-3 opacity-50">📭</div>
-              <h3 className="text-gray-500 font-bold text-sm">ยังไม่มีรายการในหมวดหมู่นี้</h3>
-              <p className="text-gray-400 text-xs mt-1">เรียกใช้บริการ Fast Delivery หรือจ้างช่างได้เลย!</p>
+              <h3 className="text-gray-500 font-bold text-sm">ไม่พบรายการในหมวดหมู่นี้</h3>
+              <p className="text-gray-400 text-xs mt-1">
+                {activeRole === 'customer' ? 'ลองเรียกใช้บริการ Fast Delivery ดูสิ!' : 'เปิดรับงานในหน้าโปรไฟล์เพื่อสร้างรายได้กัน!'}
+              </p>
             </div>
           ) : (
             filteredHistories.map((item) => (
@@ -113,7 +144,7 @@ export default function HistoryPage() {
               >
                 <div className="flex justify-between items-start mb-3 border-b border-gray-50 pb-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-orange-50 rounded-full flex items-center justify-center text-xl shadow-inner">
+                    <div className="w-10 h-10 bg-orange-50 rounded-full flex items-center justify-center text-xl shadow-inner border border-orange-100/50">
                       {item.icon}
                     </div>
                     <div>
@@ -121,21 +152,24 @@ export default function HistoryPage() {
                       <p className="text-[10px] text-gray-500 mt-0.5">{item.id}</p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-[#EE4D2D] font-black text-sm">฿{item.price}</p>
+                  <div className="text-right flex-shrink-0">
+                    <p className={`font-black text-sm ${activeRole === 'provider' ? 'text-green-600' : 'text-[#EE4D2D]'}`}>
+                      {activeRole === 'provider' ? '+' : '-'}฿{item.price}
+                    </p>
                   </div>
                 </div>
                 
                 <div className="flex justify-between items-end">
                   <div>
-                    <p className="text-xs font-bold text-gray-700 mb-1 flex items-center gap-1.5">
-                      <span className="text-gray-400">ผู้ให้บริการ:</span> {item.provider}
+                    <p className="text-[11px] font-bold text-gray-700 mb-1.5 flex items-center gap-1.5">
+                      <span className="text-gray-400">{activeRole === 'customer' ? 'บริการโดย:' : 'ลูกค้า:'}</span> 
+                      {item.person}
                     </p>
                     <p className="text-[10px] text-gray-400 font-medium">🕒 {item.date}</p>
                   </div>
                   
                   {/* Status Badge */}
-                  <span className={`text-[10px] font-bold px-3 py-1.5 rounded-full ${
+                  <span className={`text-[9px] font-bold px-3 py-1.5 rounded-full ${
                     item.status === 'ongoing' 
                     ? 'bg-blue-50 text-blue-600 border border-blue-100 animate-pulse' 
                     : 'bg-green-50 text-green-600 border border-green-100'
