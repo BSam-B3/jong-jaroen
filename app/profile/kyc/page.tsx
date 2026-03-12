@@ -35,8 +35,6 @@ export default function KYCWizardPage() {
   // ── AI & Camera States ──
   const [faceApiLoaded, setFaceApiLoaded] = useState(false);
   const [instruction, setInstruction] = useState('');
-  
-  // สถานะตรวจจับบัตร (สแกนหาโฟกัส -> พร้อมถ่าย)
   const [cardScanState, setCardScanState] = useState<'scanning' | 'ready'>('scanning');
 
   // ── Form States ──
@@ -46,6 +44,9 @@ export default function KYCWizardPage() {
   const [bankName, setBankName] = useState('');
   const [bankAccount, setBankAccount] = useState('');
   const [bankAccountName, setBankAccountName] = useState('');
+  
+  // ✅ PDPA Consent State
+  const [pdpaConsent, setPdpaConsent] = useState(false);
 
   // ── Refs ──
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -62,7 +63,6 @@ export default function KYCWizardPage() {
   const smileProgressRef = useRef(0);
   const blinkNeeded = 2;
 
-  // สเตทสำหรับดึงค่า Ref มาโชว์ใน UI
   const [uiPhase, setUiPhase] = useState<'blink' | 'smile'>('blink');
   const [uiBlinkCount, setUiBlinkCount] = useState(0);
   const [uiSmileProgress, setUiSmileProgress] = useState(0);
@@ -135,7 +135,6 @@ export default function KYCWizardPage() {
     stopCamera();
     setError('');
     
-    // Reset States
     capturedRef.current = false;
     livenessPhaseRef.current = 'blink';
     blinkCountRef.current = 0;
@@ -163,7 +162,6 @@ export default function KYCWizardPage() {
             setInstruction('กระพริบตา 2 ครั้ง เพื่อเริ่มการยืนยันตัวตน');
             detectLivenessCombo();
           } else {
-            // ระบบตรวจสอบบัตร: หน่วงเวลา 3 วิ ให้กล้องจับโฟกัส แล้วถึงจะเปลี่ยนเป็นสีเขียวให้ถ่ายได้
             setInstruction('กำลังตรวจสอบความคมชัด กรุณาถือค้างไว้...');
             cardTimeoutRef.current = setTimeout(() => {
               setCardScanState('ready');
@@ -290,7 +288,7 @@ export default function KYCWizardPage() {
     if (type === 'id_card') {
       setIdCardBlob(null);
       setIdCardPreview('');
-      setCardScanState('scanning'); // รีเซ็ตการสแกนบัตรใหม่
+      setCardScanState('scanning');
       setStep(1);
     } else {
       setSelfieBlob(null);
@@ -310,18 +308,72 @@ export default function KYCWizardPage() {
     }, 1500);
   };
 
+  // ✅ ฟังก์ชันสำหรับตีตราประทับลายน้ำลงบนรูปบัตร
+  const addWatermark = (fileOrBlob: Blob): Promise<Blob> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return resolve(fileOrBlob);
+
+        // วาดรูปต้นฉบับ
+        ctx.drawImage(img, 0, 0);
+
+        // ตั้งค่าข้อความลายน้ำ
+        const text = 'ใช้สำหรับยืนยันตัวตนแอปจงเจริญเท่านั้น';
+        const dateText = new Date().toLocaleDateString('th-TH');
+        
+        ctx.font = `bold ${Math.floor(img.width / 22)}px Arial`;
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.6)'; // สีขาวโปร่งแสง
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)'; // ขอบดำบางๆ ให้อ่านง่ายบนพื้นสว่าง
+        ctx.lineWidth = 3;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        // หมุนองศาข้อความเฉียงๆ
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.rotate(-Math.PI / 6); // เอียง -30 องศา
+
+        // วาดข้อความ
+        ctx.strokeText(text, 0, -20);
+        ctx.fillText(text, 0, -20);
+        
+        ctx.font = `bold ${Math.floor(img.width / 30)}px Arial`;
+        ctx.strokeText(dateText, 0, 40);
+        ctx.fillText(dateText, 0, 40);
+
+        canvas.toBlob((blob) => {
+          resolve(blob || fileOrBlob);
+        }, 'image/jpeg', 0.9);
+      };
+      img.onerror = () => resolve(fileOrBlob);
+      img.src = URL.createObjectURL(fileOrBlob);
+    });
+  };
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!currentUser || !idCardBlob || !selfieBlob) return;
+    if (!pdpaConsent) {
+      setError('กรุณากดยอมรับนโยบายความเป็นส่วนตัวและให้ความยินยอมก่อนส่งข้อมูล');
+      return;
+    }
 
     setSubmitting(true);
     setError('');
 
     try {
+      // ✅ ประทับลายน้ำก่อนอัปโหลดเพื่อความปลอดภัย 100%
+      const watermarkedIdBlob = await addWatermark(idCardBlob);
+
       const idPath = `id-cards/${currentUser.id}_${Date.now()}.jpg`;
       const selPath = `selfies/${currentUser.id}_${Date.now()}.jpg`;
 
-      await supabase.storage.from('kyc-documents').upload(idPath, idCardBlob, { upsert: true, contentType: 'image/jpeg' });
+      // อัปโหลดรูปลายน้ำขึ้น Supabase
+      await supabase.storage.from('kyc-documents').upload(idPath, watermarkedIdBlob, { upsert: true, contentType: 'image/jpeg' });
       await supabase.storage.from('kyc-documents').upload(selPath, selfieBlob, { upsert: true, contentType: 'image/jpeg' });
 
       const { data: idData } = supabase.storage.from('kyc-documents').getPublicUrl(idPath);
@@ -331,9 +383,13 @@ export default function KYCWizardPage() {
         kyc_status: 'pending',
         id_card_url: idData.publicUrl,
         selfie_with_id_url: selData.publicUrl,
+        id_card_number: idNumber,
+        full_name: fullName,
+        address: address,
         bank_name: bankName,
         bank_account_number: bankAccount,
         bank_account_name: bankAccountName,
+        pdpa_consented_at: new Date().toISOString(), // เก็บเวลาที่กดยินยอมเป็นหลักฐาน
       };
 
       const { error: updateErr } = await supabase.from('profiles').update(updates).eq('id', currentUser.id);
@@ -360,8 +416,8 @@ export default function KYCWizardPage() {
           <h1 className="font-black text-2xl text-gray-800 mb-2">
             {kycStatus === 'approved' ? 'ยืนยันตัวตนสำเร็จ!' : 'รอการตรวจสอบ'}
           </h1>
-          <p className="text-gray-600 mb-8 font-medium">
-            {kycStatus === 'approved' ? 'คุณสามารถใช้งานระบบได้เต็มรูปแบบแล้ว' : 'กำลังอยู่ในขั้นตอนการพิจารณา จะใช้เวลาไม่เกิน 24 ชั่วโมงค่ะ'}
+          <p className="text-gray-600 mb-8 font-medium leading-relaxed">
+            {kycStatus === 'approved' ? 'คุณสามารถใช้งานระบบได้เต็มรูปแบบแล้ว' : 'ข้อมูลที่เข้ารหัสของคุณกำลังอยู่ในขั้นตอนการพิจารณา จะใช้เวลาไม่เกิน 24 ชั่วโมงค่ะ'}
           </p>
           <button onClick={() => router.push('/profile')} className="w-full bg-[#EE4D2D] text-white py-4 rounded-full font-bold text-lg shadow-md hover:bg-[#D74022] active:scale-95 transition-all">
             กลับสู่หน้าโปรไฟล์
@@ -378,7 +434,7 @@ export default function KYCWizardPage() {
         <div className="bg-white p-5 pt-10 sticky top-0 z-50 border-b border-gray-100 shadow-sm">
           <div className="flex items-center gap-3 mb-4">
             <button onClick={() => { step > 1 ? setStep(step - 1) : router.back() }} className="text-gray-500 font-bold text-xl active:scale-90 transition-transform">←</button>
-            <h1 className="font-black text-xl text-gray-800 tracking-tight">ยืนยันตัวตน</h1>
+            <h1 className="font-black text-xl text-gray-800 tracking-tight">ยืนยันตัวตน (KYC)</h1>
             <span className="ml-auto text-sm font-bold text-[#EE4D2D] bg-orange-50 px-3 py-1 rounded-full border border-orange-100">ขั้นตอน {step}/3</span>
           </div>
           <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
@@ -396,27 +452,19 @@ export default function KYCWizardPage() {
             <div className="flex flex-col h-full animate-fade-in">
               <div className="mb-4 text-center">
                 <h2 className="text-xl font-black text-[#EE4D2D] mb-1">1. ถ่ายรูปบัตรประชาชน</h2>
-                <p className="text-xs text-gray-500 font-medium">โปรดใช้บัตรประชาชนตัวจริงเท่านั้น</p>
+                <p className="text-xs text-gray-500 font-medium">โปรดใช้บัตรประชาชนตัวจริงเท่านั้น (ระบบจะประทับลายน้ำให้อัตโนมัติ)</p>
               </div>
 
               {!idCardPreview ? (
                 <div className="flex-1 flex flex-col justify-center">
                   <div className="relative w-full aspect-[3/4] sm:aspect-video bg-black rounded-3xl overflow-hidden shadow-inner flex items-center justify-center">
                     <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover" />
-                    
                     <div className="absolute inset-0 bg-black/40 pointer-events-none transition-all duration-500" style={{ opacity: cardScanState === 'ready' ? 0.1 : 0.4 }}></div>
-                    
-                    {/* ✅ กรอบสี่เหลี่ยมผืนผ้า (เปลี่ยนสีตามสถานะ) */}
                     <div className="w-[85%] aspect-[1.6/1] border-[3px] border-white/80 rounded-2xl relative z-10 shadow-[0_0_0_9999px_rgba(0,0,0,0.6)] flex flex-col items-center justify-center overflow-hidden bg-transparent">
-                      
                       <div className={`absolute inset-0 border-[3px] rounded-2xl transition-colors duration-500 ${cardScanState === 'ready' ? 'border-[#22C55E]' : 'border-[#EE4D2D]'}`}></div>
-                      
-                      {/* เส้นสแกนเลเซอร์ (จะซ่อนเมื่อพร้อมถ่าย) */}
                       {cardScanState === 'scanning' && (
                         <div className="w-full h-0.5 bg-[#EE4D2D] shadow-[0_0_15px_3px_rgba(238,77,45,0.8)] absolute top-0 animate-scan-line"></div>
                       )}
-                      
-                      {/* ข้อความในกรอบ */}
                       <div className="bg-black/40 backdrop-blur-sm px-4 py-2 rounded-full absolute bottom-4">
                         <p className={`font-bold tracking-wider text-xs drop-shadow-md transition-colors ${cardScanState === 'ready' ? 'text-[#22C55E]' : 'text-white'}`}>
                           {instruction}
@@ -424,22 +472,14 @@ export default function KYCWizardPage() {
                       </div>
                     </div>
                   </div>
-                  
-                  {/* ✅ ปุ่มถ่ายภาพ (ล็อคไว้จนกว่ากรอบจะเขียว) */}
                   <button 
                     onClick={() => { if(cardScanState === 'ready') captureFrame('id_card'); }} 
                     disabled={cardScanState !== 'ready'}
                     className={`mt-8 w-20 h-20 rounded-full mx-auto flex items-center justify-center text-3xl transition-all duration-300 ${
-                      cardScanState === 'ready' 
-                      ? 'bg-[#22C55E] text-white shadow-[0_0_0_6px_rgba(34,197,94,0.3)] hover:scale-105 active:scale-95 cursor-pointer' 
-                      : 'bg-gray-400 text-gray-200 shadow-[0_0_0_6px_rgba(156,163,175,0.3)] cursor-not-allowed opacity-50'
+                      cardScanState === 'ready' ? 'bg-[#22C55E] text-white shadow-[0_0_0_6px_rgba(34,197,94,0.3)] hover:scale-105 active:scale-95 cursor-pointer' : 'bg-gray-400 text-gray-200 shadow-[0_0_0_6px_rgba(156,163,175,0.3)] cursor-not-allowed opacity-50'
                     }`}
-                  >
-                    📸
-                  </button>
-                  <p className="text-center text-[10px] text-gray-400 mt-3 font-medium">
-                    {cardScanState === 'ready' ? 'กดปุ่มเพื่อถ่ายภาพได้เลย' : 'กรุณาถือกล้องนิ่งๆ...'}
-                  </p>
+                  >📸</button>
+                  <p className="text-center text-[10px] text-gray-400 mt-3 font-medium">{cardScanState === 'ready' ? 'กดปุ่มเพื่อถ่ายภาพได้เลย' : 'กรุณาถือกล้องนิ่งๆ...'}</p>
                 </div>
               ) : (
                 <div className="flex-1 flex flex-col">
@@ -461,7 +501,7 @@ export default function KYCWizardPage() {
           )}
 
           {/* ────────────────────────────────────────────────────────
-              STEP 2: ถ่ายเซลฟี่ (Blink -> Smile)
+              STEP 2: ถ่ายเซลฟี่
           ──────────────────────────────────────────────────────── */}
           {step === 2 && (
             <div className="flex flex-col h-full animate-fade-in">
@@ -472,22 +512,15 @@ export default function KYCWizardPage() {
 
               {!selfiePreview ? (
                 <div className="flex-1 flex flex-col justify-center relative">
-                  
                   <div className="relative w-full aspect-[3/4] sm:aspect-[4/5] bg-black rounded-3xl overflow-hidden shadow-inner flex items-center justify-center">
                     <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover transform scale-x-[-1]" /> 
-                    
                     <div className="w-[65%] aspect-[3/4] rounded-[100%] relative z-10 shadow-[0_0_0_9999px_rgba(0,0,0,0.7)] flex items-center justify-center">
                       <div className="absolute inset-0 border-4 border-white/30 rounded-[100%]"></div>
-                      
                       <div className="absolute inset-0 border-4 rounded-[100%] transition-colors duration-300" style={{ borderColor: uiSmileProgress > 50 ? '#22c55e' : (uiSmileProgress > 0 ? '#EE4D2D' : 'transparent') }}></div>
                     </div>
-
                     <div className="absolute bottom-10 left-0 right-0 text-center z-20">
                       <div className="inline-block bg-black/70 backdrop-blur-md px-6 py-3 rounded-2xl border border-white/20">
-                         <p className="text-white font-bold text-sm mb-1">
-                           {faceApiLoaded ? instruction : '⏳ กำลังเตรียมระบบ AI...'}
-                         </p>
-                         
+                         <p className="text-white font-bold text-sm mb-1">{faceApiLoaded ? instruction : '⏳ กำลังเตรียมระบบ AI...'}</p>
                          {faceApiLoaded && uiPhase === 'blink' && (
                            <div className="flex justify-center gap-2 mt-2">
                              {[...Array(blinkNeeded)].map((_, i) => (
@@ -495,7 +528,6 @@ export default function KYCWizardPage() {
                              ))}
                            </div>
                          )}
-
                          {faceApiLoaded && uiPhase === 'smile' && (
                            <div className="w-full bg-white/20 h-1.5 rounded-full mt-2 overflow-hidden">
                              <div className={`h-full transition-all duration-300 ${uiSmileProgress >= 100 ? 'bg-green-500' : 'bg-[#EE4D2D]'}`} style={{ width: `${uiSmileProgress}%` }}></div>
@@ -504,12 +536,6 @@ export default function KYCWizardPage() {
                       </div>
                     </div>
                   </div>
-
-                  {!faceApiLoaded && (
-                    <button onClick={() => captureFrame('selfie')} className="mt-6 bg-[#EE4D2D] text-white w-16 h-16 rounded-full mx-auto flex items-center justify-center text-2xl shadow-lg active:scale-90 transition-transform">
-                      📸
-                    </button>
-                  )}
                 </div>
               ) : (
                 <div className="flex-1 flex flex-col">
@@ -531,13 +557,13 @@ export default function KYCWizardPage() {
           )}
 
           {/* ────────────────────────────────────────────────────────
-              STEP 3: ตรวจสอบข้อมูล OCR + บัญชีธนาคาร
+              STEP 3: ตรวจสอบข้อมูล + บัญชี + PDPA
           ──────────────────────────────────────────────────────── */}
           {step === 3 && (
             <div className="flex flex-col h-full animate-fade-in overflow-y-auto pb-6">
               <div className="mb-5 text-center">
                 <h2 className="text-xl font-black text-[#EE4D2D] mb-1">3. ตรวจสอบข้อมูล</h2>
-                <p className="text-xs text-gray-500 font-medium">ตรวจสอบข้อมูลบัตร และกรอกบัญชีเพื่อรับรายได้</p>
+                <p className="text-xs text-gray-500 font-medium">โปรดตรวจสอบข้อมูลให้ถูกต้องก่อนส่งยืนยัน</p>
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-6">
@@ -554,58 +580,60 @@ export default function KYCWizardPage() {
                 </div>
 
                 <div className="bg-orange-50 p-5 rounded-[1.5rem] border border-orange-100 space-y-4">
-                  <h3 className="font-bold text-[#EE4D2D] text-sm flex items-center gap-2">
-                    <span>✨</span> ข้อมูลจากบัตร (แก้ไขได้)
-                  </h3>
+                  <h3 className="font-bold text-[#EE4D2D] text-sm flex items-center gap-2"><span>✨</span> ข้อมูลจากบัตร (แก้ไขได้)</h3>
                   <div>
                     <label className="block text-[11px] font-bold text-gray-500 mb-1 ml-1">เลขประจำตัวประชาชน</label>
-                    <input type="text" value={idNumber} onChange={e => setIdNumber(e.target.value)}
-                      className="w-full bg-white border border-gray-200 rounded-xl p-3.5 text-sm font-bold text-gray-800 outline-none focus:border-[#EE4D2D] focus:ring-1 focus:ring-[#EE4D2D]/50 transition-all" required />
+                    <input type="text" value={idNumber} onChange={e => setIdNumber(e.target.value)} className="w-full bg-white border border-gray-200 rounded-xl p-3.5 text-sm font-bold text-gray-800 outline-none focus:border-[#EE4D2D]" required />
                   </div>
                   <div>
                     <label className="block text-[11px] font-bold text-gray-500 mb-1 ml-1">ชื่อ-นามสกุล (ภาษาไทย)</label>
-                    <input type="text" value={fullName} onChange={e => setFullName(e.target.value)}
-                      className="w-full bg-white border border-gray-200 rounded-xl p-3.5 text-sm font-bold text-gray-800 outline-none focus:border-[#EE4D2D] focus:ring-1 focus:ring-[#EE4D2D]/50 transition-all" required />
+                    <input type="text" value={fullName} onChange={e => setFullName(e.target.value)} className="w-full bg-white border border-gray-200 rounded-xl p-3.5 text-sm font-bold text-gray-800 outline-none focus:border-[#EE4D2D]" required />
                   </div>
                   <div>
                     <label className="block text-[11px] font-bold text-gray-500 mb-1 ml-1">ที่อยู่ตามบัตรประชาชน</label>
-                    <textarea value={address} onChange={e => setAddress(e.target.value)} rows={2}
-                      className="w-full bg-white border border-gray-200 rounded-xl p-3.5 text-sm font-bold text-gray-800 outline-none focus:border-[#EE4D2D] focus:ring-1 focus:ring-[#EE4D2D]/50 transition-all" required />
+                    <textarea value={address} onChange={e => setAddress(e.target.value)} rows={2} className="w-full bg-white border border-gray-200 rounded-xl p-3.5 text-sm font-bold text-gray-800 outline-none focus:border-[#EE4D2D]" required />
                   </div>
                 </div>
 
                 <div className="bg-white p-5 rounded-[1.5rem] border border-gray-200 shadow-sm space-y-4">
-                  <h3 className="font-bold text-gray-800 text-sm flex items-center gap-2">
-                    <span>🏦</span> บัญชีสำหรับรับเงิน
-                  </h3>
+                  <h3 className="font-bold text-gray-800 text-sm flex items-center gap-2"><span>🏦</span> บัญชีสำหรับรับเงิน</h3>
                   <div>
                     <label className="block text-[11px] font-bold text-gray-500 mb-1 ml-1">ธนาคาร</label>
-                    <select value={bankName} onChange={e => setBankName(e.target.value)}
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3.5 text-sm font-medium text-gray-800 outline-none focus:border-[#EE4D2D] focus:ring-1 focus:ring-[#EE4D2D]/50 transition-all" required>
+                    <select value={bankName} onChange={e => setBankName(e.target.value)} className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3.5 text-sm font-medium text-gray-800 outline-none focus:border-[#EE4D2D]" required>
                       <option value="">-- เลือกธนาคาร --</option>
                       <option value="กสิกรไทย">กสิกรไทย (KBANK)</option>
                       <option value="ไทยพาณิชย์">ไทยพาณิชย์ (SCB)</option>
                       <option value="กรุงไทย">กรุงไทย (KTB)</option>
                       <option value="กรุงเทพ">กรุงเทพ (BBL)</option>
-                      <option value="ออมสิน">ออมสิน (GSB)</option>
                     </select>
                   </div>
                   <div>
                     <label className="block text-[11px] font-bold text-gray-500 mb-1 ml-1">ชื่อบัญชี (ต้องตรงกับชื่อในบัตร)</label>
-                    <input type="text" value={bankAccountName} onChange={e => setBankAccountName(e.target.value)}
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3.5 text-sm font-medium text-gray-800 outline-none focus:border-[#EE4D2D] focus:ring-1 focus:ring-[#EE4D2D]/50 transition-all" required />
+                    <input type="text" value={bankAccountName} onChange={e => setBankAccountName(e.target.value)} className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3.5 text-sm font-medium text-gray-800 outline-none focus:border-[#EE4D2D]" required />
                   </div>
                   <div>
                     <label className="block text-[11px] font-bold text-gray-500 mb-1 ml-1">เลขบัญชี</label>
-                    <input type="text" value={bankAccount} onChange={e => setBankAccount(e.target.value.replace(/\D/g,'').slice(0,15))}
-                      placeholder="ไม่ต้องใส่ขีด (-)"
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3.5 text-sm font-medium text-gray-800 outline-none focus:border-[#EE4D2D] focus:ring-1 focus:ring-[#EE4D2D]/50 transition-all tracking-widest" required />
+                    <input type="text" value={bankAccount} onChange={e => setBankAccount(e.target.value.replace(/\D/g,'').slice(0,15))} placeholder="ไม่ต้องใส่ขีด (-)" className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3.5 text-sm font-medium text-gray-800 outline-none focus:border-[#EE4D2D] tracking-widest" required />
                   </div>
                 </div>
 
-                <button type="submit" disabled={submitting}
-                  className="w-full bg-[#EE4D2D] text-white py-4 rounded-full font-black text-lg shadow-lg hover:bg-[#D74022] active:scale-[0.98] transition-all disabled:opacity-50 mt-4">
-                  {submitting ? '⏳ กำลังอัปโหลดข้อมูล...' : '📤 ส่งให้ Admin ตรวจสอบ'}
+                {/* ✅ กล่องยินยอม PDPA */}
+                <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 flex items-start gap-3">
+                  <input 
+                    type="checkbox" 
+                    id="pdpa" 
+                    checked={pdpaConsent}
+                    onChange={(e) => setPdpaConsent(e.target.checked)}
+                    className="mt-1 w-5 h-5 rounded border-gray-300 text-[#EE4D2D] focus:ring-[#EE4D2D]"
+                  />
+                  <label htmlFor="pdpa" className="text-[10px] text-gray-600 leading-relaxed cursor-pointer">
+                    ข้าพเจ้ายินยอมให้แอปพลิเคชันจงเจริญ เก็บรวบรวม ใช้ และประมวลผลข้อมูลส่วนบุคคลของข้าพเจ้า (รวมถึงภาพถ่ายบัตรประชาชนและข้อมูลชีวมิติ) เพื่อวัตถุประสงค์ในการยืนยันตัวตนตามกฎหมาย (PDPA) โดยภาพบัตรจะถูก <strong className="text-gray-800">ประทับลายน้ำอัตโนมัติ</strong> เพื่อความปลอดภัยก่อนจัดเก็บ
+                  </label>
+                </div>
+
+                <button type="submit" disabled={submitting || !pdpaConsent}
+                  className="w-full bg-[#EE4D2D] text-white py-4 rounded-full font-black text-lg shadow-lg hover:bg-[#D74022] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-4">
+                  {submitting ? '⏳ กำลังอัปโหลดและประทับลายน้ำ...' : '📤 ยืนยันข้อมูลส่งตรวจสอบ'}
                 </button>
               </form>
             </div>
