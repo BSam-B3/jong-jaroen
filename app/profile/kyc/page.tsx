@@ -3,62 +3,78 @@ import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
-type CameraStep = 'id_card' | 'selfie';
+const EAR_THRESHOLD = 0.25; 
+const BLINK_FRAMES  = 2;     
+
+function calcEAR(eye: number[][]): number {
+  const dist = (a: number[], b: number[]) => Math.sqrt((a[0]-b[0])**2 + (a[1]-b[1])**2);
+  const A = dist(eye[1], eye[5]);
+  const B = dist(eye[2], eye[4]);
+  const C = dist(eye[0], eye[3]);
+  return (A + B) / (2.0 * C);
+}
 
 export default function KYCWizardPage() {
   const router = useRouter();
   
-  // ── States พื้นฐาน ──
+  // ── States ──
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [kycStatus, setKycStatus] = useState<string | null>(null);
   const [error, setError] = useState('');
   
-  // ── States สำหรับ Wizard (Step 1-3) ──
   const [step, setStep] = useState<number>(1);
   const [isExtracting, setIsExtracting] = useState(false);
 
-  // ── States ข้อมูลเอกสารและ AI ──
   const [idCardBlob, setIdCardBlob] = useState<Blob | null>(null);
   const [idCardPreview, setIdCardPreview] = useState('');
   const [selfieBlob, setSelfieBlob] = useState<Blob | null>(null);
   const [selfiePreview, setSelfiePreview] = useState('');
   
+  // ── AI States ──
   const [faceApiLoaded, setFaceApiLoaded] = useState(false);
-  const [smileProgress, setSmileProgress] = useState(0); // หลอดความคืบหน้ารอยยิ้ม (0-100)
   const [instruction, setInstruction] = useState('');
-
-  // ข้อมูลจากบัตร (OCR)
+  
+  // ── Form States ──
   const [idNumber, setIdNumber] = useState('');
   const [fullName, setFullName] = useState('');
   const [address, setAddress] = useState('');
-
-  // ข้อมูลบัญชี
   const [bankName, setBankName] = useState('');
   const [bankAccount, setBankAccount] = useState('');
   const [bankAccountName, setBankAccountName] = useState('');
 
-  // ── Camera Refs ──
+  // ── Refs ──
   const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const rafRef = useRef<number>(0);
+  
+  // ── Liveness Refs ──
   const capturedRef = useRef(false);
+  const livenessPhaseRef = useRef<'blink' | 'smile'>('blink'); // จัดการสถานะ AI (กระพริบตา -> ยิ้ม)
+  const blinkCountRef = useRef(0);
+  const blinkFramesRef = useRef(0);
+  const wasOpenRef = useRef(true);
+  const smileProgressRef = useRef(0);
+  const blinkNeeded = 2; // ต้องกระพริบ 2 ครั้ง
+
+  // สเตทสำหรับดึงค่า Ref มาโชว์ใน UI
+  const [uiPhase, setUiPhase] = useState<'blink' | 'smile'>('blink');
+  const [uiBlinkCount, setUiBlinkCount] = useState(0);
+  const [uiSmileProgress, setUiSmileProgress] = useState(0);
 
   useEffect(() => {
     loadUserData();
     loadFaceApi();
   }, []);
 
-  // เปิด-ปิด กล้องอัตโนมัติตาม Step
   useEffect(() => {
     if (kycStatus === 'approved' || kycStatus === 'pending') return;
 
     if (step === 1 && !idCardPreview) {
-      startCamera('environment'); // กล้องหลัง
+      startCamera('environment'); 
     } else if (step === 2 && !selfiePreview) {
-      startCamera('user'); // กล้องหน้า
+      startCamera('user'); 
     } else {
       stopCamera();
     }
@@ -87,7 +103,6 @@ export default function KYCWizardPage() {
     setLoading(false);
   }
 
-  // ✅ โหลด AI สำหรับตรวจจับใบหน้า และ "อารมณ์ (รอยยิ้ม)"
   async function loadFaceApi() {
     try {
       if (!(window as any).faceapi) {
@@ -103,7 +118,8 @@ export default function KYCWizardPage() {
       const MODEL_URL = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@0.22.2/weights';
       await Promise.all([
         faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-        faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL), // โหลดตัวจับรอยยิ้ม
+        faceapi.nets.faceLandmark68TinyNet.loadFromUri(MODEL_URL), // จับตา
+        faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL),   // จับรอยยิ้ม
       ]);
       setFaceApiLoaded(true);
     } catch (e) {
@@ -114,10 +130,19 @@ export default function KYCWizardPage() {
   async function startCamera(facingMode: 'user' | 'environment') {
     stopCamera();
     setError('');
-    setSmileProgress(0);
+    
+    // Reset Liveness States
     capturedRef.current = false;
+    livenessPhaseRef.current = 'blink';
+    blinkCountRef.current = 0;
+    blinkFramesRef.current = 0;
+    wasOpenRef.current = true;
+    smileProgressRef.current = 0;
+    
+    setUiPhase('blink');
+    setUiBlinkCount(0);
+    setUiSmileProgress(0);
 
-    // หน่วงเวลาให้ React วาด <video> ให้เสร็จก่อนเปิดกล้อง (แก้จอดำ)
     setTimeout(async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -129,12 +154,11 @@ export default function KYCWizardPage() {
           videoRef.current.srcObject = stream;
           await videoRef.current.play();
 
-          // ถ้าเป็น Step 2 (หน้าตรง) ให้รัน AI ตรวจรอยยิ้ม
           if (facingMode === 'user' && faceApiLoaded) {
-            setInstruction('มองกล้องแล้วยิ้มกว้างๆ 😊');
-            detectLivenessSmile();
+            setInstruction('กระพริบตา 2 ครั้ง เพื่อเริ่มการยืนยันตัวตน');
+            detectLivenessCombo();
           } else {
-            setInstruction('วางบัตรให้ตรงกรอบ แล้วกดปุ่มถ่าย');
+            setInstruction('โปรดขยับบัตรของท่านให้อยู่ในกรอบ');
           }
         }
       } catch (err: any) {
@@ -143,49 +167,77 @@ export default function KYCWizardPage() {
     }, 200);
   }
 
-  // ✅ ระบบ Liveness Detection: ตรวจจับรอยยิ้ม
-  function detectLivenessSmile() {
+  // ✅ ระบบ AI Combo (กระพริบตา 2 ครั้ง -> ยิ้ม)
+  function detectLivenessCombo() {
     const faceapi = (window as any).faceapi;
     const video = videoRef.current;
     if (!video || !faceapi) return;
 
-    let progress = 0; // เก็บค่ารอยยิ้มสะสม
-
     async function detect() {
-      if (capturedRef.current) return; // ถ้าถ่ายไปแล้วให้หยุดทำงาน
+      if (capturedRef.current) return; 
       try {
-        // จับใบหน้าและอารมณ์ (expressions)
         const detection = await faceapi
           .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ scoreThreshold: 0.5 }))
+          .withFaceLandmarks(true)
           .withFaceExpressions();
 
         if (detection) {
-          // เช็คค่าความสุข (รอยยิ้ม) ตั้งแต่ 0.0 ถึง 1.0
-          const happyScore = detection.expressions.happy;
           
-          if (happyScore > 0.7) {
-            // ถ้ายิ้มกว้าง ให้เพิ่มหลอด progress
-            progress += 15; 
-            setInstruction('ดีมากค่ะ ค้างไว้... 📸');
-          } else {
-            // ถ้าหุบยิ้ม หลอดลดลง
-            progress = Math.max(0, progress - 10);
-            setInstruction('โปรดยิ้มกว้างๆ เพื่อยืนยันตัวตน 😊');
+          // --- เฟส 1: ตรวจจับการกระพริบตา ---
+          if (livenessPhaseRef.current === 'blink') {
+            const landmarks = detection.landmarks;
+            const leftEye  = landmarks.getLeftEye().map((p: any) => [p.x, p.y]);
+            const rightEye = landmarks.getRightEye().map((p: any) => [p.x, p.y]);
+            const earLeft  = calcEAR(leftEye);
+            const earRight = calcEAR(rightEye);
+            const ear = (earLeft + earRight) / 2;
+
+            if (ear < EAR_THRESHOLD) {
+              blinkFramesRef.current++;
+            } else {
+              if (blinkFramesRef.current >= BLINK_FRAMES && wasOpenRef.current === false) {
+                blinkCountRef.current++;
+                setUiBlinkCount(blinkCountRef.current);
+                
+                if (blinkCountRef.current >= blinkNeeded) {
+                  // ผ่านเฟสกระพริบตา -> เปลี่ยนไปเฟสยิ้ม
+                  livenessPhaseRef.current = 'smile';
+                  setUiPhase('smile');
+                  setInstruction('เยี่ยมมาก! ตอนนี้ยิ้มกว้างๆ ค่ะ 😊');
+                } else {
+                  setInstruction(`กระพริบตาแล้ว ${blinkCountRef.current}/${blinkNeeded} ครั้ง`);
+                }
+              }
+              wasOpenRef.current = ear >= EAR_THRESHOLD;
+              blinkFramesRef.current = 0;
+            }
+            if (ear < EAR_THRESHOLD) wasOpenRef.current = false;
+          } 
+          
+          // --- เฟส 2: ตรวจจับรอยยิ้ม ---
+          else if (livenessPhaseRef.current === 'smile') {
+            const happyScore = detection.expressions.happy;
+            
+            if (happyScore > 0.7) {
+              smileProgressRef.current += 15; 
+              setInstruction('ดีมากค่ะ ค้างไว้... 📸');
+            } else {
+              smileProgressRef.current = Math.max(0, smileProgressRef.current - 10);
+              setInstruction('โปรดยิ้มกว้างๆ เพื่อถ่ายภาพ 😊');
+            }
+
+            setUiSmileProgress(Math.min(100, smileProgressRef.current));
+
+            if (smileProgressRef.current >= 100 && !capturedRef.current) {
+              capturedRef.current = true;
+              setInstruction('ยืนยันสำเร็จ! 📸');
+              setTimeout(() => captureFrame('selfie'), 300);
+              return; 
+            }
           }
 
-          setSmileProgress(Math.min(100, progress));
-
-          // ถ้ายิ้มค้างจนครบ 100% ให้ถ่ายรูปอัตโนมัติ!
-          if (progress >= 100 && !capturedRef.current) {
-            capturedRef.current = true;
-            setInstruction('ยืนยันสำเร็จ! 📸');
-            setTimeout(() => captureFrame('selfie'), 300);
-            return; // จบ loop
-          }
         } else {
           setInstruction('ไม่พบใบหน้า กรุณาอยู่ในกรอบวงรี');
-          progress = 0;
-          setSmileProgress(0);
         }
       } catch (_e) {}
       
@@ -203,13 +255,14 @@ export default function KYCWizardPage() {
   }
 
   function captureFrame(type: 'id_card' | 'selfie') {
-    if (type === 'selfie' && capturedRef.current === false) return; // ป้องกันกดรัว
+    if (type === 'selfie' && capturedRef.current === false) return; 
     capturedRef.current = true;
 
     const video = videoRef.current;
-    const canvas = canvasRef.current;
-    if (!video || !canvas) return;
+    if (!video) return;
 
+    // สร้าง canvas แบบไม่แสดงผล (hidden canvas) เพื่อวาดรูป
+    const canvas = document.createElement('canvas');
     canvas.width = video.videoWidth || 1280;
     canvas.height = video.videoHeight || 720;
     const ctx = canvas.getContext('2d')!;
@@ -237,12 +290,10 @@ export default function KYCWizardPage() {
     } else {
       setSelfieBlob(null);
       setSelfiePreview('');
-      setSmileProgress(0);
       setStep(2);
     }
   }
 
-  // ── จำลองระบบ AI อ่านบัตร (OCR) ──
   const handleNextFromStep1 = () => {
     setIsExtracting(true);
     setTimeout(() => {
@@ -275,9 +326,6 @@ export default function KYCWizardPage() {
         kyc_status: 'pending',
         id_card_url: idData.publicUrl,
         selfie_with_id_url: selData.publicUrl,
-        id_card_number: idNumber, 
-        full_name: fullName,      
-        address: address,         
         bank_name: bankName,
         bank_account_number: bankAccount,
         bank_account_name: bankAccountName,
@@ -288,12 +336,11 @@ export default function KYCWizardPage() {
 
       setKycStatus('pending');
     } catch (_err) {
-      setError('เกิดข้อผิดพลาดในการส่งข้อมูล กรุณาลองใหม่อีกครั้งค่ะ');
+      setError('เกิดข้อผิดพลาดในการส่งข้อมูล');
     }
     setSubmitting(false);
   }
 
-  // ── Render Loading & Status ──
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="text-[#EE4D2D] text-center"><div className="text-4xl animate-bounce mb-2">🔍</div><p className="font-bold">กำลังโหลดข้อมูล...</p></div>
@@ -306,10 +353,10 @@ export default function KYCWizardPage() {
         <div className={`w-full max-w-md rounded-[2rem] p-8 text-center shadow-xl border ${kycStatus === 'approved' ? 'bg-green-50 border-green-200' : 'bg-orange-50 border-orange-200'}`}>
           <div className="text-6xl mb-4">{kycStatus === 'approved' ? '✅' : '⏳'}</div>
           <h1 className="font-black text-2xl text-gray-800 mb-2">
-            {kycStatus === 'approved' ? 'ยืนยันตัวตนสำเร็จ!' : 'รอการตรวจสอบจากแอดมิน'}
+            {kycStatus === 'approved' ? 'ยืนยันตัวตนสำเร็จ!' : 'รอการตรวจสอบ'}
           </h1>
           <p className="text-gray-600 mb-8 font-medium">
-            {kycStatus === 'approved' ? 'คุณสามารถใช้งานระบบรับงานได้เต็มรูปแบบแล้ว' : 'ข้อมูลของคุณกำลังอยู่ในขั้นตอนการพิจารณา จะใช้เวลาไม่เกิน 24 ชั่วโมงค่ะ'}
+            {kycStatus === 'approved' ? 'คุณสามารถใช้งานระบบได้เต็มรูปแบบแล้ว' : 'กำลังอยู่ในขั้นตอนการพิจารณา จะใช้เวลาไม่เกิน 24 ชั่วโมงค่ะ'}
           </p>
           <button onClick={() => router.push('/profile')} className="w-full bg-[#EE4D2D] text-white py-4 rounded-full font-bold text-lg shadow-md hover:bg-[#D74022] active:scale-95 transition-all">
             กลับสู่หน้าโปรไฟล์
@@ -320,17 +367,15 @@ export default function KYCWizardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 flex justify-center">
-      <div className="w-full sm:max-w-2xl md:max-w-3xl bg-white min-h-screen relative flex flex-col shadow-xl">
+    <div className="min-h-screen bg-gray-100 flex justify-center pb-24">
+      <div className="w-full sm:max-w-2xl md:max-w-3xl bg-white min-h-screen relative flex flex-col shadow-xl overflow-hidden">
         
-        {/* Header แบบมี Progress Bar */}
         <div className="bg-white p-5 pt-10 sticky top-0 z-50 border-b border-gray-100 shadow-sm">
           <div className="flex items-center gap-3 mb-4">
             <button onClick={() => { step > 1 ? setStep(step - 1) : router.back() }} className="text-gray-500 font-bold text-xl active:scale-90 transition-transform">←</button>
             <h1 className="font-black text-xl text-gray-800 tracking-tight">ยืนยันตัวตน</h1>
             <span className="ml-auto text-sm font-bold text-[#EE4D2D] bg-orange-50 px-3 py-1 rounded-full border border-orange-100">ขั้นตอน {step}/3</span>
           </div>
-          
           <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
             <div className="bg-[#EE4D2D] h-full transition-all duration-500" style={{ width: `${(step / 3) * 100}%` }}></div>
           </div>
@@ -338,7 +383,6 @@ export default function KYCWizardPage() {
 
         <div className="p-5 flex-1 relative flex flex-col">
           {error && <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 text-xs font-bold mb-4 flex items-center gap-2"><span>⚠️</span> {error}</div>}
-          <canvas ref={canvasRef} className="hidden" />
 
           {/* ────────────────────────────────────────────────────────
               STEP 1: ถ่ายบัตรประชาชน
@@ -347,17 +391,29 @@ export default function KYCWizardPage() {
             <div className="flex flex-col h-full animate-fade-in">
               <div className="mb-4 text-center">
                 <h2 className="text-xl font-black text-[#EE4D2D] mb-1">1. ถ่ายรูปบัตรประชาชน</h2>
-                <p className="text-xs text-gray-500 font-medium">วางบัตรประชาชนให้อยู่ในกรอบ และเห็นตัวหนังสือชัดเจน</p>
+                <p className="text-xs text-gray-500 font-medium">โปรดใช้บัตรประชาชนตัวจริงเท่านั้น</p>
               </div>
 
               {!idCardPreview ? (
                 <div className="flex-1 flex flex-col justify-center">
                   <div className="relative w-full aspect-[3/4] sm:aspect-video bg-black rounded-3xl overflow-hidden shadow-inner flex items-center justify-center">
                     <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover" />
+                    
+                    {/* Overlay หน้าบัตรประชาชน */}
+                    <div className="absolute inset-0 bg-black/40 pointer-events-none"></div>
+                    
                     {/* กรอบสี่เหลี่ยมผืนผ้า (บัตร ปชช) */}
-                    <div className="w-[85%] aspect-[1.6/1] border-[3px] border-white/80 rounded-2xl relative z-10 shadow-[0_0_0_9999px_rgba(0,0,0,0.6)] flex items-center justify-center">
-                      <div className="absolute inset-0 border-[3px] border-[#EE4D2D] rounded-2xl animate-pulse"></div>
-                      <span className="text-white/50 font-bold tracking-widest text-sm">วางบัตรประชาชนตรงนี้</span>
+                    <div className="w-[85%] aspect-[1.6/1] border-[3px] border-white/80 rounded-2xl relative z-10 shadow-[0_0_0_9999px_rgba(0,0,0,0.6)] flex flex-col items-center justify-center overflow-hidden bg-transparent">
+                      <div className="absolute inset-0 border-[3px] border-[#EE4D2D] rounded-2xl"></div>
+                      
+                      {/* เส้นสแกนเลเซอร์ */}
+                      <div className="w-full h-0.5 bg-[#EE4D2D] shadow-[0_0_15px_3px_rgba(238,77,45,0.8)] absolute top-0 animate-scan-line"></div>
+                      
+                      {/* ✅ ข้อความสั่งการ */}
+                      <p className="text-white font-bold tracking-wider text-sm mt-4 drop-shadow-md">
+                        โปรดขยับบัตรของท่านให้อยู่ในกรอบ
+                      </p>
+                      <p className="text-white/70 text-[10px] mt-1">ระบบกำลังตรวจสอบความคมชัด...</p>
                     </div>
                   </div>
                   <button onClick={() => captureFrame('id_card')} className="mt-8 bg-[#EE4D2D] text-white w-20 h-20 rounded-full mx-auto flex items-center justify-center text-3xl shadow-[0_0_0_6px_rgba(238,77,45,0.3)] hover:scale-105 active:scale-95 transition-all">
@@ -384,47 +440,53 @@ export default function KYCWizardPage() {
           )}
 
           {/* ────────────────────────────────────────────────────────
-              STEP 2: ถ่ายเซลฟี่ (Liveness Detection - ยิ้ม)
+              STEP 2: ถ่ายเซลฟี่ (Blink -> Smile)
           ──────────────────────────────────────────────────────── */}
           {step === 2 && (
             <div className="flex flex-col h-full animate-fade-in">
               <div className="mb-4 text-center">
-                <h2 className="text-xl font-black text-[#EE4D2D] mb-1">2. ยืนยันตัวตน (Liveness)</h2>
-                <p className="text-xs text-gray-500 font-medium">วางหน้าในกรอบวงรี ถอดแว่น/หมวก แล้ว <strong className="text-[#EE4D2D]">ยิ้มกว้างๆ</strong> 😊</p>
+                <h2 className="text-xl font-black text-[#EE4D2D] mb-1">2. ยืนยันใบหน้า</h2>
+                <p className="text-xs text-gray-500 font-medium">วางหน้าในกรอบ ถอดแว่น/หมวก และทำตามคำสั่ง</p>
               </div>
 
               {!selfiePreview ? (
                 <div className="flex-1 flex flex-col justify-center relative">
                   
-                  {/* กรอบกล้องหลัก */}
                   <div className="relative w-full aspect-[3/4] sm:aspect-[4/5] bg-black rounded-3xl overflow-hidden shadow-inner flex items-center justify-center">
-                    <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover transform scale-x-[-1]" /> {/* กลับซ้ายขวาให้เหมือนกระจก */}
+                    <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover transform scale-x-[-1]" /> 
                     
-                    {/* กรอบวงรี (ใบหน้า) พร้อมวงแหวน Progress */}
                     <div className="w-[65%] aspect-[3/4] rounded-[100%] relative z-10 shadow-[0_0_0_9999px_rgba(0,0,0,0.7)] flex items-center justify-center">
-                      {/* วงแหวนสีเทา (พื้นหลัง) */}
                       <div className="absolute inset-0 border-4 border-white/30 rounded-[100%]"></div>
                       
-                      {/* วงแหวนสีส้ม (Progress) จำลองด้วย Border ธรรมดาที่เปลี่ยนสีตาม Progress */}
-                      <div className="absolute inset-0 border-4 rounded-[100%] transition-colors duration-300" style={{ borderColor: smileProgress > 50 ? '#22c55e' : (smileProgress > 0 ? '#EE4D2D' : 'transparent') }}></div>
+                      {/* วงแหวน Progress สีส้ม (จะแสดงตอนให้ยิ้ม) */}
+                      <div className="absolute inset-0 border-4 rounded-[100%] transition-colors duration-300" style={{ borderColor: uiSmileProgress > 50 ? '#22c55e' : (uiSmileProgress > 0 ? '#EE4D2D' : 'transparent') }}></div>
                     </div>
 
-                    {/* ข้อความแจ้งเตือนกลางจอ */}
                     <div className="absolute bottom-10 left-0 right-0 text-center z-20">
-                      <div className="inline-block bg-black/60 backdrop-blur-md px-6 py-2.5 rounded-full border border-white/20">
-                         <p className="text-white font-bold text-sm">
+                      <div className="inline-block bg-black/70 backdrop-blur-md px-6 py-3 rounded-2xl border border-white/20">
+                         <p className="text-white font-bold text-sm mb-1">
                            {faceApiLoaded ? instruction : '⏳ กำลังเตรียมระบบ AI...'}
                          </p>
-                         {faceApiLoaded && (
+                         
+                         {/* UI สำหรับเฟส กระพริบตา */}
+                         {faceApiLoaded && uiPhase === 'blink' && (
+                           <div className="flex justify-center gap-2 mt-2">
+                             {[...Array(blinkNeeded)].map((_, i) => (
+                               <div key={i} className={`w-3 h-3 rounded-full ${i < uiBlinkCount ? 'bg-green-500' : 'bg-gray-500'}`}></div>
+                             ))}
+                           </div>
+                         )}
+
+                         {/* UI สำหรับเฟส ยิ้ม */}
+                         {faceApiLoaded && uiPhase === 'smile' && (
                            <div className="w-full bg-white/20 h-1.5 rounded-full mt-2 overflow-hidden">
-                             <div className={`h-full transition-all duration-300 ${smileProgress >= 100 ? 'bg-green-500' : 'bg-[#EE4D2D]'}`} style={{ width: `${smileProgress}%` }}></div>
+                             <div className={`h-full transition-all duration-300 ${uiSmileProgress >= 100 ? 'bg-green-500' : 'bg-[#EE4D2D]'}`} style={{ width: `${uiSmileProgress}%` }}></div>
                            </div>
                          )}
                       </div>
                     </div>
                   </div>
 
-                  {/* ซ่อนปุ่มถ่ายรูปแบบแมนนวลไว้ เผื่อ AI พังจริงๆ ค่อยแสดงให้กดเอง */}
                   {!faceApiLoaded && (
                     <button onClick={() => captureFrame('selfie')} className="mt-6 bg-[#EE4D2D] text-white w-16 h-16 rounded-full mx-auto flex items-center justify-center text-2xl shadow-lg active:scale-90 transition-transform">
                       📸
@@ -456,13 +518,12 @@ export default function KYCWizardPage() {
           {step === 3 && (
             <div className="flex flex-col h-full animate-fade-in overflow-y-auto pb-6">
               <div className="mb-5 text-center">
-                <h2 className="text-xl font-black text-[#EE4D2D] mb-1">3. ตรวจสอบและบัญชีรับเงิน</h2>
-                <p className="text-xs text-gray-500 font-medium">กรุณาตรวจสอบข้อมูลที่อ่านได้จากบัตร และกรอกบัญชีธนาคาร</p>
+                <h2 className="text-xl font-black text-[#EE4D2D] mb-1">3. ตรวจสอบข้อมูล</h2>
+                <p className="text-xs text-gray-500 font-medium">ตรวจสอบข้อมูลบัตร และกรอกบัญชีเพื่อรับรายได้</p>
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-6">
                 
-                {/* พรีวิวรูปที่ถ่าย */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="relative rounded-2xl overflow-hidden border border-gray-200 aspect-[4/3] shadow-sm">
                     <img src={idCardPreview} className="w-full h-full object-cover opacity-90" alt="ID" />
@@ -474,10 +535,9 @@ export default function KYCWizardPage() {
                   </div>
                 </div>
 
-                {/* ข้อมูลที่อ่านจากบัตร (OCR) */}
                 <div className="bg-orange-50 p-5 rounded-[1.5rem] border border-orange-100 space-y-4">
                   <h3 className="font-bold text-[#EE4D2D] text-sm flex items-center gap-2">
-                    <span>✨</span> ข้อมูลจากบัตร (โปรดตรวจสอบและแก้ไขได้)
+                    <span>✨</span> ข้อมูลจากบัตร (แก้ไขได้)
                   </h3>
                   <div>
                     <label className="block text-[11px] font-bold text-gray-500 mb-1 ml-1">เลขประจำตัวประชาชน</label>
@@ -496,10 +556,9 @@ export default function KYCWizardPage() {
                   </div>
                 </div>
 
-                {/* บัญชีธนาคาร */}
                 <div className="bg-white p-5 rounded-[1.5rem] border border-gray-200 shadow-sm space-y-4">
                   <h3 className="font-bold text-gray-800 text-sm flex items-center gap-2">
-                    <span>🏦</span> บัญชีสำหรับรับเงินค่าจ้าง
+                    <span>🏦</span> บัญชีสำหรับรับเงิน
                   </h3>
                   <div>
                     <label className="block text-[11px] font-bold text-gray-500 mb-1 ml-1">ธนาคาร</label>
@@ -511,7 +570,6 @@ export default function KYCWizardPage() {
                       <option value="กรุงไทย">กรุงไทย (KTB)</option>
                       <option value="กรุงเทพ">กรุงเทพ (BBL)</option>
                       <option value="ออมสิน">ออมสิน (GSB)</option>
-                      <option value="ธ.ก.ส.">ธ.ก.ส. (BAAC)</option>
                     </select>
                   </div>
                   <div>
@@ -529,13 +587,26 @@ export default function KYCWizardPage() {
 
                 <button type="submit" disabled={submitting}
                   className="w-full bg-[#EE4D2D] text-white py-4 rounded-full font-black text-lg shadow-lg hover:bg-[#D74022] active:scale-[0.98] transition-all disabled:opacity-50 mt-4">
-                  {submitting ? '⏳ กำลังอัปโหลดข้อมูล...' : '📤 บันทึกและส่งให้ Admin ตรวจสอบ'}
+                  {submitting ? '⏳ กำลังอัปโหลดข้อมูล...' : '📤 ส่งให้ Admin ตรวจสอบ'}
                 </button>
               </form>
             </div>
           )}
 
         </div>
+        
+        {/* ต้องใช้ CSS ด้านล่างนี้เพื่อให้เส้นเลเซอร์ทำงาน */}
+        <style dangerouslySetInnerHTML={{__html: `
+          @keyframes scan-line {
+            0% { top: 0%; opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { top: 100%; opacity: 0; }
+          }
+          .animate-scan-line {
+            animation: scan-line 3s linear infinite;
+          }
+        `}} />
       </div>
     </div>
   );
