@@ -1,178 +1,179 @@
 'use client';
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 
-export default function JobsServicesPage() {
+// --- สร้าง Component หลักแยกออกมาเพื่อใช้ Suspense ครอบ (แก้ Error ของ Next.js) ---
+function ServicesContent() {
   const router = useRouter();
-  const [activeCategory, setActiveCategory] = useState('ทั้งหมด');
+  const searchParams = useSearchParams();
+  
+  // ดึงค่าการค้นหาจาก URL (ถ้ามาจากหน้าโฮม)
+  const initialQuery = searchParams.get('q') || '';
+  const initialCategory = searchParams.get('category') || 'ทั้งหมด';
 
-  // จำลองข้อมูลผู้รับจ้าง (สไตล์ Fastwork)
-  const services = [
-    {
-      id: 1,
-      providerName: 'ช่างเอก ประแส',
-      avatar: 'https://via.placeholder.com/100',
-      title: 'รับล้างแอร์บ้าน ซ่อมแอร์ เติมน้ำยาแอร์ (งานจบ งบไม่บาน)',
-      category: 'ล้างแอร์',
-      rating: 4.9,
-      reviews: 34,
-      startPrice: 500,
-      coverImg: 'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?auto=format&fit=crop&q=80&w=500'
-    },
-    {
-      id: 2,
-      providerName: 'พี่สมศรี คลีนนิ่ง',
-      avatar: 'https://via.placeholder.com/100',
-      title: 'บริการแม่บ้านทำความสะอาด รายวัน/รายสัปดาห์ สะอาดกริบ',
-      category: 'แม่บ้าน',
-      rating: 4.8,
-      reviews: 56,
-      startPrice: 450,
-      coverImg: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?auto=format&fit=crop&q=80&w=500'
-    },
-    {
-      id: 3,
-      providerName: 'ช่างดำ การไฟฟ้า',
-      avatar: 'https://via.placeholder.com/100',
-      title: 'เดินสายไฟ ซ่อมไฟช็อต ติดตั้งกล้องวงจรปิด',
-      category: 'ช่างไฟ',
-      rating: 5.0,
-      reviews: 12,
-      startPrice: 300,
-      coverImg: 'https://images.unsplash.com/photo-1621905252507-b35492cc74b4?auto=format&fit=crop&q=80&w=500'
-    }
+  const [searchQuery, setSearchQuery] = useState(initialQuery);
+  const [activeCategory, setActiveCategory] = useState(initialCategory);
+  const [activeTab, setActiveTab] = useState('services');
+
+  const CATEGORIES = ['ทั้งหมด', 'ล้างแอร์', 'ช่างไฟ', 'ประปา', 'แม่บ้าน', 'ซ่อมรถ', 'ขนส่ง', 'ย้ายบ้าน', 'อื่นๆ'];
+
+  // 🚧 Mock Data (จำลองข้อมูลจากตาราง services + profiles)
+  const MOCK_SERVICES = [
+    { id: '1', provider_name: 'ช่างสมหมาย', avatar: '👨‍🔧', title: 'รับล้างแอร์ ซ่อมแอร์ เติมน้ำยา', category: 'ล้างแอร์', starting_price: 500, avg_rating: 4.9, review_count: 124 },
+    { id: '2', provider_name: 'พี่วินัย', avatar: '👷‍♂️', title: 'เดินสายไฟ ซ่อมไฟช็อต ไฟดับ', category: 'ช่างไฟ', starting_price: 300, avg_rating: 4.8, review_count: 89 },
+    { id: '3', provider_name: 'ป้าศรี', avatar: '👩‍🍳', title: 'รับทำความสะอาดบ้าน คอนโด', category: 'แม่บ้าน', starting_price: 600, avg_rating: 5.0, review_count: 205 },
+    { id: '4', provider_name: 'ช่างเอก', avatar: '🚰', title: 'ซ่อมท่อประปารั่ว ปั๊มน้ำไม่ทำงาน', category: 'ประปา', starting_price: 400, avg_rating: 4.5, review_count: 42 },
+    { id: '5', provider_name: 'อู่ช่างแมว', avatar: '🔧', title: 'ปะยาง เปลี่ยนถ่ายน้ำมันเครื่อง นอกสถานที่', category: 'ซ่อมรถ', starting_price: 200, avg_rating: 4.7, review_count: 67 },
   ];
 
-  const categories = ['ทั้งหมด', 'ล้างแอร์', 'แม่บ้าน', 'ช่างไฟ', 'ประปา', 'ซ่อมรถ'];
+  // ฟิลเตอร์ข้อมูลตาม ค้นหา + หมวดหมู่
+  const filteredServices = MOCK_SERVICES.filter(service => {
+    const matchCategory = activeCategory === 'ทั้งหมด' || service.category === activeCategory;
+    const matchSearch = service.title.includes(searchQuery) || service.provider_name.includes(searchQuery);
+    return matchCategory && matchSearch;
+  });
 
   return (
-    <div className="min-h-screen bg-gray-100 flex justify-center">
-      {/* 🧩 ตัวแอป Container */}
-      <div className="w-full sm:max-w-2xl md:max-w-3xl bg-[#F4F6F8] min-h-screen pb-28 shadow-xl relative flex flex-col">
+    <div className="min-h-screen bg-gray-100 flex justify-center pb-24">
+      <div className="w-full sm:max-w-2xl md:max-w-3xl bg-[#F4F6F8] min-h-screen relative flex flex-col shadow-xl overflow-x-hidden">
         
-        {/* 🟠 Header */}
-        <div className="bg-[#F05D40] rounded-b-[2.5rem] p-5 pt-12 shadow-sm relative z-10">
-          <div className="flex justify-between items-center mb-4 px-2">
-            <button onClick={() => router.push('/')} className="text-white text-sm font-bold flex items-center gap-1">
-              ← กลับ
-            </button>
-            <h1 className="text-xl font-black text-white tracking-tight">บริการชุมชน 🛠️</h1>
-            <div className="w-10"></div> {/* Spacer */}
+        {/* 🟠 Header & Search */}
+        <div className="bg-gradient-to-br from-[#EE4D2D] to-[#FF7337] rounded-b-[2.5rem] pt-12 pb-6 px-6 shadow-md relative z-10">
+          <div className="flex items-center gap-3 mb-5">
+            <button onClick={() => router.push('/')} className="text-white font-bold text-lg active:scale-90 transition-transform">←</button>
+            <h1 className="text-xl font-black text-white tracking-tight">ค้นหาบริการ</h1>
           </div>
 
-          {/* 🔍 Search Bar */}
-          <div className="bg-white rounded-2xl p-3 flex items-center shadow-md mx-2 mb-2">
-            <span className="text-xl mr-2">🔍</span>
-            <input 
-              type="text" 
-              placeholder="ค้นหาบริการ, ชื่อช่าง..." 
-              className="w-full bg-transparent outline-none text-sm text-gray-700 placeholder-gray-400"
+          {/* Search Box */}
+          <div className="relative">
+            <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+              <span className="text-gray-400 text-lg">🔍</span>
+            </div>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="ค้นหาช่าง, บริการ..."
+              className="w-full bg-white text-gray-800 rounded-2xl py-3.5 pl-12 pr-4 text-sm font-bold shadow-lg outline-none focus:ring-4 focus:ring-white/30 transition-all placeholder:font-medium"
             />
           </div>
-
-          {/* 🏷️ Filter Categories (เลื่อนซ้ายขวาได้) */}
-          <div className="flex gap-2 overflow-x-auto scrollbar-hide px-2 pb-2 pt-1 mt-3">
-            {categories.map((cat) => (
-              <button 
-                key={cat}
-                onClick={() => setActiveCategory(cat)}
-                className={`whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
-                  activeCategory === cat 
-                  ? 'bg-white text-[#F05D40] shadow-sm' 
-                  : 'bg-white/20 text-white hover:bg-white/30'
-                }`}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
         </div>
 
-        {/* 📋 รายการผู้ให้บริการ (Freelance Cards) */}
-        <div className="p-4 space-y-4 relative z-0 mt-2">
+        <main className="flex-1 relative z-20 space-y-4">
           
-          {/* 🚀 Banner สำหรับชวนคนมาลงรับงาน */}
-          <div className="bg-gradient-to-r from-blue-500 to-blue-400 rounded-2xl p-4 shadow-sm flex justify-between items-center text-white mb-2">
-            <div>
-              <h3 className="font-bold text-sm">มีฝีมือ? อยากรับงาน?</h3>
-              <p className="text-[10px] text-blue-100 mt-0.5">ลงประกาศบริการของคุณฟรี ไม่มีค่าใช้จ่าย</p>
+          {/* 🏷️ หมวดหมู่ (Horizontal Scroll) */}
+          <div className="pt-5 pb-2 pl-5">
+            <div className="flex gap-2 overflow-x-auto pr-5 snap-x hide-scrollbar">
+              {CATEGORIES.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setActiveCategory(cat)}
+                  className={`snap-start whitespace-nowrap px-5 py-2 rounded-full text-[11px] font-bold border transition-all ${
+                    activeCategory === cat 
+                      ? 'bg-[#EE4D2D] text-white border-[#EE4D2D] shadow-md' 
+                      : 'bg-white text-gray-600 border-gray-200 hover:bg-orange-50 hover:text-[#EE4D2D] hover:border-orange-200'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
             </div>
-            <button className="bg-white text-blue-500 text-[10px] font-black px-4 py-2 rounded-full shadow-sm hover:scale-105 transition-transform">
-              ลงประกาศ 📝
-            </button>
           </div>
 
-          <div className="flex justify-between items-center px-1 mb-1">
-            <h2 className="font-bold text-gray-800 text-sm">บริการแนะนำ</h2>
-            <span className="text-[10px] text-gray-500">ทั้งหมด {services.length} รายการ</span>
-          </div>
+          {/* 📋 รายการบริการ */}
+          <div className="px-5 pb-6 space-y-4">
+            <div className="flex justify-between items-end mb-2">
+              <h2 className="text-sm font-black text-gray-800">
+                {activeCategory === 'ทั้งหมด' ? 'บริการแนะนำสำหรับคุณ' : `บริการหมวด: ${activeCategory}`}
+              </h2>
+              <span className="text-[10px] text-gray-500 font-bold">เจอ {filteredServices.length} รายการ</span>
+            </div>
 
-          {/* Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {services.map((service) => (
-              <div 
-                key={service.id} 
-                className="bg-white rounded-[1.5rem] shadow-sm border border-gray-100 overflow-hidden cursor-pointer active:scale-[0.98] transition-all hover:shadow-md"
-              >
-                {/* Cover Image */}
-                <div className="h-32 bg-gray-200 relative">
-                  <img src={service.coverImg} alt={service.title} className="w-full h-full object-cover" />
-                  <div className="absolute top-2 left-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-lg text-[9px] font-bold text-gray-700 shadow-sm flex items-center gap-1">
-                    <span>⭐ {service.rating}</span>
-                    <span className="text-gray-400 font-medium">({service.reviews})</span>
-                  </div>
-                </div>
-
-                <div className="p-4">
-                  {/* Provider Info */}
-                  <div className="flex items-center gap-2 mb-2 -mt-8 relative z-10">
-                    <img src={service.avatar} alt="avatar" className="w-10 h-10 rounded-full border-2 border-white shadow-sm bg-white" />
-                    <span className="text-xs font-bold text-gray-800 bg-white/90 px-2 py-0.5 rounded-full shadow-sm backdrop-blur-sm mt-4">
-                      {service.providerName}
-                    </span>
-                  </div>
-
-                  {/* Service Title */}
-                  <h3 className="font-bold text-gray-800 text-sm leading-tight mb-3 line-clamp-2">
-                    {service.title}
-                  </h3>
-
-                  {/* Price & Action */}
-                  <div className="flex justify-between items-end border-t border-gray-50 pt-3">
-                    <div>
-                      <p className="text-[9px] text-gray-400 font-medium uppercase tracking-wider mb-0.5">เริ่มต้นที่</p>
-                      <p className="text-[#F05D40] font-black text-base">฿{service.startPrice}</p>
-                    </div>
-                    <button className="bg-gray-100 text-gray-800 text-[10px] font-black px-4 py-2 rounded-xl hover:bg-[#F05D40] hover:text-white transition-colors">
-                      ดูรายละเอียด
-                    </button>
-                  </div>
-                </div>
+            {filteredServices.length === 0 ? (
+              <div className="bg-white rounded-[2rem] p-10 text-center shadow-sm border border-gray-100">
+                <div className="text-5xl mb-3 opacity-40">🕵️‍♂️</div>
+                <p className="font-bold text-gray-700">ไม่พบบริการที่ค้นหา</p>
+                <p className="text-[10px] text-gray-500 mt-1">ลองเปลี่ยนคำค้นหา หรือเลือกหมวดหมู่ใหม่ดูนะคะ</p>
+                <button 
+                  onClick={() => {setSearchQuery(''); setActiveCategory('ทั้งหมด');}}
+                  className="mt-4 text-[#EE4D2D] text-xs font-bold underline underline-offset-2"
+                >
+                  ดูบริการทั้งหมด
+                </button>
               </div>
-            ))}
+            ) : (
+              <div className="space-y-3">
+                {filteredServices.map((service) => (
+                  <div key={service.id} className="bg-white p-4 rounded-3xl shadow-sm border border-gray-100 flex gap-4 hover:border-[#EE4D2D]/30 transition-all cursor-pointer active:scale-[0.98]">
+                    
+                    {/* รูปภาพ/อวาตาร์ */}
+                    <div className="w-20 h-20 bg-orange-50 rounded-2xl flex flex-col items-center justify-center text-3xl border border-orange-100 shrink-0">
+                      {service.avatar}
+                      <span className="text-[8px] font-bold text-[#EE4D2D] mt-1 bg-white px-2 py-0.5 rounded-full border border-orange-100">{service.category}</span>
+                    </div>
+
+                    {/* ข้อมูล */}
+                    <div className="flex-1 min-w-0 py-1">
+                      <div className="flex justify-between items-start gap-2">
+                        <h3 className="font-black text-gray-800 text-sm leading-tight line-clamp-2">{service.title}</h3>
+                      </div>
+                      <p className="text-[10px] text-gray-500 mt-1 font-medium flex items-center gap-1">
+                        👤 {service.provider_name}
+                      </p>
+                      
+                      <div className="flex items-center justify-between mt-2.5 pt-2.5 border-t border-gray-50">
+                        <div className="flex items-center gap-1">
+                          <span className="text-yellow-400 text-[11px]">★</span>
+                          <span className="text-[11px] font-bold text-gray-700">{service.avg_rating.toFixed(1)}</span>
+                          <span className="text-[9px] text-gray-400 ml-0.5">({service.review_count})</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-[9px] text-gray-400 font-medium">เริ่มต้น</span>
+                          <span className="text-sm font-black text-[#EE4D2D] ml-1">฿{service.starting_price.toLocaleString()}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
+        </main>
+
+        {/* 🧭 Bottom Nav (Active: บริการ) */}
+        <div className="fixed bottom-0 w-full sm:max-w-2xl md:max-w-3xl bg-white/95 backdrop-blur-md border-t border-gray-100 px-8 py-4 flex justify-between items-center shadow-[0_-4px_25px_rgba(0,0,0,0.06)] rounded-t-[2.5rem] z-50">
+           <button onClick={() => router.push('/')} className="flex flex-col items-center gap-1 opacity-40 hover:opacity-100 transition-opacity"><span className="text-xl">🏠</span><span className="text-[10px] font-bold text-gray-500">หน้าแรก</span></button>
+           
+           {/* ✅ Active: บริการ */}
+           <div className="flex flex-col items-center gap-1 scale-110">
+             <span className="text-xl">🛠️</span>
+             <span className="text-[10px] font-bold text-[#EE4D2D]">บริการ</span>
+             <div className="w-1.5 h-1.5 bg-[#EE4D2D] rounded-full shadow-sm"></div>
+           </div>
+
+           <button onClick={() => router.push('/win-online')} className="flex flex-col items-center gap-1 opacity-40 hover:opacity-100 transition-opacity"><span className="text-xl">📋</span><span className="text-[10px] font-bold text-gray-500">ด่วนนน</span></button>
+           <button onClick={() => router.push('/history')} className="flex flex-col items-center gap-1 opacity-40 hover:opacity-100 transition-opacity"><span className="text-xl">📜</span><span className="text-[10px] font-bold text-gray-500">ประวัติ</span></button>
+           <button onClick={() => router.push('/profile/edit')} className="flex flex-col items-center gap-1 opacity-40 hover:opacity-100 transition-opacity"><span className="text-xl">👤</span><span className="text-[10px] font-bold text-gray-500">ฉัน</span></button>
         </div>
 
-        {/* 🧭 Bottom Nav (จำลอง) */}
-        <div className="fixed bottom-0 w-full sm:max-w-2xl md:max-w-3xl bg-white/95 backdrop-blur-md border-t border-gray-100 px-8 py-4 flex justify-between items-center shadow-[0_-4px_25px_rgba(0,0,0,0.06)] rounded-t-[2.5rem] z-50">
-           <button onClick={() => router.push('/')} className="flex flex-col items-center gap-1 opacity-40">
-             <span className="text-xl">🏠</span><span className="text-[10px] font-bold text-gray-500">หน้าแรก</span>
-           </button>
-           <div className="flex flex-col items-center gap-1 scale-110">
-             <span className="text-xl">🛠️</span><span className="text-[10px] font-bold text-[#F05D40]">บริการ</span>
-             <div className="w-1.5 h-1.5 bg-[#F05D40] rounded-full shadow-sm"></div>
-           </div>
-           <button onClick={() => router.push('/win-online')} className="flex flex-col items-center gap-1 opacity-40">
-             <span className="text-xl">📋</span><span className="text-[10px] font-bold text-gray-500">ด่วนนน</span>
-           </button>
-           <button onClick={() => router.push('/history')} className="flex flex-col items-center gap-1 opacity-40">
-             <span className="text-xl">📜</span><span className="text-[10px] font-bold text-gray-500">ประวัติ</span>
-           </button>
-           <button onClick={() => router.push('/profile')} className="flex flex-col items-center gap-1 opacity-40">
-             <span className="text-xl">👤</span><span className="text-[10px] font-bold text-gray-500">ฉัน</span>
-           </button>
-        </div>
+        <style dangerouslySetInnerHTML={{__html: `
+          .hide-scrollbar::-webkit-scrollbar { display: none; }
+          .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        `}} />
       </div>
     </div>
+  );
+}
+
+// ครอบด้วย Suspense ตามข้อบังคับของ Next.js เวลามีการใช้ useSearchParams
+export default function ServicesPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center"><div className="text-4xl animate-bounce mb-2 text-[#EE4D2D]">🛠️</div><p className="font-bold text-gray-500">กำลังโหลดบริการ...</p></div>
+      </div>
+    }>
+      <ServicesContent />
+    </Suspense>
   );
 }
