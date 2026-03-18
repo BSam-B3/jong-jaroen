@@ -1,30 +1,41 @@
 'use client';
+import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
-
-// Mock Data สำหรับหมวดหมู่บริการ
-const CATEGORIES = [
-  { id: '1', name: 'ล้างแอร์', icon: '❄️', color: 'bg-blue-50 text-blue-500' },
-  { id: '2', name: 'ช่างไฟฟ้า', icon: '⚡', color: 'bg-yellow-50 text-yellow-500' },
-  { id: '3', name: 'ประปา', icon: '🚰', color: 'bg-cyan-50 text-cyan-500' },
-  { id: '4', name: 'ทำความสะอาด', icon: '🧹', color: 'bg-green-50 text-green-500' },
-  { id: '5', name: 'ซ่อมรถ/จยย.', icon: '🛵', color: 'bg-orange-50 text-orange-500' },
-  { id: '6', name: 'ไอที/คอมฯ', icon: '💻', color: 'bg-indigo-50 text-indigo-500' },
-  { id: '7', name: 'รับส่งของ', icon: '📦', color: 'bg-rose-50 text-rose-500' },
-  { id: '8', name: 'ดูทั้งหมด', icon: '➡️', color: 'bg-gray-100 text-gray-500' },
-];
-
-// Mock Data สำหรับช่างแนะนำ
-const TOP_FREELANCERS = [
-  { id: 'f1', name: 'ช่างสมหมาย', skill: 'ผู้เชี่ยวชาญระบบแอร์', rating: 4.9, reviews: 124, img: '👨‍🔧' },
-  { id: 'f2', name: 'พี่วินัย', skill: 'ช่างไฟฟ้าระดับ 2', rating: 4.8, reviews: 89, img: '👷‍♂️' },
-  { id: 'f3', name: 'ป้าศรี', skill: 'แม่บ้านมือโปร', rating: 5.0, reviews: 205, img: '👩‍🍳' },
-];
 
 export default function HomePage() {
+  const [userName, setUserName] = useState('กำลังโหลด...');
+  const [userInitial, setUserInitial] = useState('');
+  const [activeTab, setActiveTab] = useState('home');
+  const [searchQuery, setSearchQuery] = useState(''); // เพิ่ม State สำหรับช่องค้นหา
   const router = useRouter();
-  const [searchQuery, setSearchQuery] = useState('');
 
+  useEffect(() => {
+    const fetchUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        // ถ้ายกเลิก Comment บรรทัดล่าง ระบบจะบังคับ Login ก่อนเข้าหน้าแรก
+        // router.push('/login');
+        setUserName('ผู้เยี่ยมชม');
+        setUserInitial('ผ');
+        return;
+      }
+
+      const user = session.user;
+      const name = user.user_metadata?.full_name 
+                   || user.user_metadata?.name 
+                   || user.email?.split('@')[0] 
+                   || 'ผู้ใช้งาน';
+
+      setUserName(name);
+      setUserInitial(name.charAt(0).toUpperCase());
+    };
+
+    fetchUser();
+  }, [router]);
+
+  // ฟังก์ชันจัดการตอนกด Enter ค้นหา
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
@@ -33,137 +44,164 @@ export default function HomePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex justify-center pb-24">
-      <div className="w-full sm:max-w-2xl md:max-w-3xl bg-[#F4F6F8] min-h-screen relative flex flex-col shadow-xl overflow-x-hidden">
-        
-        {/* 🟠 Hero & Search Section */}
-        <div className="bg-gradient-to-br from-[#EE4D2D] to-[#FF7337] rounded-b-[2.5rem] pt-12 pb-8 px-6 shadow-md relative z-10">
-          
-          {/* Header */}
-          <div className="flex justify-between items-center mb-6">
-            <div>
-              <p className="text-white/80 text-[10px] font-bold tracking-wider uppercase mb-0.5">ชุมชนปากน้ำประแส</p>
-              <h1 className="text-2xl font-black text-white leading-tight">จงเจริญ <span className="text-orange-200">แพลตฟอร์ม</span></h1>
-            </div>
-            <button 
-              onClick={() => router.push('/profile')}
-              className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center text-white text-lg border border-white/30 shadow-sm hover:bg-white/30 active:scale-95 transition-all"
-            >
-              🔔
-              <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
-            </button>
-          </div>
+    /* 📱 พื้นหลังด้านนอกสุด (Desk/Background) */
+    <div className="min-h-screen bg-[#E5E7EB] flex justify-center items-start md:items-center md:py-8">
 
-          {/* Search Box */}
-          <form onSubmit={handleSearch} className="relative">
-            <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
-              <span className="text-gray-400 text-lg">🔍</span>
-            </div>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="ค้นหาบริการ... เช่น ล้างแอร์, ช่างไฟ"
-              className="w-full bg-white text-gray-800 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold shadow-lg outline-none focus:ring-4 focus:ring-white/30 transition-all placeholder:font-medium"
-            />
-          </form>
-        </div>
+      {/* 📱 ตัวแอป (Main App Container) - ปรับขนาดอัตโนมัติตาม Device */}
+      <div className="w-full sm:max-w-xl md:max-w-md bg-[#F4F6F8] min-h-screen md:min-h-[850px] md:h-[850px] md:rounded-[3rem] shadow-2xl overflow-hidden relative flex flex-col border-[8px] border-transparent md:border-black">
 
-        <main className="flex-1 relative z-20 -mt-4 space-y-6">
+        {/* ส่วนเนื้อหาที่ Scroll ได้ */}
+        <div className="flex-1 overflow-y-auto pb-24 scrollbar-hide">
           
-          {/* 📢 Banner โปรโมชั่น / ประชาสัมพันธ์ */}
-          <div className="px-5 mt-2">
-            <div className="bg-gradient-to-r from-orange-100 to-orange-50 rounded-2xl p-4 border border-orange-200 shadow-sm flex items-center justify-between">
+          {/* 🟠 Header (สีส้ม) */}
+          <div className="bg-[#F05D40] rounded-b-[2.5rem] p-6 pt-12 shadow-sm relative">
+            <div className="flex justify-between items-start mb-6 px-2">
               <div>
-                <span className="bg-[#EE4D2D] text-white text-[9px] font-black px-2 py-0.5 rounded-sm uppercase tracking-wider mb-1 inline-block">ประกาศ</span>
-                <h3 className="font-bold text-gray-800 text-sm leading-tight">ต้อนรับช่างใหม่! สมัครวันนี้</h3>
-                <p className="text-[10px] text-gray-500 mt-0.5">รับตราประทับ ยืนยันตัวตนฟรี 100%</p>
+                <h1 className="text-2xl font-black text-white flex items-center gap-2">
+                  จงเจริญ <span className="text-xl">🌟</span>
+                </h1>
+                <p className="text-white/90 text-xs mt-1 font-medium">แอปพลิเคชันคู่ชุมชนปากน้ำประแส</p>
               </div>
-              <div className="text-3xl drop-shadow-sm">🎉</div>
-            </div>
-          </div>
-
-          {/* 🗂️ หมวดหมู่บริการ (Categories) */}
-          <div className="px-5">
-            <h2 className="text-sm font-black text-gray-800 mb-3 flex items-center gap-2">
-              <span className="text-[#EE4D2D] text-lg">📌</span> หมวดหมู่ยอดฮิต
-            </h2>
-            <div className="grid grid-cols-4 gap-x-3 gap-y-4">
-              {CATEGORIES.map((cat) => (
-                <button 
-                  key={cat.id} 
-                  onClick={() => router.push(cat.id === '8' ? '/services' : `/services?category=${cat.name}`)}
-                  className="flex flex-col items-center gap-2 group"
-                >
-                  <div className={`w-14 h-14 ${cat.color} rounded-[1.2rem] flex items-center justify-center text-2xl shadow-sm border border-black/5 group-hover:scale-105 group-active:scale-95 transition-transform`}>
-                    {cat.icon}
-                  </div>
-                  <span className="text-[10px] font-bold text-gray-600 text-center leading-tight">
-                    {cat.name}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* ⭐ ช่างแนะนำ (Top Rated Freelancers) */}
-          <div className="pl-5 pb-6">
-            <div className="flex justify-between items-end pr-5 mb-3">
-              <h2 className="text-sm font-black text-gray-800 flex items-center gap-2">
-                <span className="text-[#EE4D2D] text-lg">⭐</span> ช่างฝีมือดีที่แนะนำ
-              </h2>
-              <button onClick={() => router.push('/services')} className="text-[10px] font-bold text-[#EE4D2D] hover:underline">
-                ดูทั้งหมด
+              
+              {/* แสดงชื่อและอักษรย่อ User */}
+              <button 
+                onClick={() => router.push('/profile/edit')}
+                className="flex items-center gap-2 bg-white/10 p-1.5 pr-4 rounded-full border border-white/20 backdrop-blur-md active:scale-95 transition-transform"
+              >
+                <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center text-[#F05D40] font-black text-sm shadow-sm">
+                  {userInitial}
+                </div>
+                <span className="text-white font-bold text-xs truncate max-w-[120px]">
+                  {userName}
+                </span>
               </button>
             </div>
+
+            {/* 🔍 Search Bar */}
+            <form onSubmit={handleSearch} className="bg-white rounded-2xl p-3.5 flex items-center shadow-lg transform translate-y-2 mx-2">
+              <svg className="w-5 h-5 text-gray-400 mr-2 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+              </svg>
+              <input 
+                type="text" 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="หาช่างแอร์, แม่บ้าน, คนช่วยยกของ..." 
+                className="w-full bg-transparent outline-none text-sm text-gray-700 placeholder-gray-400 font-medium"
+              />
+            </form>
+          </div>
+
+          {/* 🧩 Content Area */}
+          <div className="p-5 space-y-6 mt-4">
             
-            {/* Horizontal Scroll */}
-            <div className="flex gap-4 overflow-x-auto pb-4 pt-1 pr-5 snap-x hide-scrollbar">
-              {TOP_FREELANCERS.map((freelance) => (
-                <div 
-                  key={freelance.id} 
-                  className="bg-white min-w-[160px] p-4 rounded-2xl shadow-sm border border-gray-100 snap-start flex flex-col hover:border-[#EE4D2D]/30 transition-colors cursor-pointer"
-                >
-                  <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center text-2xl mb-2 border border-gray-100">
-                    {freelance.img}
-                  </div>
-                  <h3 className="font-bold text-gray-800 text-sm">{freelance.name}</h3>
-                  <p className="text-[10px] text-gray-500 mb-2 truncate">{freelance.skill}</p>
-                  
-                  <div className="mt-auto flex items-center justify-between pt-2 border-t border-gray-50">
-                    <div className="flex items-center gap-1">
-                      <span className="text-yellow-400 text-[10px]">★</span>
-                      <span className="text-[11px] font-bold text-gray-700">{freelance.rating}</span>
-                    </div>
-                    <span className="text-[9px] text-gray-400">({freelance.reviews} งาน)</span>
-                  </div>
+            {/* 🗂️ เมนูลัด (Grid 2 คอลัมน์) */}
+            <div className="grid grid-cols-2 gap-5">
+              <MenuButton 
+                icon="🛠️" title="จ้างช่าง/แม่บ้าน" desc="ค้นหาบริการมืออาชีพ" color="blue"
+                onClick={() => router.push('/services')} 
+              />
+              <MenuButton 
+                icon="🛵" title="งานด่วน/ฝากซื้อ" desc="หาคนช่วยวิ่งธุระ" color="orange" badge="วินออนไลน์"
+                onClick={() => router.push('/win-online')} 
+              />
+            </div>
+
+            {/* 🛠️ หมวดหมู่บริการ (Grid 4 คอลัมน์) */}
+            <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-100">
+              <div className="flex justify-between items-center mb-6 px-1">
+                <div className="flex items-center gap-2">
+                  <div className="w-1.5 h-5 bg-[#F05D40] rounded-full"></div>
+                  <h2 className="font-bold text-gray-800">หมวดหมู่บริการ</h2>
                 </div>
-              ))}
+                <button 
+                  onClick={() => router.push('/services')}
+                  className="text-[#F05D40] text-xs font-bold bg-orange-50 px-4 py-1.5 rounded-full hover:bg-orange-100 transition-colors"
+                >
+                  ดูทั้งหมด
+                </button>
+              </div>
+              
+              <div className="grid grid-cols-4 gap-y-8 gap-x-2">
+                {[
+                  { icon: '❄️', name: 'ล้างแอร์' }, { icon: '🧹', name: 'แม่บ้าน' },
+                  { icon: '⚡', name: 'ช่างไฟ' }, { icon: '💧', name: 'ประปา' },
+                  { icon: '🔧', name: 'ซ่อมรถ' }, { icon: '🚚', name: 'ขนส่ง' },
+                  { icon: '📦', name: 'ย้ายบ้าน' }, { icon: '✨', name: 'อื่นๆ' },
+                ].map((item, index) => (
+                  <div 
+                    key={index} 
+                    onClick={() => router.push(`/services?category=${item.name}`)}
+                    className="flex flex-col items-center gap-2 active:scale-90 transition-transform cursor-pointer"
+                  >
+                    <div className="w-14 h-14 bg-gray-50 rounded-2xl flex items-center justify-center text-2xl border border-gray-100 shadow-sm hover:border-[#F05D40]/30 transition-colors">
+                      {item.icon}
+                    </div>
+                    <span className="text-[10px] text-gray-600 font-bold">{item.name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* ✅ แบนเนอร์ Job Board */}
+            <div 
+              onClick={() => router.push('/job-board')}
+              className="bg-gradient-to-br from-[#0082FA] to-[#00A3FF] rounded-[2.5rem] p-7 shadow-lg flex justify-between items-center text-white relative overflow-hidden cursor-pointer active:scale-95 transition-all"
+            >
+              <div className="absolute -right-6 -top-6 w-36 h-36 bg-white/10 rounded-full blur-2xl"></div>
+              <div className="z-10">
+                <h2 className="font-bold text-xl flex items-center gap-2">💼 กระดานหางาน</h2>
+                <p className="text-xs text-white/90 mt-1 font-medium">ค้นหาตำแหน่งงานว่างในชุมชน</p>
+              </div>
+              <button className="z-10 bg-white text-[#0082FA] text-[10px] font-black py-3 px-6 rounded-full shadow-md uppercase tracking-widest">
+                เข้าดู 🚀
+              </button>
             </div>
           </div>
 
-        </main>
-
-        {/* 🧭 Bottom Nav (อัปเดตสถานะ Active ที่หน้าแรก) */}
-        <div className="fixed bottom-0 w-full sm:max-w-2xl md:max-w-3xl bg-white/95 backdrop-blur-md border-t border-gray-100 px-8 py-4 flex justify-between items-center shadow-[0_-4px_25px_rgba(0,0,0,0.06)] rounded-t-[2.5rem] z-50">
-           {/* ✅ Active: หน้าแรก */}
-           <div className="flex flex-col items-center gap-1 scale-110">
-             <span className="text-xl">🏠</span>
-             <span className="text-[10px] font-bold text-[#EE4D2D]">หน้าแรก</span>
-             <div className="w-1.5 h-1.5 bg-[#EE4D2D] rounded-full shadow-sm"></div>
-           </div>
-           
-           <button onClick={() => router.push('/services')} className="flex flex-col items-center gap-1 opacity-40 hover:opacity-100 transition-opacity"><span className="text-xl">🛠️</span><span className="text-[10px] font-bold text-gray-500">บริการ</span></button>
-           <button onClick={() => router.push('/win-online')} className="flex flex-col items-center gap-1 opacity-40 hover:opacity-100 transition-opacity"><span className="text-xl">📋</span><span className="text-[10px] font-bold text-gray-500">ด่วนนน</span></button>
-           <button onClick={() => router.push('/history')} className="flex flex-col items-center gap-1 opacity-40 hover:opacity-100 transition-opacity"><span className="text-xl">📜</span><span className="text-[10px] font-bold text-gray-500">ประวัติ</span></button>
-           <button onClick={() => router.push('/profile/edit')} className="flex flex-col items-center gap-1 opacity-40 hover:opacity-100 transition-opacity"><span className="text-xl">👤</span><span className="text-[10px] font-bold text-gray-500">ฉัน</span></button>
         </div>
 
-        <style dangerouslySetInnerHTML={{__html: `
-          .hide-scrollbar::-webkit-scrollbar { display: none; }
-          .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        `}} />
+        {/* 🧭 แถบเมนูด้านล่าง (Bottom Navigation) - ยึดไว้ล่างสุดของ Container */}
+        <div className="absolute bottom-0 left-0 w-full bg-white/90 backdrop-blur-md border-t border-gray-100 px-8 py-4 flex justify-between items-center shadow-[0_-4px_25px_rgba(0,0,0,0.06)] rounded-t-[2.5rem] z-50">
+          <NavItem icon="🏠" label="หน้าแรก" active={activeTab === 'home'} onClick={() => {setActiveTab('home'); router.push('/')}} />
+          <NavItem icon="🛠️" label="บริการ" active={activeTab === 'services'} onClick={() => {setActiveTab('services'); router.push('/services')}} />
+          <NavItem icon="📋" label="งานด่วน" active={activeTab === 'urgent'} onClick={() => {setActiveTab('urgent'); router.push('/win-online')}} />
+          <NavItem icon="📜" label="ประวัติ" active={activeTab === 'history'} onClick={() => {setActiveTab('history'); router.push('/history')}} />
+          <NavItem icon="👤" label="ฉัน" active={activeTab === 'profile'} onClick={() => {setActiveTab('profile'); router.push('/profile/edit')}} />
+        </div>
+
       </div>
+
+      <style dangerouslySetInnerHTML={{__html: `
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+      `}} />
+    </div>
+  );
+}
+
+// --- คอมโพเนนต์ย่อย ---
+
+// --- คอมโพเนนต์ปุ่มเมนูลัด ---
+function MenuButton({ icon, title, desc, color, badge, onClick }: any) {
+  const colorClass = color === 'blue' ? 'bg-blue-50 border-blue-50 text-blue-500' : 'bg-orange-50 border-orange-50 text-[#F05D40]';
+  return (
+    <div onClick={onClick} className={`bg-white p-6 rounded-[2rem] shadow-sm border ${colorClass} flex flex-col items-center justify-center text-center active:scale-95 transition-all cursor-pointer relative overflow-hidden h-full hover:shadow-md`}>
+      {badge && <div className="absolute top-0 right-0 bg-[#F05D40] text-white text-[9px] font-black px-4 py-1 rounded-bl-2xl shadow-sm z-10">{badge}</div>}
+      <div className={`w-16 h-16 ${colorClass} rounded-3xl flex items-center justify-center text-4xl mb-4 shadow-inner border border-black/5`}>{icon}</div>
+      <h3 className="font-black text-gray-800 text-sm">{title}</h3>
+      <p className="text-[10px] text-gray-500 mt-1 font-medium">{desc}</p>
+    </div>
+  );
+}
+
+// --- คอมโพเนนต์เมนูด้านล่าง ---
+function NavItem({ icon, label, active, onClick }: any) {
+  return (
+    <div onClick={onClick} className={`flex flex-col items-center gap-1.5 cursor-pointer transition-all ${active ? 'scale-110' : 'opacity-40 hover:opacity-100'}`}>
+      <span className="text-2xl">{icon}</span>
+      <span className={`text-[10px] font-bold ${active ? 'text-[#F05D40]' : 'text-gray-500'}`}>{label}</span>
+      {active && <div className="w-1.5 h-1.5 bg-[#F05D40] rounded-full shadow-sm"></div>}
     </div>
   );
 }
