@@ -3,88 +3,43 @@ import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
-const EAR_THRESHOLD = 0.25; 
-const BLINK_FRAMES  = 2;     
-
-function calcEAR(eye: number[][]): number {
-  const dist = (a: number[], b: number[]) => Math.sqrt((a[0]-b[0])**2 + (a[1]-b[1])**2);
-  const A = dist(eye[1], eye[5]);
-  const B = dist(eye[2], eye[4]);
-  const C = dist(eye[0], eye[3]);
-  return (A + B) / (2.0 * C);
-}
-
-export default function KYCWizardPage() {
+export default function KYCPhoneAndBankPage() {
   const router = useRouter();
   
-  // ── States ──
+  // ── States พื้นฐาน ──
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [kycStatus, setKycStatus] = useState<string | null>(null);
   const [error, setError] = useState('');
-  
-  const [step, setStep] = useState<number>(1);
-  const [isExtracting, setIsExtracting] = useState(false);
+  const [step, setStep] = useState<number>(1); // 1: OTP, 2: Bank & PDPA
 
-  const [idCardBlob, setIdCardBlob] = useState<Blob | null>(null);
-  const [idCardPreview, setIdCardPreview] = useState('');
-  const [selfieBlob, setSelfieBlob] = useState<Blob | null>(null);
-  const [selfiePreview, setSelfiePreview] = useState('');
-  
-  // ── AI & Camera States ──
-  const [faceApiLoaded, setFaceApiLoaded] = useState(false);
-  const [instruction, setInstruction] = useState('');
-  const [cardScanState, setCardScanState] = useState<'scanning' | 'ready'>('scanning');
+  // ── Step 1: OTP States ──
+  const [phone, setPhone] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const [countdown, setCountdown] = useState(0);
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const otpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  // ── Form States ──
-  const [idNumber, setIdNumber] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [address, setAddress] = useState('');
+  // ── Step 2: Bank & PDPA States ──
   const [bankName, setBankName] = useState('');
   const [bankAccount, setBankAccount] = useState('');
   const [bankAccountName, setBankAccountName] = useState('');
-  
-  // ✅ PDPA Consent State
   const [pdpaConsent, setPdpaConsent] = useState(false);
-
-  // ── Refs ──
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const rafRef = useRef<number>(0);
-  const cardTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
-  // ── Liveness Refs ──
-  const capturedRef = useRef(false);
-  const livenessPhaseRef = useRef<'blink' | 'smile'>('blink'); 
-  const blinkCountRef = useRef(0);
-  const blinkFramesRef = useRef(0);
-  const wasOpenRef = useRef(true);
-  const smileProgressRef = useRef(0);
-  const blinkNeeded = 2;
-
-  const [uiPhase, setUiPhase] = useState<'blink' | 'smile'>('blink');
-  const [uiBlinkCount, setUiBlinkCount] = useState(0);
-  const [uiSmileProgress, setUiSmileProgress] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     loadUserData();
-    loadFaceApi();
   }, []);
 
+  // ระบบนับถอยหลังปุ่มส่ง OTP
   useEffect(() => {
-    if (kycStatus === 'approved' || kycStatus === 'pending') return;
-
-    if (step === 1 && !idCardPreview) {
-      startCamera('environment'); 
-    } else if (step === 2 && !selfiePreview) {
-      startCamera('user'); 
-    } else {
-      stopCamera();
+    if (countdown > 0) {
+      const timer = setInterval(() => setCountdown(c => c - 1), 1000);
+      return () => clearInterval(timer);
     }
-
-    return () => stopCamera();
-  }, [step, idCardPreview, selfiePreview, kycStatus]);
+  }, [countdown]);
 
   async function loadUserData() {
     setLoading(true);
@@ -92,333 +47,182 @@ export default function KYCWizardPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push('/login'); return; } 
       setCurrentUser(user);
+      
       const { data: profile } = await supabase
         .from('profiles')
-        .select('kyc_status, bank_name, bank_account_number, bank_account_name')
+        .select('kyc_status, phone_verified, bank_name, bank_account_number, bank_account_name')
         .eq('id', user.id).single();
       
       if (profile) {
-        setKycStatus(profile.kyc_status || null);
+        setKycStatus(profile.kyc_status || 'none');
         if (profile.bank_name) setBankName(profile.bank_name);
         if (profile.bank_account_number) setBankAccount(profile.bank_account_number);
         if (profile.bank_account_name) setBankAccountName(profile.bank_account_name);
+        
+        // ถ้าเคยยืนยันเบอร์แล้ว ให้ข้ามไป Step 2 ได้เลย (ถ้ายังไม่ approved)
+        if (profile.phone_verified && profile.kyc_status === 'none') {
+          setStep(2);
+        }
       }
     } catch (_e) {}
     setLoading(false);
   }
 
-  async function loadFaceApi() {
-    try {
-      if (!(window as any).faceapi) {
-        await new Promise<void>((res, rej) => {
-          const s = document.createElement('script');
-          s.src = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js';
-          s.onload = () => res();
-          s.onerror = () => rej(new Error('โหลด AI ไม่สำเร็จ'));
-          document.head.appendChild(s);
-        });
-      }
-      const faceapi = (window as any).faceapi;
-      const MODEL_URL = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@0.22.2/weights';
-      await Promise.all([
-        faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-        faceapi.nets.faceLandmark68TinyNet.loadFromUri(MODEL_URL), 
-        faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL),   
-      ]);
-      setFaceApiLoaded(true);
-    } catch (e) {
-      console.warn('AI Load Error:', e);
-    }
-  }
+  // ────────────────────────────────────────────────────────
+  // ฟังก์ชัน Step 1: ยืนยันเบอร์โทรศัพท์ (OTP)
+  // ────────────────────────────────────────────────────────
 
-  async function startCamera(facingMode: 'user' | 'environment') {
-    stopCamera();
+  const handleSendOTP = async () => {
+    if (phone.length < 9) {
+      setError('กรุณากรอกเบอร์โทรศัพท์ให้ถูกต้อง');
+      return;
+    }
     setError('');
-    
-    capturedRef.current = false;
-    livenessPhaseRef.current = 'blink';
-    blinkCountRef.current = 0;
-    blinkFramesRef.current = 0;
-    wasOpenRef.current = true;
-    smileProgressRef.current = 0;
-    setUiPhase('blink');
-    setUiBlinkCount(0);
-    setUiSmileProgress(0);
-    
-    setCardScanState('scanning');
+    setIsSendingOtp(true);
 
-    setTimeout(async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: facingMode }, width: { ideal: 1280 }, height: { ideal: 720 } },
-          audio: false
-        });
-        streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play();
-
-          if (facingMode === 'user' && faceApiLoaded) {
-            setInstruction('กระพริบตา 2 ครั้ง เพื่อเริ่มการยืนยันตัวตน');
-            detectLivenessCombo();
-          } else {
-            setInstruction('กำลังตรวจสอบความคมชัด กรุณาถือค้างไว้...');
-            cardTimeoutRef.current = setTimeout(() => {
-              setCardScanState('ready');
-              setInstruction('บัตรชัดเจนแล้ว! กดถ่ายรูปได้เลย ✅');
-            }, 3000);
-          }
-        }
-      } catch (err: any) {
-        setError('ไม่สามารถเปิดกล้องได้ กรุณาอนุญาตการเข้าถึงกล้องค่ะ');
-      }
-    }, 200);
-  }
-
-  function detectLivenessCombo() {
-    const faceapi = (window as any).faceapi;
-    const video = videoRef.current;
-    if (!video || !faceapi) return;
-
-    async function detect() {
-      if (capturedRef.current) return; 
-      try {
-        const detection = await faceapi
-          .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ scoreThreshold: 0.5 }))
-          .withFaceLandmarks(true)
-          .withFaceExpressions();
-
-        if (detection) {
-          if (livenessPhaseRef.current === 'blink') {
-            const landmarks = detection.landmarks;
-            const leftEye  = landmarks.getLeftEye().map((p: any) => [p.x, p.y]);
-            const rightEye = landmarks.getRightEye().map((p: any) => [p.x, p.y]);
-            const earLeft  = calcEAR(leftEye);
-            const earRight = calcEAR(rightEye);
-            const ear = (earLeft + earRight) / 2;
-
-            if (ear < EAR_THRESHOLD) {
-              blinkFramesRef.current++;
-            } else {
-              if (blinkFramesRef.current >= BLINK_FRAMES && wasOpenRef.current === false) {
-                blinkCountRef.current++;
-                setUiBlinkCount(blinkCountRef.current);
-                
-                if (blinkCountRef.current >= blinkNeeded) {
-                  livenessPhaseRef.current = 'smile';
-                  setUiPhase('smile');
-                  setInstruction('เยี่ยมมาก! ตอนนี้ยิ้มกว้างๆ ค่ะ 😊');
-                } else {
-                  setInstruction(`กระพริบตาแล้ว ${blinkCountRef.current}/${blinkNeeded} ครั้ง`);
-                }
-              }
-              wasOpenRef.current = ear >= EAR_THRESHOLD;
-              blinkFramesRef.current = 0;
-            }
-            if (ear < EAR_THRESHOLD) wasOpenRef.current = false;
-          } 
-          else if (livenessPhaseRef.current === 'smile') {
-            const happyScore = detection.expressions.happy;
-            
-            if (happyScore > 0.7) {
-              smileProgressRef.current += 15; 
-              setInstruction('ดีมากค่ะ ค้างไว้... 📸');
-            } else {
-              smileProgressRef.current = Math.max(0, smileProgressRef.current - 10);
-              setInstruction('โปรดยิ้มกว้างๆ เพื่อถ่ายภาพ 😊');
-            }
-
-            setUiSmileProgress(Math.min(100, smileProgressRef.current));
-
-            if (smileProgressRef.current >= 100 && !capturedRef.current) {
-              capturedRef.current = true;
-              setInstruction('ยืนยันสำเร็จ! 📸');
-              setTimeout(() => captureFrame('selfie'), 300);
-              return; 
-            }
-          }
-
-        } else {
-          setInstruction('ไม่พบใบหน้า กรุณาอยู่ในกรอบวงรี');
-        }
-      } catch (_e) {}
+    try {
+      // 🚧 จุดเชื่อมต่อระบบของ C: เรียก Edge Function เพื่อสร้าง OTP
+      // const { error } = await supabase.functions.invoke('create_phone_otp', { body: { phone } });
+      // if (error) throw error;
       
-      rafRef.current = requestAnimationFrame(detect);
+      // จำลองการโหลด
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      setOtpSent(true);
+      setCountdown(60); // นับถอยหลัง 60 วินาที
+      // Auto focus ช่องแรก
+      setTimeout(() => otpInputRefs.current[0]?.focus(), 100);
+    } catch (err) {
+      setError('ไม่สามารถส่งรหัส OTP ได้ กรุณาลองใหม่');
     }
-    rafRef.current = requestAnimationFrame(detect);
-  }
+    setIsSendingOtp(false);
+  };
 
-  function stopCamera() {
-    cancelAnimationFrame(rafRef.current);
-    if (cardTimeoutRef.current) clearTimeout(cardTimeoutRef.current);
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => t.stop());
-      streamRef.current = null;
+  const handleOtpChange = (index: number, value: string) => {
+    if (isNaN(Number(value))) return;
+    const newOtp = [...otp];
+    newOtp[index] = value.substring(value.length - 1); // เอาแค่ตัวล่าสุด
+    setOtp(newOtp);
+
+    // พิมพ์เสร็จ เลื่อนไปช่องถัดไปอัตโนมัติ
+    if (value && index < 5) {
+      otpInputRefs.current[index + 1]?.focus();
     }
-  }
+  };
 
-  function captureFrame(type: 'id_card' | 'selfie') {
-    if (type === 'selfie' && capturedRef.current === false) return; 
-    capturedRef.current = true;
+  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace' && !otp[index] && index > 0) {
+      // กดลบแล้วช่องว่าง ให้ถอยไปช่องก่อนหน้า
+      otpInputRefs.current[index - 1]?.focus();
+    }
+  };
 
-    const video = videoRef.current;
-    if (!video) return;
+  const handleVerifyOTP = async () => {
+    const otpString = otp.join('');
+    if (otpString.length !== 6) {
+      setError('กรุณากรอกรหัส OTP ให้ครบ 6 หลัก');
+      return;
+    }
+    setError('');
+    setIsVerifying(true);
 
-    const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth || 1280;
-    canvas.height = video.videoHeight || 720;
-    const ctx = canvas.getContext('2d')!;
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-    canvas.toBlob(blob => {
-      if (!blob) return;
-      const url = URL.createObjectURL(blob);
-      if (type === 'id_card') {
-        setIdCardBlob(blob);
-        setIdCardPreview(url);
-      } else {
-        setSelfieBlob(blob);
-        setSelfiePreview(url);
+    try {
+      // 💡 Dev Mode Bypass: ใส่ 000000 เพื่อข้ามไปดู UI Step 2 (สำหรับตอนพัฒนา)
+      if (otpString === '000000') {
+        await new Promise(resolve => setTimeout(resolve, 800));
+        setStep(2);
+        setIsVerifying(false);
+        return;
       }
-      stopCamera();
-    }, 'image/jpeg', 0.90);
-  }
 
-  function retake(type: 'id_card' | 'selfie') {
-    if (type === 'id_card') {
-      setIdCardBlob(null);
-      setIdCardPreview('');
-      setCardScanState('scanning');
-      setStep(1);
-    } else {
-      setSelfieBlob(null);
-      setSelfiePreview('');
+      // 🚧 จุดเชื่อมต่อระบบของ C: เรียก RPC เพื่อตรวจสอบ OTP
+      /*
+      const { data, error } = await supabase.rpc('verify_phone_otp', {
+        p_user_id: currentUser.id,
+        p_phone: phone,
+        p_otp_plain: otpString
+      });
+      if (error || !data) throw new Error('OTP ไม่ถูกต้อง');
+      */
+      
+      // ถ้า API ตรวจสอบผ่าน
       setStep(2);
+    } catch (err: any) {
+      setError(err.message || 'รหัส OTP ไม่ถูกต้อง หรือหมดอายุแล้ว');
+      setOtp(['', '', '', '', '', '']); // เคลียร์ช่องให้กรอกใหม่
+      otpInputRefs.current[0]?.focus();
     }
-  }
-
-  const handleNextFromStep1 = () => {
-    setIsExtracting(true);
-    setTimeout(() => {
-      setIdNumber('1-2345-67890-12-3');
-      setFullName('นาย จงเจริญ รักประแส');
-      setAddress('123 ม.4 ต.ปากน้ำประแส อ.แกลง จ.ระยอง 21170');
-      setIsExtracting(false);
-      setStep(2);
-    }, 1500);
+    setIsVerifying(false);
   };
 
-  // ✅ ฟังก์ชันสำหรับตีตราประทับลายน้ำลงบนรูปบัตร
-  const addWatermark = (fileOrBlob: Blob): Promise<Blob> => {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return resolve(fileOrBlob);
+  // ────────────────────────────────────────────────────────
+  // ฟังก์ชัน Step 2: ผูกบัญชีและส่งยืนยัน
+  // ────────────────────────────────────────────────────────
 
-        // วาดรูปต้นฉบับ
-        ctx.drawImage(img, 0, 0);
-
-        // ตั้งค่าข้อความลายน้ำ
-        const text = 'ใช้สำหรับยืนยันตัวตนแอปจงเจริญเท่านั้น';
-        const dateText = new Date().toLocaleDateString('th-TH');
-        
-        ctx.font = `bold ${Math.floor(img.width / 22)}px Arial`;
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.6)'; // สีขาวโปร่งแสง
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)'; // ขอบดำบางๆ ให้อ่านง่ายบนพื้นสว่าง
-        ctx.lineWidth = 3;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-
-        // หมุนองศาข้อความเฉียงๆ
-        ctx.translate(canvas.width / 2, canvas.height / 2);
-        ctx.rotate(-Math.PI / 6); // เอียง -30 องศา
-
-        // วาดข้อความ
-        ctx.strokeText(text, 0, -20);
-        ctx.fillText(text, 0, -20);
-        
-        ctx.font = `bold ${Math.floor(img.width / 30)}px Arial`;
-        ctx.strokeText(dateText, 0, 40);
-        ctx.fillText(dateText, 0, 40);
-
-        canvas.toBlob((blob) => {
-          resolve(blob || fileOrBlob);
-        }, 'image/jpeg', 0.9);
-      };
-      img.onerror = () => resolve(fileOrBlob);
-      img.src = URL.createObjectURL(fileOrBlob);
-    });
-  };
-
-  async function handleSubmit(e: React.FormEvent) {
+  const handleSubmitData = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentUser || !idCardBlob || !selfieBlob) return;
+    if (!currentUser) return;
     if (!pdpaConsent) {
-      setError('กรุณากดยอมรับนโยบายความเป็นส่วนตัวและให้ความยินยอมก่อนส่งข้อมูล');
+      setError('กรุณากดยอมรับเงื่อนไขนโยบายความเป็นส่วนตัว (PDPA)');
       return;
     }
 
-    setSubmitting(true);
+    setIsSubmitting(true);
     setError('');
 
     try {
-      // ✅ ประทับลายน้ำก่อนอัปโหลดเพื่อความปลอดภัย 100%
-      const watermarkedIdBlob = await addWatermark(idCardBlob);
-
-      const idPath = `id-cards/${currentUser.id}_${Date.now()}.jpg`;
-      const selPath = `selfies/${currentUser.id}_${Date.now()}.jpg`;
-
-      // อัปโหลดรูปลายน้ำขึ้น Supabase
-      await supabase.storage.from('kyc-documents').upload(idPath, watermarkedIdBlob, { upsert: true, contentType: 'image/jpeg' });
-      await supabase.storage.from('kyc-documents').upload(selPath, selfieBlob, { upsert: true, contentType: 'image/jpeg' });
-
-      const { data: idData } = supabase.storage.from('kyc-documents').getPublicUrl(idPath);
-      const { data: selData } = supabase.storage.from('kyc-documents').getPublicUrl(selPath);
-
       const updates = {
-        kyc_status: 'pending',
-        id_card_url: idData.publicUrl,
-        selfie_with_id_url: selData.publicUrl,
-        id_card_number: idNumber,
-        full_name: fullName,
-        address: address,
+        kyc_status: 'pending', // RLS ของ C จะล็อกข้อมูลทันทีที่ค่านี้ถูกเซ็ต
         bank_name: bankName,
         bank_account_number: bankAccount,
         bank_account_name: bankAccountName,
-        pdpa_consented_at: new Date().toISOString(), // เก็บเวลาที่กดยินยอมเป็นหลักฐาน
+        pdpa_consented_at: new Date().toISOString(),
+        phone_verified: true, // Mark ว่าเบอร์นี้ยืนยันแล้ว
       };
 
-      const { error: updateErr } = await supabase.from('profiles').update(updates).eq('id', currentUser.id);
+      const { error: updateErr } = await supabase
+        .from('profiles')
+        .update(updates)
+        .eq('id', currentUser.id);
+
       if (updateErr) throw updateErr;
 
       setKycStatus('pending');
     } catch (_err) {
-      setError('เกิดข้อผิดพลาดในการส่งข้อมูล');
+      setError('เกิดข้อผิดพลาดในการบันทึกข้อมูล กรุณาลองอีกครั้ง');
     }
-    setSubmitting(false);
-  }
+    setIsSubmitting(false);
+  };
 
+  // ── Render Loading & Status Screens ──
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="text-[#EE4D2D] text-center"><div className="text-4xl animate-bounce mb-2">🔍</div><p className="font-bold">กำลังโหลดข้อมูล...</p></div>
+      <div className="text-[#EE4D2D] text-center"><div className="text-4xl animate-bounce mb-2">🛡️</div><p className="font-bold">กำลังตรวจสอบความปลอดภัย...</p></div>
     </div>
   );
 
+  // หน้าจอตอนรออนุมัติ หรือ อนุมัติแล้ว
   if (kycStatus === 'approved' || kycStatus === 'pending') {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-6">
         <div className={`w-full max-w-md rounded-[2rem] p-8 text-center shadow-xl border ${kycStatus === 'approved' ? 'bg-green-50 border-green-200' : 'bg-orange-50 border-orange-200'}`}>
           <div className="text-6xl mb-4">{kycStatus === 'approved' ? '✅' : '⏳'}</div>
           <h1 className="font-black text-2xl text-gray-800 mb-2">
-            {kycStatus === 'approved' ? 'ยืนยันตัวตนสำเร็จ!' : 'รอการตรวจสอบ'}
+            {kycStatus === 'approved' ? 'ยืนยันตัวตนสำเร็จ!' : 'บัญชีอยู่ระหว่างการตรวจสอบ'}
           </h1>
-          <p className="text-gray-600 mb-8 font-medium leading-relaxed">
-            {kycStatus === 'approved' ? 'คุณสามารถใช้งานระบบได้เต็มรูปแบบแล้ว' : 'ข้อมูลที่เข้ารหัสของคุณกำลังอยู่ในขั้นตอนการพิจารณา จะใช้เวลาไม่เกิน 24 ชั่วโมงค่ะ'}
+          <p className="text-gray-600 mb-6 font-medium leading-relaxed">
+            {kycStatus === 'approved' 
+              ? 'คุณสามารถใช้งานระบบรับเงินและเบิกจ่ายได้เต็มรูปแบบแล้วค่ะ' 
+              : 'ข้อมูลของคุณถูกล็อกเพื่อความปลอดภัย และกำลังรอการอนุมัติจาก Admin (ไม่เกิน 24 ชม.)'}
           </p>
+          
+          <div className="bg-white p-4 rounded-xl border border-gray-100 mb-6 text-left shadow-sm">
+            <p className="text-[10px] font-bold text-gray-400 mb-1 uppercase tracking-widest">ข้อมูลบัญชีรับเงินของคุณ (ถูกล็อก)</p>
+            <p className="text-sm font-bold text-gray-800">{bankName}</p>
+            <p className="text-sm font-medium text-gray-600 font-mono tracking-wider">{bankAccount}</p>
+            <p className="text-xs text-gray-500 mt-1">ชื่อบัญชี: {bankAccountName}</p>
+          </div>
+
           <button onClick={() => router.push('/profile')} className="w-full bg-[#EE4D2D] text-white py-4 rounded-full font-bold text-lg shadow-md hover:bg-[#D74022] active:scale-95 transition-all">
             กลับสู่หน้าโปรไฟล์
           </button>
@@ -427,231 +231,198 @@ export default function KYCWizardPage() {
     );
   }
 
+  // ── Render Main Wizard ──
   return (
     <div className="min-h-screen bg-gray-100 flex justify-center pb-24">
       <div className="w-full sm:max-w-2xl md:max-w-3xl bg-white min-h-screen relative flex flex-col shadow-xl overflow-hidden">
         
+        {/* Header แบบ Wizard */}
         <div className="bg-white p-5 pt-10 sticky top-0 z-50 border-b border-gray-100 shadow-sm">
           <div className="flex items-center gap-3 mb-4">
             <button onClick={() => { step > 1 ? setStep(step - 1) : router.back() }} className="text-gray-500 font-bold text-xl active:scale-90 transition-transform">←</button>
             <h1 className="font-black text-xl text-gray-800 tracking-tight">ยืนยันตัวตน (KYC)</h1>
-            <span className="ml-auto text-sm font-bold text-[#EE4D2D] bg-orange-50 px-3 py-1 rounded-full border border-orange-100">ขั้นตอน {step}/3</span>
+            <span className="ml-auto text-sm font-bold text-[#EE4D2D] bg-orange-50 px-3 py-1 rounded-full border border-orange-100">ขั้นตอน {step}/2</span>
           </div>
-          <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
-            <div className="bg-[#EE4D2D] h-full transition-all duration-500" style={{ width: `${(step / 3) * 100}%` }}></div>
+          <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden flex">
+            <div className="bg-[#EE4D2D] h-full transition-all duration-500" style={{ width: `${(step / 2) * 100}%` }}></div>
           </div>
         </div>
 
         <div className="p-5 flex-1 relative flex flex-col">
-          {error && <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 text-xs font-bold mb-4 flex items-center gap-2"><span>⚠️</span> {error}</div>}
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 text-xs font-bold mb-4 flex items-start gap-2 shadow-sm animate-fade-in">
+              <span>⚠️</span> {error}
+            </div>
+          )}
 
           {/* ────────────────────────────────────────────────────────
-              STEP 1: ถ่ายบัตรประชาชน
+              STEP 1: ยืนยันเบอร์โทรศัพท์ด้วย OTP
           ──────────────────────────────────────────────────────── */}
           {step === 1 && (
             <div className="flex flex-col h-full animate-fade-in">
-              <div className="mb-4 text-center">
-                <h2 className="text-xl font-black text-[#EE4D2D] mb-1">1. ถ่ายรูปบัตรประชาชน</h2>
-                <p className="text-xs text-gray-500 font-medium">โปรดใช้บัตรประชาชนตัวจริงเท่านั้น (ระบบจะประทับลายน้ำให้อัตโนมัติ)</p>
+              <div className="mb-6 text-center">
+                <div className="w-16 h-16 bg-orange-50 rounded-full flex items-center justify-center text-3xl mx-auto mb-3 border border-orange-100">📱</div>
+                <h2 className="text-xl font-black text-[#EE4D2D] mb-1">1. ยืนยันเบอร์โทรศัพท์</h2>
+                <p className="text-xs text-gray-500 font-medium leading-relaxed px-4">เพื่อความปลอดภัยของบัญชี เราจำเป็นต้องยืนยันตัวตนของคุณผ่านรหัส OTP</p>
               </div>
 
-              {!idCardPreview ? (
-                <div className="flex-1 flex flex-col justify-center">
-                  <div className="relative w-full aspect-[3/4] sm:aspect-video bg-black rounded-3xl overflow-hidden shadow-inner flex items-center justify-center">
-                    <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover" />
-                    <div className="absolute inset-0 bg-black/40 pointer-events-none transition-all duration-500" style={{ opacity: cardScanState === 'ready' ? 0.1 : 0.4 }}></div>
-                    <div className="w-[85%] aspect-[1.6/1] border-[3px] border-white/80 rounded-2xl relative z-10 shadow-[0_0_0_9999px_rgba(0,0,0,0.6)] flex flex-col items-center justify-center overflow-hidden bg-transparent">
-                      <div className={`absolute inset-0 border-[3px] rounded-2xl transition-colors duration-500 ${cardScanState === 'ready' ? 'border-[#22C55E]' : 'border-[#EE4D2D]'}`}></div>
-                      {cardScanState === 'scanning' && (
-                        <div className="w-full h-0.5 bg-[#EE4D2D] shadow-[0_0_15px_3px_rgba(238,77,45,0.8)] absolute top-0 animate-scan-line"></div>
-                      )}
-                      <div className="bg-black/40 backdrop-blur-sm px-4 py-2 rounded-full absolute bottom-4">
-                        <p className={`font-bold tracking-wider text-xs drop-shadow-md transition-colors ${cardScanState === 'ready' ? 'text-[#22C55E]' : 'text-white'}`}>
-                          {instruction}
-                        </p>
-                      </div>
+              {!otpSent ? (
+                // ฟอร์มกรอกเบอร์โทร
+                <div className="flex-1 flex flex-col mt-4">
+                  <div className="bg-white border border-gray-200 rounded-[1.5rem] p-6 shadow-sm">
+                    <label className="text-[11px] font-bold text-gray-500 mb-1.5 block ml-1">หมายเลขโทรศัพท์มือถือ</label>
+                    <div className="flex items-center bg-gray-50 border border-gray-200 rounded-xl overflow-hidden focus-within:border-[#EE4D2D] focus-within:ring-1 focus-within:ring-[#EE4D2D]/50 transition-all">
+                      <div className="px-4 py-3.5 bg-gray-100 border-r border-gray-200 text-sm font-bold text-gray-600">+66</div>
+                      <input 
+                        type="tel" 
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                        placeholder="08X XXX XXXX"
+                        className="w-full bg-transparent px-4 py-3.5 text-base font-bold text-gray-800 outline-none tracking-wider"
+                      />
                     </div>
                   </div>
+                  
                   <button 
-                    onClick={() => { if(cardScanState === 'ready') captureFrame('id_card'); }} 
-                    disabled={cardScanState !== 'ready'}
-                    className={`mt-8 w-20 h-20 rounded-full mx-auto flex items-center justify-center text-3xl transition-all duration-300 ${
-                      cardScanState === 'ready' ? 'bg-[#22C55E] text-white shadow-[0_0_0_6px_rgba(34,197,94,0.3)] hover:scale-105 active:scale-95 cursor-pointer' : 'bg-gray-400 text-gray-200 shadow-[0_0_0_6px_rgba(156,163,175,0.3)] cursor-not-allowed opacity-50'
-                    }`}
-                  >📸</button>
-                  <p className="text-center text-[10px] text-gray-400 mt-3 font-medium">{cardScanState === 'ready' ? 'กดปุ่มเพื่อถ่ายภาพได้เลย' : 'กรุณาถือกล้องนิ่งๆ...'}</p>
+                    onClick={handleSendOTP} 
+                    disabled={isSendingOtp || phone.length < 9}
+                    className="mt-6 w-full bg-[#EE4D2D] text-white py-4 rounded-full font-black text-base shadow-lg hover:bg-[#D74022] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isSendingOtp ? '⏳ กำลังส่งรหัส...' : '✉️ รับรหัส OTP'}
+                  </button>
                 </div>
               ) : (
-                <div className="flex-1 flex flex-col">
-                  <div className="w-full aspect-[4/3] bg-gray-100 rounded-3xl overflow-hidden border border-gray-200 relative shadow-inner">
-                    <img src={idCardPreview} alt="ID Preview" className="w-full h-full object-contain" />
-                    <div className="absolute top-4 right-4 bg-green-500 text-white p-2 rounded-full shadow-lg">✅</div>
+                // ฟอร์มกรอก OTP 6 หลัก
+                <div className="flex-1 flex flex-col mt-2">
+                  <div className="bg-white border border-gray-200 rounded-[1.5rem] p-6 text-center shadow-sm">
+                    <p className="text-xs font-bold text-gray-600 mb-2">รหัส 6 หลักถูกส่งไปยังหมายเลข</p>
+                    <p className="text-lg font-black text-[#EE4D2D] mb-6 tracking-widest">+66 {phone.substring(0,2)}-XXX-{phone.substring(6)}</p>
+                    
+                    {/* กล่องใส่รหัส 6 ช่อง */}
+                    <div className="flex justify-center gap-2 sm:gap-3 mb-6">
+                      {otp.map((digit, idx) => (
+                        <input
+                          key={idx}
+                          ref={(el) => { otpInputRefs.current[idx] = el; }}
+                          type="tel"
+                          maxLength={1}
+                          value={digit}
+                          onChange={(e) => handleOtpChange(idx, e.target.value)}
+                          onKeyDown={(e) => handleOtpKeyDown(idx, e)}
+                          className="w-12 h-14 sm:w-14 sm:h-16 bg-gray-50 border border-gray-200 rounded-xl text-center text-2xl font-black text-gray-800 outline-none focus:border-[#EE4D2D] focus:bg-white focus:ring-2 focus:ring-[#EE4D2D]/20 transition-all shadow-inner"
+                        />
+                      ))}
+                    </div>
+
+                    <div className="text-[11px] font-bold text-gray-500">
+                      {countdown > 0 ? (
+                        <span>ส่งรหัสใหม่ได้ใน <strong className="text-[#EE4D2D]">{countdown}</strong> วินาที</span>
+                      ) : (
+                        <button onClick={handleSendOTP} className="text-[#EE4D2D] underline underline-offset-2 hover:text-[#D74022]">ส่งรหัส OTP อีกครั้ง</button>
+                      )}
+                    </div>
                   </div>
-                  <div className="mt-auto pt-6 space-y-3">
-                    <button onClick={handleNextFromStep1} disabled={isExtracting} className="w-full bg-[#EE4D2D] text-white py-4 rounded-full font-black text-lg shadow-md hover:bg-[#D74022] active:scale-95 transition-all disabled:opacity-70 flex justify-center items-center gap-2">
-                      {isExtracting ? '⏳ กำลังดึงข้อมูลจากบัตร...' : 'ใช้รูปนี้ และไปต่อ ➡️'}
-                    </button>
-                    <button onClick={() => retake('id_card')} disabled={isExtracting} className="w-full text-gray-500 py-3 font-bold text-sm hover:text-gray-800 transition-colors">
-                      🔄 ถ่ายใหม่
-                    </button>
-                  </div>
+
+                  <button 
+                    onClick={handleVerifyOTP} 
+                    disabled={isVerifying || otp.join('').length !== 6}
+                    className="mt-6 w-full bg-[#EE4D2D] text-white py-4 rounded-full font-black text-base shadow-lg hover:bg-[#D74022] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isVerifying ? '⏳ กำลังตรวจสอบ...' : 'ยืนยันรหัส OTP'}
+                  </button>
                 </div>
               )}
             </div>
           )}
 
           {/* ────────────────────────────────────────────────────────
-              STEP 2: ถ่ายเซลฟี่
+              STEP 2: ผูกบัญชีธนาคาร + ยอมรับเงื่อนไข (PDPA)
           ──────────────────────────────────────────────────────── */}
           {step === 2 && (
-            <div className="flex flex-col h-full animate-fade-in">
-              <div className="mb-4 text-center">
-                <h2 className="text-xl font-black text-[#EE4D2D] mb-1">2. ยืนยันใบหน้า</h2>
-                <p className="text-xs text-gray-500 font-medium">วางหน้าในกรอบ ถอดแว่น/หมวก และทำตามคำสั่ง</p>
-              </div>
-
-              {!selfiePreview ? (
-                <div className="flex-1 flex flex-col justify-center relative">
-                  <div className="relative w-full aspect-[3/4] sm:aspect-[4/5] bg-black rounded-3xl overflow-hidden shadow-inner flex items-center justify-center">
-                    <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover transform scale-x-[-1]" /> 
-                    <div className="w-[65%] aspect-[3/4] rounded-[100%] relative z-10 shadow-[0_0_0_9999px_rgba(0,0,0,0.7)] flex items-center justify-center">
-                      <div className="absolute inset-0 border-4 border-white/30 rounded-[100%]"></div>
-                      <div className="absolute inset-0 border-4 rounded-[100%] transition-colors duration-300" style={{ borderColor: uiSmileProgress > 50 ? '#22c55e' : (uiSmileProgress > 0 ? '#EE4D2D' : 'transparent') }}></div>
-                    </div>
-                    <div className="absolute bottom-10 left-0 right-0 text-center z-20">
-                      <div className="inline-block bg-black/70 backdrop-blur-md px-6 py-3 rounded-2xl border border-white/20">
-                         <p className="text-white font-bold text-sm mb-1">{faceApiLoaded ? instruction : '⏳ กำลังเตรียมระบบ AI...'}</p>
-                         {faceApiLoaded && uiPhase === 'blink' && (
-                           <div className="flex justify-center gap-2 mt-2">
-                             {[...Array(blinkNeeded)].map((_, i) => (
-                               <div key={i} className={`w-3 h-3 rounded-full ${i < uiBlinkCount ? 'bg-green-500' : 'bg-gray-500'}`}></div>
-                             ))}
-                           </div>
-                         )}
-                         {faceApiLoaded && uiPhase === 'smile' && (
-                           <div className="w-full bg-white/20 h-1.5 rounded-full mt-2 overflow-hidden">
-                             <div className={`h-full transition-all duration-300 ${uiSmileProgress >= 100 ? 'bg-green-500' : 'bg-[#EE4D2D]'}`} style={{ width: `${uiSmileProgress}%` }}></div>
-                           </div>
-                         )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex-1 flex flex-col">
-                  <div className="w-full aspect-[3/4] bg-gray-100 rounded-3xl overflow-hidden border border-gray-200 relative shadow-inner">
-                    <img src={selfiePreview} alt="Selfie Preview" className="w-full h-full object-cover" />
-                    <div className="absolute top-4 right-4 bg-green-500 text-white p-2 rounded-full shadow-lg">✅</div>
-                  </div>
-                  <div className="mt-auto pt-6 space-y-3">
-                    <button onClick={() => setStep(3)} className="w-full bg-[#EE4D2D] text-white py-4 rounded-full font-black text-lg shadow-md hover:bg-[#D74022] active:scale-95 transition-all flex justify-center items-center gap-2">
-                      ใช้รูปนี้ และไปต่อ ➡️
-                    </button>
-                    <button onClick={() => retake('selfie')} className="w-full text-gray-500 py-3 font-bold text-sm hover:text-gray-800 transition-colors">
-                      🔄 ถ่ายใหม่
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ────────────────────────────────────────────────────────
-              STEP 3: ตรวจสอบข้อมูล + บัญชี + PDPA
-          ──────────────────────────────────────────────────────── */}
-          {step === 3 && (
             <div className="flex flex-col h-full animate-fade-in overflow-y-auto pb-6">
-              <div className="mb-5 text-center">
-                <h2 className="text-xl font-black text-[#EE4D2D] mb-1">3. ตรวจสอบข้อมูล</h2>
-                <p className="text-xs text-gray-500 font-medium">โปรดตรวจสอบข้อมูลให้ถูกต้องก่อนส่งยืนยัน</p>
+              <div className="mb-6 text-center">
+                <div className="w-16 h-16 bg-orange-50 rounded-full flex items-center justify-center text-3xl mx-auto mb-3 border border-orange-100">🏦</div>
+                <h2 className="text-xl font-black text-[#EE4D2D] mb-1">2. ผูกบัญชีรับเงิน</h2>
+                <p className="text-xs text-gray-500 font-medium px-4">เพื่อป้องกันมิจฉาชีพ ชื่อบัญชีธนาคารจะต้องตรงกับชื่อโปรไฟล์ของคุณเท่านั้น</p>
               </div>
 
-              <form onSubmit={handleSubmit} className="space-y-6">
+              <form onSubmit={handleSubmitData} className="space-y-5">
                 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="relative rounded-2xl overflow-hidden border border-gray-200 aspect-[4/3] shadow-sm">
-                    <img src={idCardPreview} className="w-full h-full object-cover opacity-90" alt="ID" />
-                    <div className="absolute top-2 left-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-md text-[10px] font-bold text-gray-700">บัตร ปชช. ✅</div>
-                  </div>
-                  <div className="relative rounded-2xl overflow-hidden border border-gray-200 aspect-[4/3] shadow-sm">
-                    <img src={selfiePreview} className="w-full h-full object-cover opacity-90" alt="Selfie" />
-                    <div className="absolute top-2 left-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-md text-[10px] font-bold text-gray-700">สแกนหน้า ✅</div>
-                  </div>
-                </div>
-
-                <div className="bg-orange-50 p-5 rounded-[1.5rem] border border-orange-100 space-y-4">
-                  <h3 className="font-bold text-[#EE4D2D] text-sm flex items-center gap-2"><span>✨</span> ข้อมูลจากบัตร (แก้ไขได้)</h3>
+                {/* ฟอร์มบัญชีธนาคาร */}
+                <div className="bg-white p-6 rounded-[1.5rem] border border-gray-200 shadow-sm space-y-4">
                   <div>
-                    <label className="block text-[11px] font-bold text-gray-500 mb-1 ml-1">เลขประจำตัวประชาชน</label>
-                    <input type="text" value={idNumber} onChange={e => setIdNumber(e.target.value)} className="w-full bg-white border border-gray-200 rounded-xl p-3.5 text-sm font-bold text-gray-800 outline-none focus:border-[#EE4D2D]" required />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-gray-500 mb-1 ml-1">ชื่อ-นามสกุล (ภาษาไทย)</label>
-                    <input type="text" value={fullName} onChange={e => setFullName(e.target.value)} className="w-full bg-white border border-gray-200 rounded-xl p-3.5 text-sm font-bold text-gray-800 outline-none focus:border-[#EE4D2D]" required />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-gray-500 mb-1 ml-1">ที่อยู่ตามบัตรประชาชน</label>
-                    <textarea value={address} onChange={e => setAddress(e.target.value)} rows={2} className="w-full bg-white border border-gray-200 rounded-xl p-3.5 text-sm font-bold text-gray-800 outline-none focus:border-[#EE4D2D]" required />
-                  </div>
-                </div>
-
-                <div className="bg-white p-5 rounded-[1.5rem] border border-gray-200 shadow-sm space-y-4">
-                  <h3 className="font-bold text-gray-800 text-sm flex items-center gap-2"><span>🏦</span> บัญชีสำหรับรับเงิน</h3>
-                  <div>
-                    <label className="block text-[11px] font-bold text-gray-500 mb-1 ml-1">ธนาคาร</label>
-                    <select value={bankName} onChange={e => setBankName(e.target.value)} className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3.5 text-sm font-medium text-gray-800 outline-none focus:border-[#EE4D2D]" required>
+                    <label className="block text-[11px] font-bold text-gray-500 mb-1.5 ml-1">ธนาคาร <span className="text-red-500">*</span></label>
+                    <select 
+                      value={bankName} 
+                      onChange={e => setBankName(e.target.value)} 
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3.5 text-sm font-medium text-gray-800 outline-none focus:border-[#EE4D2D] focus:bg-white focus:ring-1 focus:ring-[#EE4D2D]/50 transition-all appearance-none" 
+                      required
+                    >
                       <option value="">-- เลือกธนาคาร --</option>
-                      <option value="กสิกรไทย">กสิกรไทย (KBANK)</option>
-                      <option value="ไทยพาณิชย์">ไทยพาณิชย์ (SCB)</option>
-                      <option value="กรุงไทย">กรุงไทย (KTB)</option>
-                      <option value="กรุงเทพ">กรุงเทพ (BBL)</option>
+                      <option value="กสิกรไทย (KBANK)">กสิกรไทย (KBANK)</option>
+                      <option value="ไทยพาณิชย์ (SCB)">ไทยพาณิชย์ (SCB)</option>
+                      <option value="กรุงเทพ (BBL)">กรุงเทพ (BBL)</option>
+                      <option value="กรุงไทย (KTB)">กรุงไทย (KTB)</option>
+                      <option value="กรุงศรีอยุธยา (BAY)">กรุงศรีอยุธยา (BAY)</option>
+                      <option value="ออมสิน (GSB)">ออมสิน (GSB)</option>
+                      <option value="พร้อมเพย์ (PromptPay)">พร้อมเพย์ (PromptPay)</option>
                     </select>
                   </div>
+                  
                   <div>
-                    <label className="block text-[11px] font-bold text-gray-500 mb-1 ml-1">ชื่อบัญชี (ต้องตรงกับชื่อในบัตร)</label>
-                    <input type="text" value={bankAccountName} onChange={e => setBankAccountName(e.target.value)} className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3.5 text-sm font-medium text-gray-800 outline-none focus:border-[#EE4D2D]" required />
+                    <label className="block text-[11px] font-bold text-gray-500 mb-1.5 ml-1 flex justify-between">
+                      <span>ชื่อบัญชี (ภาษาไทย หรือ อังกฤษ) <span className="text-red-500">*</span></span>
+                    </label>
+                    <input 
+                      type="text" 
+                      value={bankAccountName} 
+                      onChange={e => setBankAccountName(e.target.value)} 
+                      placeholder="เช่น นาย สมชาย รักประแส"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3.5 text-sm font-bold text-gray-800 outline-none focus:border-[#EE4D2D] focus:bg-white focus:ring-1 focus:ring-[#EE4D2D]/50 transition-all" 
+                      required 
+                    />
                   </div>
+                  
                   <div>
-                    <label className="block text-[11px] font-bold text-gray-500 mb-1 ml-1">เลขบัญชี</label>
-                    <input type="text" value={bankAccount} onChange={e => setBankAccount(e.target.value.replace(/\D/g,'').slice(0,15))} placeholder="ไม่ต้องใส่ขีด (-)" className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3.5 text-sm font-medium text-gray-800 outline-none focus:border-[#EE4D2D] tracking-widest" required />
+                    <label className="block text-[11px] font-bold text-gray-500 mb-1.5 ml-1">เลขบัญชี / เบอร์พร้อมเพย์ <span className="text-red-500">*</span></label>
+                    <input 
+                      type="text" 
+                      value={bankAccount} 
+                      onChange={e => setBankAccount(e.target.value.replace(/\D/g,'').slice(0, 15))} 
+                      placeholder="ตัวเลขเท่านั้น ไม่ต้องใส่ขีด (-)"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3.5 text-base font-bold text-gray-800 outline-none focus:border-[#EE4D2D] focus:bg-white focus:ring-1 focus:ring-[#EE4D2D]/50 transition-all tracking-widest font-mono" 
+                      required 
+                    />
                   </div>
                 </div>
 
-                {/* ✅ กล่องยินยอม PDPA */}
-                <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 flex items-start gap-3">
+                {/* กล่องยินยอม PDPA */}
+                <div className="bg-orange-50 p-5 rounded-2xl border border-orange-100 flex items-start gap-3 shadow-sm">
                   <input 
                     type="checkbox" 
                     id="pdpa" 
                     checked={pdpaConsent}
                     onChange={(e) => setPdpaConsent(e.target.checked)}
-                    className="mt-1 w-5 h-5 rounded border-gray-300 text-[#EE4D2D] focus:ring-[#EE4D2D]"
+                    className="mt-1 w-5 h-5 rounded border-orange-300 text-[#EE4D2D] focus:ring-[#EE4D2D]"
                   />
-                  <label htmlFor="pdpa" className="text-[10px] text-gray-600 leading-relaxed cursor-pointer">
-                    ข้าพเจ้ายินยอมให้แอปพลิเคชันจงเจริญ เก็บรวบรวม ใช้ และประมวลผลข้อมูลส่วนบุคคลของข้าพเจ้า (รวมถึงภาพถ่ายบัตรประชาชนและข้อมูลชีวมิติ) เพื่อวัตถุประสงค์ในการยืนยันตัวตนตามกฎหมาย (PDPA) โดยภาพบัตรจะถูก <strong className="text-gray-800">ประทับลายน้ำอัตโนมัติ</strong> เพื่อความปลอดภัยก่อนจัดเก็บ
+                  <label htmlFor="pdpa" className="text-[10px] text-gray-700 leading-relaxed cursor-pointer font-medium">
+                    ข้าพเจ้ายินยอมให้แพลตฟอร์ม "จงเจริญ" เก็บรวบรวมและใช้ข้อมูลเบอร์โทรศัพท์และบัญชีธนาคาร เพื่อวัตถุประสงค์ในการยืนยันตัวตนและการเบิกจ่ายเงิน (PDPA) <br/>
+                    <span className="text-red-500 font-bold block mt-1">⚠️ เมื่อส่งข้อมูลแล้ว ระบบจะทำการล็อก (Freeze) ข้อมูลบัญชีธนาคารเพื่อความปลอดภัย หากต้องการแก้ไขในภายหลังต้องติดต่อ Admin เท่านั้น</span>
                   </label>
                 </div>
 
-                <button type="submit" disabled={submitting || !pdpaConsent}
-                  className="w-full bg-[#EE4D2D] text-white py-4 rounded-full font-black text-lg shadow-lg hover:bg-[#D74022] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-4">
-                  {submitting ? '⏳ กำลังอัปโหลดและประทับลายน้ำ...' : '📤 ยืนยันข้อมูลส่งตรวจสอบ'}
+                <button 
+                  type="submit" 
+                  disabled={isSubmitting || !pdpaConsent}
+                  className="w-full bg-[#EE4D2D] text-white py-4 rounded-full font-black text-lg shadow-lg hover:bg-[#D74022] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-4"
+                >
+                  {isSubmitting ? '⏳ กำลังบันทึกข้อมูล...' : '📤 ผูกบัญชีและส่งยืนยัน'}
                 </button>
               </form>
             </div>
           )}
 
         </div>
-        
-        <style dangerouslySetInnerHTML={{__html: `
-          @keyframes scan-line {
-            0% { top: 0%; opacity: 0; }
-            10% { opacity: 1; }
-            90% { opacity: 1; }
-            100% { top: 100%; opacity: 0; }
-          }
-          .animate-scan-line {
-            animation: scan-line 3s linear infinite;
-          }
-        `}} />
       </div>
     </div>
   );
