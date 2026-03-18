@@ -53,30 +53,22 @@ export default function ProfileEditHubPage() {
              </p>
           </div>
 
-          {/* 👤 หมวด: ข้อมูลส่วนตัวและการเงิน */}
+          {/* 👤 หมวด: แก้ไขข้อมูลส่วนตัว (จัดใหม่ให้คลีน) */}
           <div className="bg-white rounded-[1.5rem] shadow-sm border border-gray-100 overflow-hidden">
             <div className="px-5 py-3 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
               <span className="text-[#EE4D2D] text-sm">👤</span>
-              <h3 className="font-bold text-gray-800 text-xs">ข้อมูลส่วนตัวและการเงิน</h3>
+              <h3 className="font-bold text-gray-800 text-xs">แก้ไขข้อมูลส่วนตัว</h3>
             </div>
             
-            {/* ✅ เพิ่มเมนูตั้งค่าบัญชีรับเงิน */}
-            <MenuRow 
-              icon="🏦" 
-              title="บัญชีรับเงิน (Bank Account)" 
-              subtitle="ตั้งค่าช่องทางรับเงินสำหรับผู้รับงาน"
-              onClick={() => router.push('/profile/bank')} 
-            />
-            
-            {/* ปุ่มแก้ไขข้อมูลส่วนตัว */}
+            {/* ✅ เก็อปุ่มแก้ไขข้อมูลโปรไฟล์หลักไว้ที่นี่ เพื่อให้ชัดเจน */}
             <div className="p-4 text-center border-t border-gray-50">
-               <button className="text-xs font-bold text-[#EE4D2D] bg-orange-50 px-6 py-2.5 rounded-full border border-orange-100 active:scale-95 transition-transform">
+               <button className="text-xs font-bold text-[#EE4D2D] bg-orange-50 px-6 py-2.5 rounded-full border border-orange-100 active:scale-95 transition-transform shadow-sm">
                  แก้ไข ชื่อ-นามสกุล / เบอร์โทร
                </button>
             </div>
           </div>
 
-          {/* 🛡️ หมวด: ความน่าเชื่อถือและเอกสาร */}
+          {/* 🛡️ หมวด: ยืนยันตัวตนและแฟ้มเอกสาร (จัดใหม่) */}
           <div className="bg-white rounded-[1.5rem] shadow-sm border border-gray-100 overflow-hidden">
             <div className="px-5 py-3 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
               <span className="text-[#EE4D2D] text-sm">🛡️</span>
@@ -86,19 +78,27 @@ export default function ProfileEditHubPage() {
             <MenuRow 
               icon="🔍" 
               title="ยืนยันตัวตน (KYC)" 
-              subtitle="ยืนยันเบอร์โทรศัพท์และประวัติ" // ปรับข้อความให้ตรงกับ Flow ใหม่
+              subtitle="ยืนยันเบอร์โทรศัพท์และประวัติ" // ปรับคำอธิบาย
               status={user.kyc_status === 'approved' ? '✅ ผ่านแล้ว' : '⏳ รอยืนยัน'}
               onClick={() => router.push('/profile/kyc')} 
             />
             <MenuRow 
               icon="🪪" 
               title="แฟ้มเอกสารส่วนตัว" 
-              subtitle="วุฒิการศึกษา, ใบขับขี่, ใบอนุญาต" // ปรับข้อความให้ตรงกับหน้า Licenses ใหม่
+              subtitle="วุฒิการศึกษา, ใบขับขี่, ใบอนุญาต" // ปรับคำอธิบาย
               onClick={() => router.push('/profile/licenses')} 
+            />
+            
+            {/* ✅ ย้ายเมนูบัญชีรับเงินมาไว้ที่นี่ (ตามลูกศรชี้) */}
+            <MenuRow 
+              icon="🏦" 
+              title="บัญชีรับเงิน (Bank Account)" 
+              subtitle="ตั้งค่าช่องทางรับเงินสำหรับผู้รับงาน"
+              onClick={() => router.push('/profile/bank')} 
             />
           </div>
 
-          {/* 🏆 หมวด: ผลงานและใบรับรอง */}
+          {/* 🏆 หมวด: ผลงานและใบรับรอง (จัดใหม่) */}
           <div className="bg-white rounded-[1.5rem] shadow-sm border border-gray-100 overflow-hidden">
             <div className="px-5 py-3 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
               <span className="text-[#EE4D2D] text-sm">🏆</span>
@@ -108,7 +108,7 @@ export default function ProfileEditHubPage() {
             <MenuRow 
               icon="🖼️" 
               title="คลังใบประกาศ (Certificates)" 
-              subtitle="อัปโหลดใบประกาศ / ใบผ่านงาน" // ปรับข้อความให้ตรงกับหน้า Certificate ใหม่
+              subtitle="อัปโหลดใบประกาศ / ใบผ่านงาน" // ปรับคำอธิบาย
               onClick={() => router.push('/profile/certificate')} 
             />
             <MenuRow 
@@ -133,17 +133,17 @@ function MenuRow({ icon, title, subtitle, onClick, status }: any) {
       className="flex items-center justify-between p-4 border-b border-gray-50 last:border-0 cursor-pointer hover:bg-gray-50 active:bg-gray-100 transition-colors"
     >
       <div className="flex items-center gap-4">
-        <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center text-xl shadow-inner border border-gray-100">
+        <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center text-xl shadow-inner border border-gray-100 shrink-0">
           {icon}
         </div>
         <div>
-          <h4 className="text-sm font-bold text-gray-800">{title}</h4>
-          {subtitle && <p className="text-[10px] text-gray-500 mt-0.5">{subtitle}</p>}
+          <h4 className="text-sm font-bold text-gray-800 leading-tight">{title}</h4>
+          {subtitle && <p className="text-[10px] text-gray-500 mt-0.5 leading-tight">{subtitle}</p>}
         </div>
       </div>
-      <div className="flex items-center gap-2">
-        {status && <span className="text-[9px] font-bold bg-gray-100 px-2 py-1 rounded-md text-gray-600">{status}</span>}
-        <span className="text-gray-300">›</span>
+      <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+        {status && <span className="text-[9px] font-bold bg-gray-100 px-2 py-1 rounded-md text-gray-600 shadow-inner">{status}</span>}
+        <span className="text-gray-300 text-xl leading-none">›</span>
       </div>
     </div>
   );
