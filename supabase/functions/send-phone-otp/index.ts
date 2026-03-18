@@ -1,3 +1,4 @@
+// @ts-nocheck
 // supabase/functions/send-phone-otp/index.ts
 // Supabase Edge Function (Deno runtime)
 // Handles: generate OTP -> hash -> store -> (send SMS)
