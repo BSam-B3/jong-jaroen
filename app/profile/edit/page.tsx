@@ -46,22 +46,31 @@ export default function ProfileEditHubPage() {
         {/* 📋 ส่วนเนื้อหาหลัก (Hub เมนูเอกสาร) */}
         <div className="p-5 space-y-5 -mt-2 relative z-20">
           
-          <div className="bg-orange-50 border border-[#EE4D2D]/20 rounded-2xl p-4 flex items-start gap-3">
+          <div className="bg-orange-50 border border-[#EE4D2D]/20 rounded-2xl p-4 flex items-start gap-3 shadow-sm">
              <span className="text-xl">💡</span>
              <p className="text-[10px] text-gray-700 leading-relaxed font-medium">
-               หน้าต่างนี้สำหรับจัดการข้อมูลส่วนตัว อัปโหลดเอกสารสำคัญ และเรียกดูใบรับรองผลงานของคุณค่ะ
+               หน้าต่างนี้สำหรับจัดการข้อมูลส่วนตัว ตั้งค่าช่องทางรับเงิน และเรียกดูประวัติผลงานของคุณค่ะ
              </p>
           </div>
 
-          {/* 👤 หมวด: แก้ไขข้อมูลส่วนตัว */}
+          {/* 👤 หมวด: ข้อมูลส่วนตัวและการเงิน */}
           <div className="bg-white rounded-[1.5rem] shadow-sm border border-gray-100 overflow-hidden">
             <div className="px-5 py-3 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
               <span className="text-[#EE4D2D] text-sm">👤</span>
-              <h3 className="font-bold text-gray-800 text-xs">ข้อมูลส่วนตัว</h3>
+              <h3 className="font-bold text-gray-800 text-xs">ข้อมูลส่วนตัวและการเงิน</h3>
             </div>
-            {/* TODO: อนาคตอาจจะทำหน้าฟอร์มกรอกข้อมูลแยก หรือให้กดแก้ตรงนี้ได้เลย (จำลองปุ่มไว้ก่อน) */}
-            <div className="p-4 text-center">
-               <button className="text-xs font-bold text-[#EE4D2D] bg-orange-50 px-6 py-2 rounded-full border border-orange-100 active:scale-95 transition-transform">
+            
+            {/* ✅ เพิ่มเมนูตั้งค่าบัญชีรับเงิน */}
+            <MenuRow 
+              icon="🏦" 
+              title="บัญชีรับเงิน (Bank Account)" 
+              subtitle="ตั้งค่าช่องทางรับเงินสำหรับผู้รับงาน"
+              onClick={() => router.push('/profile/bank')} 
+            />
+            
+            {/* ปุ่มแก้ไขข้อมูลส่วนตัว */}
+            <div className="p-4 text-center border-t border-gray-50">
+               <button className="text-xs font-bold text-[#EE4D2D] bg-orange-50 px-6 py-2.5 rounded-full border border-orange-100 active:scale-95 transition-transform">
                  แก้ไข ชื่อ-นามสกุล / เบอร์โทร
                </button>
             </div>
@@ -71,20 +80,20 @@ export default function ProfileEditHubPage() {
           <div className="bg-white rounded-[1.5rem] shadow-sm border border-gray-100 overflow-hidden">
             <div className="px-5 py-3 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
               <span className="text-[#EE4D2D] text-sm">🛡️</span>
-              <h3 className="font-bold text-gray-800 text-xs">ยืนยันตัวตนและเอกสาร</h3>
+              <h3 className="font-bold text-gray-800 text-xs">ยืนยันตัวตนและแฟ้มเอกสาร</h3>
             </div>
             
             <MenuRow 
               icon="🔍" 
               title="ยืนยันตัวตน (KYC)" 
-              subtitle="สแกนใบหน้าและบัตรประชาชน"
+              subtitle="ยืนยันเบอร์โทรศัพท์และประวัติ" // ปรับข้อความให้ตรงกับ Flow ใหม่
               status={user.kyc_status === 'approved' ? '✅ ผ่านแล้ว' : '⏳ รอยืนยัน'}
               onClick={() => router.push('/profile/kyc')} 
             />
             <MenuRow 
               icon="🪪" 
-              title="ใบอนุญาต & ใบขับขี่" 
-              subtitle="จัดการเอกสารสำหรับรับงาน"
+              title="แฟ้มเอกสารส่วนตัว" 
+              subtitle="วุฒิการศึกษา, ใบขับขี่, ใบอนุญาต" // ปรับข้อความให้ตรงกับหน้า Licenses ใหม่
               onClick={() => router.push('/profile/licenses')} 
             />
           </div>
@@ -97,9 +106,9 @@ export default function ProfileEditHubPage() {
             </div>
             
             <MenuRow 
-              icon="📄" 
-              title="ใบรับรองฝีมือ (Certificate)" 
-              subtitle="ออกใบรับรองโดยจงเจริญ (PDF)"
+              icon="🖼️" 
+              title="คลังใบประกาศ (Certificates)" 
+              subtitle="อัปโหลดใบประกาศ / ใบผ่านงาน" // ปรับข้อความให้ตรงกับหน้า Certificate ใหม่
               onClick={() => router.push('/profile/certificate')} 
             />
             <MenuRow 
