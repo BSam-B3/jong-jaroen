@@ -1,159 +1,122 @@
+@@ -1,22 +1,20 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 
-export default function WinOnlinePage() {
+export default function HomePage() {
+  const [userName, setUserName] = useState('กำลังโหลด...');
+  const [userInitial, setUserInitial] = useState('');
+  const [activeTab, setActiveTab] = useState('home');
+  const [searchQuery, setSearchQuery] = useState(''); // เพิ่ม State สำหรับช่องค้นหา
+  const [searchQuery, setSearchQuery] = useState('');
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState('urgent');
-  const [taskType, setTaskType] = useState('ride'); // ride, buy, deliver
-  
-  // States สำหรับฟอร์ม
-  const [pickup, setPickup] = useState('');
-  const [dropoff, setDropoff] = useState('');
-  const [details, setDetails] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    const fetchUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        // ถ้ายกเลิก Comment บรรทัดล่าง ระบบจะบังคับ Login ก่อนเข้าหน้าแรก
+        // router.push('/login');
+        setUserName('ผู้เยี่ยมชม');
+        setUserInitial('ผ');
+        return;
+@@ -35,7 +33,6 @@
+    fetchUser();
+  }, [router]);
+
+  // ฟังก์ชันจัดการตอนกด Enter ค้นหา
+  const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    alert('ระบบกำลังค้นหาวินมอเตอร์ไซค์ในพื้นที่... (รอเชื่อม API)');
+    if (searchQuery.trim()) {
+@@ -44,17 +41,15 @@
   };
 
   return (
+    /* 📱 พื้นหลังด้านนอกสุด (Desk/Background) */
+    <div className="min-h-screen bg-[#E5E7EB] flex justify-center items-start md:items-center md:py-8">
+
+      {/* 📱 ตัวแอป (Main App Container) - ปรับขนาดอัตโนมัติตาม Device */}
+      <div className="w-full sm:max-w-xl md:max-w-md bg-[#F4F6F8] min-h-screen md:min-h-[850px] md:h-[850px] md:rounded-[3rem] shadow-2xl overflow-hidden relative flex flex-col border-[8px] border-transparent md:border-black">
+    // ✅ ปรับพื้นหลังและคอนเทนเนอร์ให้ตรงกับหน้าอื่นๆ ของแอป (ไม่มีขอบดำ)
     <div className="min-h-screen bg-gray-100 flex justify-center pb-24">
       <div className="w-full sm:max-w-2xl md:max-w-3xl bg-[#F4F6F8] min-h-screen relative flex flex-col shadow-xl overflow-x-hidden">
-        
-        {/* 🔴 Header (ปรับโทนสีให้ดูด่วน/Active มากขึ้น) */}
-        <div className="bg-gradient-to-br from-[#FF4B2B] to-[#FF416C] rounded-b-[2.5rem] pt-12 pb-8 px-6 shadow-md relative z-10">
-          <div className="flex items-center gap-3 mb-2">
-            <button onClick={() => router.push('/')} className="text-white font-bold text-lg active:scale-90 transition-transform">←</button>
-            <h1 className="text-xl font-black text-white tracking-tight">วินออนไลน์ 🛵</h1>
+
+        {/* ส่วนเนื้อหาที่ Scroll ได้ */}
+        <div className="flex-1 overflow-y-auto pb-24 scrollbar-hide">
+        <div className="flex-1 overflow-y-auto pb-6 scrollbar-hide">
+
+          {/* 🟠 Header (สีส้ม) */}
+          <div className="bg-[#F05D40] rounded-b-[2.5rem] p-6 pt-12 shadow-sm relative">
+          <div className="bg-[#F05D40] rounded-b-[2.5rem] p-6 pt-12 shadow-sm relative z-10">
+            <div className="flex justify-between items-start mb-6 px-2">
+              <div>
+                <h1 className="text-2xl font-black text-white flex items-center gap-2">
+@@ -63,7 +58,6 @@
+                <p className="text-white/90 text-xs mt-1 font-medium">แอปพลิเคชันคู่ชุมชนปากน้ำประแส</p>
+              </div>
+
+              {/* แสดงชื่อและอักษรย่อ User */}
+              <button 
+                onClick={() => router.push('/profile/edit')}
+                className="flex items-center gap-2 bg-white/10 p-1.5 pr-4 rounded-full border border-white/20 backdrop-blur-md active:scale-95 transition-transform"
+@@ -93,7 +87,7 @@
           </div>
-          <p className="text-white/90 text-xs font-medium pl-8">เรียกวิน ฝากซื้อของ ส่งพัสดุด่วนในชุมชน</p>
+
+          {/* 🧩 Content Area */}
+          <div className="p-5 space-y-6 mt-4">
+          <div className="p-5 space-y-6 mt-4 relative z-20">
+
+            {/* 🗂️ เมนูลัด (Grid 2 คอลัมน์) */}
+            <div className="grid grid-cols-2 gap-5">
+@@ -161,47 +155,47 @@
+
         </div>
 
-        <main className="flex-1 relative z-20 -mt-4 space-y-5 px-5">
-          
-          {/* 🔘 เลือกประเภทงาน */}
-          <div className="bg-white rounded-[2rem] p-2 shadow-sm border border-gray-100 flex justify-between gap-2">
-            <button 
-              onClick={() => setTaskType('ride')}
-              className={`flex-1 py-3.5 rounded-[1.5rem] text-xs font-bold transition-all flex flex-col items-center gap-1 ${taskType === 'ride' ? 'bg-[#FF416C] text-white shadow-md' : 'bg-transparent text-gray-500 hover:bg-gray-50'}`}
-            >
-              <span className="text-xl">🛵</span>
-              รับ-ส่งคน
-            </button>
-            <button 
-              onClick={() => setTaskType('buy')}
-              className={`flex-1 py-3.5 rounded-[1.5rem] text-xs font-bold transition-all flex flex-col items-center gap-1 ${taskType === 'buy' ? 'bg-[#FF416C] text-white shadow-md' : 'bg-transparent text-gray-500 hover:bg-gray-50'}`}
-            >
-              <span className="text-xl">🥡</span>
-              ฝากซื้อของ
-            </button>
-            <button 
-              onClick={() => setTaskType('deliver')}
-              className={`flex-1 py-3.5 rounded-[1.5rem] text-xs font-bold transition-all flex flex-col items-center gap-1 ${taskType === 'deliver' ? 'bg-[#FF416C] text-white shadow-md' : 'bg-transparent text-gray-500 hover:bg-gray-50'}`}
-            >
-              <span className="text-xl">📦</span>
-              ส่งพัสดุ
-            </button>
-          </div>
-
-          {/* 📝 ฟอร์มเรียกวิน */}
-          <form onSubmit={handleSubmit} className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100 space-y-5">
-            
-            <div className="relative">
-              {/* เส้นประเชื่อมจุด A ไป B */}
-              <div className="absolute left-3.5 top-8 bottom-8 w-0.5 border-l-2 border-dashed border-gray-200 z-0"></div>
-
-              {/* จุดรับ */}
-              <div className="relative z-10 flex items-start gap-3 mb-4">
-                <div className="w-7 h-7 bg-blue-100 rounded-full flex items-center justify-center shrink-0 mt-1 border-2 border-white shadow-sm">
-                  <div className="w-2.5 h-2.5 bg-blue-500 rounded-full"></div>
-                </div>
-                <div className="flex-1 bg-gray-50 border border-gray-200 rounded-2xl p-3 focus-within:border-[#FF416C] focus-within:ring-1 focus-within:ring-[#FF416C]/30 transition-all">
-                  <label className="text-[10px] font-bold text-gray-500 block mb-0.5">
-                    {taskType === 'buy' ? 'ซื้อที่ไหน (ร้านค้า)' : 'จุดรับ'}
-                  </label>
-                  <input 
-                    type="text" 
-                    value={pickup}
-                    onChange={(e) => setPickup(e.target.value)}
-                    placeholder={taskType === 'buy' ? 'เช่น ตลาดประแส, เซเว่นหน้าปากซอย' : 'ระบุตำแหน่งปัจจุบัน หรือชื่อสถานที่'}
-                    className="w-full bg-transparent text-sm font-bold text-gray-800 outline-none placeholder:font-medium placeholder:text-gray-400"
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* จุดส่ง */}
-              <div className="relative z-10 flex items-start gap-3">
-                <div className="w-7 h-7 bg-red-100 rounded-full flex items-center justify-center shrink-0 mt-1 border-2 border-white shadow-sm">
-                  <span className="text-red-500 text-[10px]">📍</span>
-                </div>
-                <div className="flex-1 bg-gray-50 border border-gray-200 rounded-2xl p-3 focus-within:border-[#FF416C] focus-within:ring-1 focus-within:ring-[#FF416C]/30 transition-all">
-                  <label className="text-[10px] font-bold text-gray-500 block mb-0.5">
-                    {taskType === 'buy' ? 'มาส่งที่ (จุดส่ง)' : 'จุดหมายปลายทาง'}
-                  </label>
-                  <input 
-                    type="text" 
-                    value={dropoff}
-                    onChange={(e) => setDropoff(e.target.value)}
-                    placeholder="ระบุบ้านเลขที่, ซอย, หรือจุดสังเกต"
-                    className="w-full bg-transparent text-sm font-bold text-gray-800 outline-none placeholder:font-medium placeholder:text-gray-400"
-                    required
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* รายละเอียดเพิ่มเติม */}
-            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 focus-within:border-[#FF416C] focus-within:ring-1 focus-within:ring-[#FF416C]/30 transition-all mt-4">
-              <label className="text-[10px] font-bold text-gray-500 block mb-1.5 flex items-center gap-1">
-                <span>📝</span> รายละเอียดเพิ่มเติม (ถ้ามี)
-              </label>
-              <textarea 
-                rows={2}
-                value={details}
-                onChange={(e) => setDetails(e.target.value)}
-                placeholder={taskType === 'buy' ? 'พิมพ์รายการของที่ต้องการซื้อ เช่น ข้าวมันไก่ 2 กล่อง ไม่เอาหนัง' : 'เบอร์โทรติดต่อ, จุดสังเกตให้พี่วินหาง่ายขึ้น'}
-                className="w-full bg-transparent text-xs font-medium text-gray-800 outline-none resize-none placeholder:text-gray-400"
-              />
-            </div>
-
-            {/* แจ้งเตือนเรื่องราคา */}
-            <div className="bg-orange-50 border border-orange-100 rounded-xl p-3 flex items-start gap-2">
-              <span className="text-orange-500 text-sm">💡</span>
-              <p className="text-[10px] text-gray-600 font-medium leading-relaxed mt-0.5">
-                ราคาค่าบริการขึ้นอยู่กับการตกลงกับคนขับ ระบบจะทำการค้นหาวินที่อยู่ใกล้ที่สุดเพื่อประเมินราคาให้คุณค่ะ
-              </p>
-            </div>
-
-            <button 
-              type="submit"
-              className="w-full bg-gradient-to-r from-[#FF4B2B] to-[#FF416C] text-white py-4 rounded-full font-black text-base shadow-lg hover:shadow-xl active:scale-[0.98] transition-all"
-            >
-              ค้นหาคนขับรถ / วินว่าง 🔍
-            </button>
-          </form>
-
-        </main>
-
-        {/* 🧭 Bottom Nav (Active: งานด่วน) */}
+        {/* 🧭 แถบเมนูด้านล่าง (Bottom Navigation) - ยึดไว้ล่างสุดของ Container */}
+        <div className="absolute bottom-0 left-0 w-full bg-white/90 backdrop-blur-md border-t border-gray-100 px-8 py-4 flex justify-between items-center shadow-[0_-4px_25px_rgba(0,0,0,0.06)] rounded-t-[2.5rem] z-50">
+        {/* 🧭 แถบเมนูด้านล่าง (Bottom Navigation) */}
         <div className="fixed bottom-0 w-full sm:max-w-2xl md:max-w-3xl bg-white/95 backdrop-blur-md border-t border-gray-100 px-8 py-4 flex justify-between items-center shadow-[0_-4px_25px_rgba(0,0,0,0.06)] rounded-t-[2.5rem] z-50">
-           <button onClick={() => router.push('/')} className="flex flex-col items-center gap-1 opacity-40 hover:opacity-100 transition-opacity"><span className="text-xl">🏠</span><span className="text-[10px] font-bold text-gray-500">หน้าแรก</span></button>
-           <button onClick={() => router.push('/services')} className="flex flex-col items-center gap-1 opacity-40 hover:opacity-100 transition-opacity"><span className="text-xl">🛠️</span><span className="text-[10px] font-bold text-gray-500">บริการ</span></button>
-           
-           {/* ✅ Active: งานด่วน */}
-           <div className="flex flex-col items-center gap-1 scale-110">
-             <span className="text-xl">📋</span>
-             <span className="text-[10px] font-bold text-[#FF416C]">งานด่วน</span>
-             <div className="w-1.5 h-1.5 bg-[#FF416C] rounded-full shadow-sm"></div>
-           </div>
-
-           <button onClick={() => router.push('/history')} className="flex flex-col items-center gap-1 opacity-40 hover:opacity-100 transition-opacity"><span className="text-xl">📜</span><span className="text-[10px] font-bold text-gray-500">ประวัติ</span></button>
-           <button onClick={() => router.push('/profile/edit')} className="flex flex-col items-center gap-1 opacity-40 hover:opacity-100 transition-opacity"><span className="text-xl">👤</span><span className="text-[10px] font-bold text-gray-500">ฉัน</span></button>
+          <NavItem icon="🏠" label="หน้าแรก" active={activeTab === 'home'} onClick={() => {setActiveTab('home'); router.push('/')}} />
+          <NavItem icon="🛠️" label="บริการ" active={activeTab === 'services'} onClick={() => {setActiveTab('services'); router.push('/services')}} />
+          <NavItem icon="📋" label="งานด่วน" active={activeTab === 'urgent'} onClick={() => {setActiveTab('urgent'); router.push('/win-online')}} />
+          <NavItem icon="📜" label="ประวัติ" active={activeTab === 'history'} onClick={() => {setActiveTab('history'); router.push('/history')}} />
+          <NavItem icon="👤" label="ฉัน" active={activeTab === 'profile'} onClick={() => {setActiveTab('profile'); router.push('/profile/edit')}} />
         </div>
 
       </div>
+
+      <style dangerouslySetInnerHTML={{__html: `
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+      `}} />
+    </div>
+  );
+}
+
+// --- คอมโพเนนต์ย่อย ---
+
+// --- คอมโพเนนต์ปุ่มเมนูลัด ---
+function MenuButton({ icon, title, desc, color, badge, onClick }: any) {
+  const colorClass = color === 'blue' ? 'bg-blue-50 border-blue-50 text-blue-500' : 'bg-orange-50 border-orange-50 text-[#F05D40]';
+  return (
+    <div onClick={onClick} className={`bg-white p-6 rounded-[2rem] shadow-sm border ${colorClass} flex flex-col items-center justify-center text-center active:scale-95 transition-all cursor-pointer relative overflow-hidden h-full hover:shadow-md`}>
+      {badge && <div className="absolute top-0 right-0 bg-[#F05D40] text-white text-[9px] font-black px-4 py-1 rounded-bl-2xl shadow-sm z-10">{badge}</div>}
+      <div className={`w-16 h-16 ${colorClass} rounded-3xl flex items-center justify-center text-4xl mb-4 shadow-inner border border-black/5`}>{icon}</div>
+      <h3 className="font-black text-gray-800 text-sm">{title}</h3>
+      <p className="text-[10px] text-gray-500 mt-1 font-medium">{desc}</p>
+    </div>
+  );
+}
+
+// --- คอมโพเนนต์เมนูด้านล่าง ---
+function NavItem({ icon, label, active, onClick }: any) {
+  return (
+    <div onClick={onClick} className={`flex flex-col items-center gap-1.5 cursor-pointer transition-all ${active ? 'scale-110' : 'opacity-40 hover:opacity-100'}`}>
+      <span className="text-2xl">{icon}</span>
+      <span className={`text-[10px] font-bold ${active ? 'text-[#F05D40]' : 'text-gray-500'}`}>{label}</span>
+      {active && <div className="w-1.5 h-1.5 bg-[#F05D40] rounded-full shadow-sm"></div>}
     </div>
   );
 }
