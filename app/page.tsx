@@ -46,8 +46,8 @@ export default function HomePage() {
         {/* ส่วนเนื้อหาที่ Scroll ได้ */}
         <div className="flex-1 overflow-y-auto pb-6 scrollbar-hide">
           
-          {/* 🟠 Header (สีส้ม) */}
-          <div className="bg-[#EE4D2D] rounded-b-[2.5rem] p-6 pt-12 shadow-sm relative z-10">
+          {/* ✅ 🟠 Header ปรับไล่สีส้ม-ทอง ให้เหมือนหน้า Profile */}
+          <div className="bg-gradient-to-b from-[#EE4D2D] to-[#FF7337] rounded-b-[2.5rem] p-6 pt-12 shadow-md relative z-10">
             <div className="flex justify-between items-start mb-6 px-2">
               <div>
                 <h1 className="text-2xl font-black text-white flex items-center gap-2">
