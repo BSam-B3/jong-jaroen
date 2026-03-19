@@ -28,54 +28,54 @@ export default function WinOnlinePage() {
     <div className="min-h-screen bg-gray-100 flex justify-center pb-24">
       <div className="w-full sm:max-w-2xl md:max-w-3xl bg-[#F4F6F8] min-h-screen relative flex flex-col shadow-xl overflow-x-hidden">
         
-        {/* 🔴 Header */}
-        <div className="bg-gradient-to-br from-[#FF4B2B] to-[#FF416C] rounded-b-[2.5rem] pt-12 pb-8 px-6 shadow-md relative z-10">
-          <div className="flex items-center gap-3 mb-2">
+        {/* ✅ 🟠 Header ปรับเป็น "การ์ดลอย" สีส้ม-ทอง มุมมน 4 ด้าน */}
+        <div className="bg-gradient-to-b from-[#EE4D2D] to-[#FF7337] rounded-[2.5rem] pt-8 pb-6 px-6 shadow-md relative z-10 m-3 mt-4">
+          <div className="flex items-center gap-3 mb-2 px-2">
             <button onClick={() => router.push('/')} className="text-white font-bold text-lg active:scale-90 transition-transform">←</button>
             <h1 className="text-xl font-black text-white tracking-tight">วินออนไลน์ 🛵</h1>
           </div>
-          <p className="text-white/90 text-xs font-medium pl-8">เรียกวิน ฝากซื้อของ ส่งพัสดุด่วนในชุมชน</p>
+          <p className="text-white/90 text-xs font-medium pl-10">เรียกวิน ฝากซื้อของ ส่งพัสดุด่วนในชุมชน</p>
         </div>
 
-        <main className="flex-1 relative z-20 -mt-4 space-y-4 px-5">
+        <main className="flex-1 relative z-20 space-y-4 px-5">
           
-          {/* 🔘 เลือกประเภทงาน */}
+          {/* 🔘 เลือกประเภทงาน (เปลี่ยน Active เป็นสีส้ม #EE4D2D) */}
           <div className="bg-white rounded-[2rem] p-2 shadow-sm border border-gray-100 flex justify-between gap-2">
             <button 
               onClick={() => setTaskType('ride')}
-              className={`flex-1 py-3.5 rounded-[1.5rem] text-xs font-bold transition-all flex flex-col items-center gap-1 ${taskType === 'ride' ? 'bg-[#FF416C] text-white shadow-md' : 'bg-transparent text-gray-500 hover:bg-gray-50'}`}
+              className={`flex-1 py-3.5 rounded-[1.5rem] text-xs font-bold transition-all flex flex-col items-center gap-1 ${taskType === 'ride' ? 'bg-[#EE4D2D] text-white shadow-md' : 'bg-transparent text-gray-500 hover:bg-gray-50'}`}
             >
               <span className="text-xl">🛵</span>
               รับ-ส่งคน
             </button>
             <button 
               onClick={() => setTaskType('buy')}
-              className={`flex-1 py-3.5 rounded-[1.5rem] text-xs font-bold transition-all flex flex-col items-center gap-1 ${taskType === 'buy' ? 'bg-[#FF416C] text-white shadow-md' : 'bg-transparent text-gray-500 hover:bg-gray-50'}`}
+              className={`flex-1 py-3.5 rounded-[1.5rem] text-xs font-bold transition-all flex flex-col items-center gap-1 ${taskType === 'buy' ? 'bg-[#EE4D2D] text-white shadow-md' : 'bg-transparent text-gray-500 hover:bg-gray-50'}`}
             >
               <span className="text-xl">🥡</span>
               ฝากซื้อของ
             </button>
             <button 
               onClick={() => setTaskType('deliver')}
-              className={`flex-1 py-3.5 rounded-[1.5rem] text-xs font-bold transition-all flex flex-col items-center gap-1 ${taskType === 'deliver' ? 'bg-[#FF416C] text-white shadow-md' : 'bg-transparent text-gray-500 hover:bg-gray-50'}`}
+              className={`flex-1 py-3.5 rounded-[1.5rem] text-xs font-bold transition-all flex flex-col items-center gap-1 ${taskType === 'deliver' ? 'bg-[#EE4D2D] text-white shadow-md' : 'bg-transparent text-gray-500 hover:bg-gray-50'}`}
             >
               <span className="text-xl">📦</span>
               ส่งพัสดุ
             </button>
           </div>
 
-          {/* 📍 สถานะรถใกล้เคียง (ฟีเจอร์ใหม่) */}
+          {/* 📍 สถานะรถใกล้เคียง */}
           <div className="pt-2">
             <h2 className="text-[11px] font-black text-gray-800 mb-3 px-1 flex items-center justify-between">
               <span className="flex items-center gap-2">
-                <span className="text-[#FF416C] text-base animate-pulse">📍</span> รถที่พร้อมรับงานใกล้คุณ
+                <span className="text-[#EE4D2D] text-base animate-pulse">📍</span> รถที่พร้อมรับงานใกล้คุณ
               </span>
               <span className="text-gray-400 font-medium">รัศมี 5 กม.</span>
             </h2>
             
             <div className="flex gap-3 overflow-x-auto pb-2 snap-x hide-scrollbar">
               {NEARBY_RIDERS.map((rider) => (
-                <div key={rider.id} className="bg-white min-w-[130px] p-3 rounded-2xl shadow-sm border border-gray-100 snap-start flex flex-col hover:border-[#FF416C]/30 transition-all cursor-pointer">
+                <div key={rider.id} className="bg-white min-w-[130px] p-3 rounded-2xl shadow-sm border border-gray-100 snap-start flex flex-col hover:border-[#EE4D2D]/30 transition-all cursor-pointer">
                   <div className="flex justify-between items-start mb-2">
                      <div className="w-10 h-10 bg-orange-50 rounded-full flex items-center justify-center text-xl border border-orange-100 shrink-0">
                        {rider.icon}
@@ -86,7 +86,7 @@ export default function WinOnlinePage() {
                   </div>
                   <h3 className="font-bold text-gray-800 text-xs truncate">{rider.name}</h3>
                   <div className="flex items-center justify-between mt-1">
-                     <span className="text-[10px] font-black text-[#FF416C]">{rider.distance}</span>
+                     <span className="text-[10px] font-black text-[#EE4D2D]">{rider.distance}</span>
                      <div className="flex items-center gap-0.5">
                        <span className="text-yellow-400 text-[9px]">★</span>
                        <span className="text-[9px] font-bold text-gray-600">{rider.rating}</span>
@@ -109,7 +109,7 @@ export default function WinOnlinePage() {
                 <div className="w-7 h-7 bg-blue-100 rounded-full flex items-center justify-center shrink-0 mt-1 border-2 border-white shadow-sm">
                   <div className="w-2.5 h-2.5 bg-blue-500 rounded-full"></div>
                 </div>
-                <div className="flex-1 bg-gray-50 border border-gray-200 rounded-2xl p-3 focus-within:border-[#FF416C] focus-within:ring-1 focus-within:ring-[#FF416C]/30 transition-all">
+                <div className="flex-1 bg-gray-50 border border-gray-200 rounded-2xl p-3 focus-within:border-[#EE4D2D] focus-within:ring-1 focus-within:ring-[#EE4D2D]/30 transition-all">
                   <label className="text-[10px] font-bold text-gray-500 block mb-0.5">
                     {taskType === 'buy' ? 'ซื้อที่ไหน (ร้านค้า)' : 'จุดรับ'}
                   </label>
@@ -129,7 +129,7 @@ export default function WinOnlinePage() {
                 <div className="w-7 h-7 bg-red-100 rounded-full flex items-center justify-center shrink-0 mt-1 border-2 border-white shadow-sm">
                   <span className="text-red-500 text-[10px]">📍</span>
                 </div>
-                <div className="flex-1 bg-gray-50 border border-gray-200 rounded-2xl p-3 focus-within:border-[#FF416C] focus-within:ring-1 focus-within:ring-[#FF416C]/30 transition-all">
+                <div className="flex-1 bg-gray-50 border border-gray-200 rounded-2xl p-3 focus-within:border-[#EE4D2D] focus-within:ring-1 focus-within:ring-[#EE4D2D]/30 transition-all">
                   <label className="text-[10px] font-bold text-gray-500 block mb-0.5">
                     {taskType === 'buy' ? 'มาส่งที่ (จุดส่ง)' : 'จุดหมายปลายทาง'}
                   </label>
@@ -146,7 +146,7 @@ export default function WinOnlinePage() {
             </div>
 
             {/* รายละเอียดเพิ่มเติม */}
-            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 focus-within:border-[#FF416C] focus-within:ring-1 focus-within:ring-[#FF416C]/30 transition-all mt-4">
+            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 focus-within:border-[#EE4D2D] focus-within:ring-1 focus-within:ring-[#EE4D2D]/30 transition-all mt-4">
               <label className="text-[10px] font-bold text-gray-500 block mb-1.5 flex items-center gap-1">
                 <span>📝</span> รายละเอียดเพิ่มเติม (ถ้ามี)
               </label>
@@ -169,7 +169,7 @@ export default function WinOnlinePage() {
 
             <button 
               type="submit"
-              className="w-full bg-gradient-to-r from-[#FF4B2B] to-[#FF416C] text-white py-4 rounded-full font-black text-base shadow-lg hover:shadow-xl active:scale-[0.98] transition-all"
+              className="w-full bg-gradient-to-b from-[#EE4D2D] to-[#FF7337] text-white py-4 rounded-full font-black text-base shadow-lg hover:shadow-xl active:scale-[0.98] transition-all"
             >
               ประกาศหารถ / ส่งคำขอ 🚀
             </button>
@@ -177,19 +177,14 @@ export default function WinOnlinePage() {
 
         </main>
 
-        {/* 🧭 Bottom Nav */}
-        <div className="fixed bottom-0 w-full sm:max-w-2xl md:max-w-3xl bg-white/95 backdrop-blur-md border-t border-gray-100 px-8 py-4 flex justify-between items-center shadow-[0_-4px_25px_rgba(0,0,0,0.06)] rounded-t-[2.5rem] z-50">
-           <button onClick={() => router.push('/')} className="flex flex-col items-center gap-1 opacity-40 hover:opacity-100 transition-opacity"><span className="text-xl">🏠</span><span className="text-[10px] font-bold text-gray-500">หน้าแรก</span></button>
-           <button onClick={() => router.push('/services')} className="flex flex-col items-center gap-1 opacity-40 hover:opacity-100 transition-opacity"><span className="text-xl">🛠️</span><span className="text-[10px] font-bold text-gray-500">บริการ</span></button>
-           
-           <div className="flex flex-col items-center gap-1 scale-110">
-             <span className="text-xl">📋</span>
-             <span className="text-[10px] font-bold text-[#FF416C]">งานด่วน</span>
-             <div className="w-1.5 h-1.5 bg-[#FF416C] rounded-full shadow-sm"></div>
-           </div>
-
-           <button onClick={() => router.push('/history')} className="flex flex-col items-center gap-1 opacity-40 hover:opacity-100 transition-opacity"><span className="text-xl">📜</span><span className="text-[10px] font-bold text-gray-500">ประวัติ</span></button>
-           <button onClick={() => router.push('/profile/edit')} className="flex flex-col items-center gap-1 opacity-40 hover:opacity-100 transition-opacity"><span className="text-xl">👤</span><span className="text-[10px] font-bold text-gray-500">ฉัน</span></button>
+        {/* ✅ Bottom Navigation อัปเดตให้มี 6 ไอคอน (Active: งานด่วน) */}
+        <div className="fixed bottom-0 w-full sm:max-w-2xl md:max-w-3xl bg-white/95 backdrop-blur-md border-t border-gray-100 px-1 py-4 flex justify-between items-center shadow-[0_-4px_25px_rgba(0,0,0,0.06)] rounded-t-[2.5rem] z-50">
+          <NavItem icon="🏠" label="หน้าแรก" active={false} onClick={() => router.push('/')} />
+          <NavItem icon="🛠️" label="บริการ" active={false} onClick={() => router.push('/services')} />
+          <NavItem icon="📋" label="งานด่วน" active={true} onClick={() => {}} />
+          <NavItem icon="📰" label="ข่าวสาร" active={false} onClick={() => router.push('/news')} />
+          <NavItem icon="🎟️" label="ปองเจริญ" active={false} onClick={() => router.push('/coupons')} />
+          <NavItem icon="👤" label="ฉัน" active={false} onClick={() => router.push('/profile')} />
         </div>
 
         <style dangerouslySetInnerHTML={{__html: `
@@ -197,6 +192,17 @@ export default function WinOnlinePage() {
           .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         `}} />
       </div>
+    </div>
+  );
+}
+
+// คอมโพเนนต์เมนูด้านล่าง ปรับปรุงใหม่ใช้ flex-1
+function NavItem({ icon, label, active, onClick }: any) {
+  return (
+    <div onClick={onClick} className={`flex flex-col items-center gap-1.5 cursor-pointer transition-all ${active ? 'scale-110' : 'opacity-40 hover:opacity-100'} flex-1`}>
+      <span className="text-[22px]">{icon}</span>
+      <span className={`text-[9px] font-bold ${active ? 'text-[#EE4D2D]' : 'text-gray-500'} whitespace-nowrap`}>{label}</span>
+      {active && <div className="w-1.5 h-1.5 bg-[#EE4D2D] rounded-full shadow-sm mt-0.5"></div>}
     </div>
   );
 }
