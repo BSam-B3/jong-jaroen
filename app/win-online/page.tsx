@@ -4,7 +4,6 @@ import { useRouter } from 'next/navigation';
 
 export default function WinOnlinePage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState('urgent');
   const [taskType, setTaskType] = useState('ride'); // ride, buy, deliver
   
   // States สำหรับฟอร์ม
@@ -12,16 +11,24 @@ export default function WinOnlinePage() {
   const [dropoff, setDropoff] = useState('');
   const [details, setDetails] = useState('');
 
+  // 🚧 Mock Data สำหรับพี่วิน/รถที่กำลังออนไลน์ใกล้เคียง
+  const NEARBY_RIDERS = [
+    { id: 'r1', name: 'พี่วินัย', distance: '0.8 กม.', rating: 4.8, type: 'มอเตอร์ไซค์', icon: '🛵' },
+    { id: 'r2', name: 'ลุงสมชาย', distance: '1.2 กม.', rating: 4.9, type: 'รถกระบะ', icon: '🛻' },
+    { id: 'r3', name: 'เอกชัย', distance: '2.5 กม.', rating: 4.7, type: 'มอเตอร์ไซค์', icon: '🛵' },
+    { id: 'r4', name: 'น้าเดช', distance: '3.1 กม.', rating: 5.0, type: 'รถพ่วงข้าง', icon: '🛺' },
+  ];
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    alert('ระบบกำลังค้นหาวินมอเตอร์ไซค์ในพื้นที่... (รอเชื่อม API)');
+    alert('ระบบกำลังส่งงานให้คนขับในรัศมี 5 กม.... (รอเชื่อม API)');
   };
 
   return (
     <div className="min-h-screen bg-gray-100 flex justify-center pb-24">
       <div className="w-full sm:max-w-2xl md:max-w-3xl bg-[#F4F6F8] min-h-screen relative flex flex-col shadow-xl overflow-x-hidden">
         
-        {/* 🔴 Header (ปรับโทนสีให้ดูด่วน/Active มากขึ้น) */}
+        {/* 🔴 Header */}
         <div className="bg-gradient-to-br from-[#FF4B2B] to-[#FF416C] rounded-b-[2.5rem] pt-12 pb-8 px-6 shadow-md relative z-10">
           <div className="flex items-center gap-3 mb-2">
             <button onClick={() => router.push('/')} className="text-white font-bold text-lg active:scale-90 transition-transform">←</button>
@@ -30,7 +37,7 @@ export default function WinOnlinePage() {
           <p className="text-white/90 text-xs font-medium pl-8">เรียกวิน ฝากซื้อของ ส่งพัสดุด่วนในชุมชน</p>
         </div>
 
-        <main className="flex-1 relative z-20 -mt-4 space-y-5 px-5">
+        <main className="flex-1 relative z-20 -mt-4 space-y-4 px-5">
           
           {/* 🔘 เลือกประเภทงาน */}
           <div className="bg-white rounded-[2rem] p-2 shadow-sm border border-gray-100 flex justify-between gap-2">
@@ -57,9 +64,42 @@ export default function WinOnlinePage() {
             </button>
           </div>
 
-          {/* 📝 ฟอร์มเรียกวิน */}
-          <form onSubmit={handleSubmit} className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100 space-y-5">
+          {/* 📍 สถานะรถใกล้เคียง (ฟีเจอร์ใหม่) */}
+          <div className="pt-2">
+            <h2 className="text-[11px] font-black text-gray-800 mb-3 px-1 flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <span className="text-[#FF416C] text-base animate-pulse">📍</span> รถที่พร้อมรับงานใกล้คุณ
+              </span>
+              <span className="text-gray-400 font-medium">รัศมี 5 กม.</span>
+            </h2>
             
+            <div className="flex gap-3 overflow-x-auto pb-2 snap-x hide-scrollbar">
+              {NEARBY_RIDERS.map((rider) => (
+                <div key={rider.id} className="bg-white min-w-[130px] p-3 rounded-2xl shadow-sm border border-gray-100 snap-start flex flex-col hover:border-[#FF416C]/30 transition-all cursor-pointer">
+                  <div className="flex justify-between items-start mb-2">
+                     <div className="w-10 h-10 bg-orange-50 rounded-full flex items-center justify-center text-xl border border-orange-100 shrink-0">
+                       {rider.icon}
+                     </div>
+                     <span className="bg-green-100 text-green-600 text-[8px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm border border-green-200">
+                       <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div> ว่าง
+                     </span>
+                  </div>
+                  <h3 className="font-bold text-gray-800 text-xs truncate">{rider.name}</h3>
+                  <div className="flex items-center justify-between mt-1">
+                     <span className="text-[10px] font-black text-[#FF416C]">{rider.distance}</span>
+                     <div className="flex items-center gap-0.5">
+                       <span className="text-yellow-400 text-[9px]">★</span>
+                       <span className="text-[9px] font-bold text-gray-600">{rider.rating}</span>
+                     </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* 📝 ฟอร์มเรียกวิน/โพสต์งาน */}
+          <form onSubmit={handleSubmit} className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100 space-y-5">
+            <h3 className="font-black text-gray-800 text-sm border-b border-gray-100 pb-3">ระบุรายละเอียดเพื่อเรียกใช้งาน</h3>
             <div className="relative">
               {/* เส้นประเชื่อมจุด A ไป B */}
               <div className="absolute left-3.5 top-8 bottom-8 w-0.5 border-l-2 border-dashed border-gray-200 z-0"></div>
@@ -123,7 +163,7 @@ export default function WinOnlinePage() {
             <div className="bg-orange-50 border border-orange-100 rounded-xl p-3 flex items-start gap-2">
               <span className="text-orange-500 text-sm">💡</span>
               <p className="text-[10px] text-gray-600 font-medium leading-relaxed mt-0.5">
-                ราคาค่าบริการขึ้นอยู่กับการตกลงกับคนขับ ระบบจะทำการค้นหาวินที่อยู่ใกล้ที่สุดเพื่อประเมินราคาให้คุณค่ะ
+                เมื่อกดส่งคำขอ ระบบจะกระจายงานให้ผู้ขับขี่ในรัศมี 1-5 กม. ราคาค่าบริการขึ้นอยู่กับการตกลงกับคนขับ
               </p>
             </div>
 
@@ -131,18 +171,17 @@ export default function WinOnlinePage() {
               type="submit"
               className="w-full bg-gradient-to-r from-[#FF4B2B] to-[#FF416C] text-white py-4 rounded-full font-black text-base shadow-lg hover:shadow-xl active:scale-[0.98] transition-all"
             >
-              ค้นหาคนขับรถ / วินว่าง 🔍
+              ประกาศหารถ / ส่งคำขอ 🚀
             </button>
           </form>
 
         </main>
 
-        {/* 🧭 Bottom Nav (Active: งานด่วน) */}
+        {/* 🧭 Bottom Nav */}
         <div className="fixed bottom-0 w-full sm:max-w-2xl md:max-w-3xl bg-white/95 backdrop-blur-md border-t border-gray-100 px-8 py-4 flex justify-between items-center shadow-[0_-4px_25px_rgba(0,0,0,0.06)] rounded-t-[2.5rem] z-50">
            <button onClick={() => router.push('/')} className="flex flex-col items-center gap-1 opacity-40 hover:opacity-100 transition-opacity"><span className="text-xl">🏠</span><span className="text-[10px] font-bold text-gray-500">หน้าแรก</span></button>
            <button onClick={() => router.push('/services')} className="flex flex-col items-center gap-1 opacity-40 hover:opacity-100 transition-opacity"><span className="text-xl">🛠️</span><span className="text-[10px] font-bold text-gray-500">บริการ</span></button>
            
-           {/* ✅ Active: งานด่วน */}
            <div className="flex flex-col items-center gap-1 scale-110">
              <span className="text-xl">📋</span>
              <span className="text-[10px] font-bold text-[#FF416C]">งานด่วน</span>
@@ -153,6 +192,10 @@ export default function WinOnlinePage() {
            <button onClick={() => router.push('/profile/edit')} className="flex flex-col items-center gap-1 opacity-40 hover:opacity-100 transition-opacity"><span className="text-xl">👤</span><span className="text-[10px] font-bold text-gray-500">ฉัน</span></button>
         </div>
 
+        <style dangerouslySetInnerHTML={{__html: `
+          .hide-scrollbar::-webkit-scrollbar { display: none; }
+          .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        `}} />
       </div>
     </div>
   );
