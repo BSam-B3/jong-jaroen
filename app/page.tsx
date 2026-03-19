@@ -46,8 +46,8 @@ export default function HomePage() {
         {/* ส่วนเนื้อหาที่ Scroll ได้ */}
         <div className="flex-1 overflow-y-auto pb-6 scrollbar-hide">
           
-          {/* 🟠 Header ปรับไล่สีส้ม-ทอง */}
-          <div className="bg-gradient-to-b from-[#EE4D2D] to-[#FF7337] rounded-b-[2.5rem] p-6 pt-12 shadow-md relative z-10">
+          {/* ✅ 🟠 Header ปรับให้เป็น "การ์ดลอย" มุมมนทั้ง 4 ด้าน */}
+          <div className="bg-gradient-to-b from-[#EE4D2D] to-[#FF7337] rounded-[2.5rem] p-6 pt-8 shadow-md relative z-10 m-3 mt-4">
             <div className="flex justify-between items-start mb-6 px-2">
               <div>
                 <h1 className="text-2xl font-black text-white flex items-center gap-2">
@@ -83,7 +83,7 @@ export default function HomePage() {
           </div>
 
           {/* 🧩 Content Area */}
-          <div className="p-5 space-y-6 mt-4 relative z-20">
+          <div className="p-5 space-y-6 relative z-20">
             
             {/* 🗂️ เมนูลัด (Grid 2 คอลัมน์) */}
             <div className="grid grid-cols-2 gap-5">
@@ -151,13 +151,13 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* ✅ Bottom Navigation (เพิ่ม ข่าวสาร และ ปองเจริญ เข้าไปเรียบร้อย) */}
+        {/* ✅ Bottom Navigation (มี 6 เมนูตามที่จัดไว้) */}
         <div className="fixed bottom-0 w-full sm:max-w-2xl md:max-w-3xl bg-white/95 backdrop-blur-md border-t border-gray-100 px-1 py-4 flex justify-between items-center shadow-[0_-4px_25px_rgba(0,0,0,0.06)] rounded-t-[2.5rem] z-50">
           <NavItem icon="🏠" label="หน้าแรก" active={true} onClick={() => router.push('/')} />
-          <NavItem icon="📰" label="ข่าวสาร" active={false} onClick={() => alert('กำลังเปิดหน้าข่าวสาร...')} />
           <NavItem icon="🛠️" label="บริการ" active={false} onClick={() => router.push('/services')} />
           <NavItem icon="📋" label="งานด่วน" active={false} onClick={() => router.push('/win-online')} />
-          <NavItem icon="🎟️" label="ปองเจริญ" active={false} onClick={() => alert('กำลังเปิดหน้าปองเจริญ...')} />
+          <NavItem icon="📰" label="ข่าวสาร" active={false} onClick={() => router.push('/news')} />
+          <NavItem icon="🎟️" label="ปองเจริญ" active={false} onClick={() => router.push('/coupons')} />
           <NavItem icon="👤" label="ฉัน" active={false} onClick={() => router.push('/profile')} />
         </div>
 
