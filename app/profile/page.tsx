@@ -1,14 +1,12 @@
-// app/profile/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase'; // ⚠️ ปรับ path ตามโปรเจกต์ของคุณ
+import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
-// คอมโพเนนต์ย่อยสำหรับแถวเมนู (Menu Row) เพื่อความสะอาดของโค้ด
-function ProfileMenuRow({ icon, label, href, status, isPrivate = false, isLoggedIn = false }) {
-  // ✅ เงื่อนไข: ถ้าเป็นเมนูส่วนตัว และผู้ใช้ยังไม่ได้ล็อกอิน ให้ซ่อนเมนูนี้
+// ✅ เติม : any ตรงนี้ เพื่อแก้ Error TypeScript ของ Vercel
+function ProfileMenuRow({ icon, label, href, status, isPrivate = false, isLoggedIn = false }: any) {
   if (isPrivate && !isLoggedIn) return null;
 
   return (
@@ -28,13 +26,23 @@ function ProfileMenuRow({ icon, label, href, status, isPrivate = false, isLogged
   );
 }
 
+// คอมโพเนนต์เมนูด้านล่าง
+function NavItem({ icon, label, active, onClick }: any) {
+  return (
+    <div onClick={onClick} className={`flex flex-col items-center gap-1.5 cursor-pointer transition-all ${active ? 'scale-110' : 'opacity-40 hover:opacity-100'} w-16`}>
+      <span className="text-2xl">{icon}</span>
+      <span className={`text-[10px] font-bold ${active ? 'text-[#EE4D2D]' : 'text-gray-500'}`}>{label}</span>
+      {active && <div className="w-1.5 h-1.5 bg-[#EE4D2D] rounded-full shadow-sm mt-0.5"></div>}
+    </div>
+  );
+}
+
 export default function ProfilePage() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
-    // 🔍 ดึงข้อมูลผู้ใช้ปัจจุบันจาก Supabase
     async function getUserData() {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
@@ -45,22 +53,20 @@ export default function ProfilePage() {
     getUserData();
   }, []);
 
-  const isLoggedIn = !!user; // ตรวจสอบสถานะการล็อกอิน
+  const isLoggedIn = !!user;
 
-  // ฟังก์ชันสำหรับ Handle การ Log Out
   const handleSignOut = async () => {
     await supabase.auth.signOut();
-    router.push('/login'); // พากลับไปหน้า Login
+    router.push('/login');
   };
 
-  if (loading) return <div className="p-10 text-center text-gray-500">กำลังโหลด...</div>;
+  if (loading) return <div className="min-h-screen bg-gray-50 flex items-center justify-center font-bold text-gray-500">กำลังโหลด...</div>;
 
   return (
     <div className="min-h-screen bg-gray-50 flex justify-center pb-24">
-      {/* Container หลัก */}
-      <div className="w-full sm:max-w-2xl md:max-w-3xl bg-white min-h-screen relative flex flex-col shadow-xl overflow-hidden rounded-t-[2.5rem]">
+      <div className="w-full sm:max-w-2xl md:max-w-3xl bg-white min-h-screen relative flex flex-col shadow-xl overflow-x-hidden rounded-t-[2.5rem]">
         
-        {/* 🟠 ส่วนหัว Profile (เหมือนใน image_2.png) */}
+        {/* 🟠 ส่วนหัว Profile */}
         <div className="bg-orange-50 p-6 pt-12 flex items-center gap-4 border-b border-orange-100">
           <div className="w-16 h-16 bg-white rounded-full border-4 border-white shadow-md flex items-center justify-center text-2xl font-black text-orange-600 flex-shrink-0">
             {isLoggedIn ? (user.user_metadata?.full_name?.charAt(0) || user.email?.charAt(0).toUpperCase()) : 'G'}
@@ -81,49 +87,24 @@ export default function ProfilePage() {
         </div>
 
         {/* 📋 ส่วนรายการเมนู */}
-        <div className="p-6 space-y-8 flex-1">
+        <div className="p-6 space-y-6 flex-1 pb-24">
           
-          {/* ✅ กลุ่มเมนู: ข้อมูลส่วนตัวและการเงิน */}
           <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
             <h2 className="text-xs font-black text-gray-400 uppercase tracking-wider mb-2 px-1">ข้อมูลส่วนตัวและการเงิน</h2>
             <div className="space-y-0.5">
-              <ProfileMenuRow 
-                icon="💳" 
-                label="บัญชีรับเงิน (Bank Account)" 
-                href="/profile/bank-account" 
-                status="ตั้งค่าช่องทางรับเงิน" 
-                isPrivate={true} 
-                isLoggedIn={isLoggedIn} // ✅ แสดงเฉพาะเมื่อล็อกอิน
-              />
-              {/* ✅ โค้ดที่บีสามต้องเพิ่ม: เมนูประวัติรายการ */}
-              <ProfileMenuRow 
-                icon="📜" // ใช้ไอคอนรูปม้วนกระดาษ หรือ 🕒 นาฬิกา ก็ได้ครับ
-                label="ประวัติรายการ" 
-                href="/history" 
-                status="บันทึกกิจกรรมทั้งหมด" 
-                isPrivate={true} // ✅ เป็นเมนูส่วนตัว
-                isLoggedIn={isLoggedIn} // ✅ แสดงเฉพาะเมื่อล็อกอินแล้วเท่านั้น
-              />
+              <ProfileMenuRow icon="💳" label="บัญชีรับเงิน (Bank Account)" href="/profile/bank-account" status="ตั้งค่าช่องทางรับเงิน" isPrivate={true} isLoggedIn={isLoggedIn} />
+              {/* ✅ เมนูประวัติรายการ ย้ายมาอยู่ที่นี่แล้ว */}
+              <ProfileMenuRow icon="📜" label="ประวัติรายการ" href="/history" status="บันทึกกิจกรรมทั้งหมด" isPrivate={true} isLoggedIn={isLoggedIn} />
             </div>
           </div>
 
-          {/* กลุ่มเมนู: ยืนยันตัวตน (ตามภาพ image_2.png) */}
           <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
             <h2 className="text-xs font-black text-gray-400 uppercase tracking-wider mb-2 px-1">ยืนยันตัวตน</h2>
             <div className="space-y-0.5">
-              <ProfileMenuRow 
-                icon="🛡️" 
-                label="ยืนยันตัวตน (KYC)" 
-                href="/profile/kyc" 
-                status="ผ่านแล้ว" 
-                isPrivate={true} 
-                isLoggedIn={isLoggedIn} 
-              />
-              {/* เมนูอื่นๆ เช่น แฟ้มเอกสาร... */}
+              <ProfileMenuRow icon="🛡️" label="ยืนยันตัวตน (KYC)" href="/profile/kyc" status="ผ่านแล้ว" isPrivate={true} isLoggedIn={isLoggedIn} />
             </div>
           </div>
 
-          {/* กลุ่มเมนู: ตั้งค่าและอื่นๆ */}
           <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
             <h2 className="text-xs font-black text-gray-400 uppercase tracking-wider mb-2 px-1">ตั้งค่า</h2>
             <div className="space-y-0.5">
@@ -132,17 +113,22 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          {/* ✅ ปุ่ม Log Out (แสดงเฉพาะเมื่อล็อกอิน) */}
           {isLoggedIn && (
-            <button 
-              onClick={handleSignOut}
-              className="w-full bg-gray-100 text-gray-700 py-4 rounded-xl font-bold text-sm shadow-inner hover:bg-gray-200 active:scale-[0.98] transition-all mt-6"
-            >
+            <button onClick={handleSignOut} className="w-full bg-gray-100 text-gray-700 py-4 rounded-xl font-bold text-sm shadow-inner hover:bg-gray-200 active:scale-[0.98] transition-all mt-4">
               ออกจากระบบ
             </button>
           )}
 
         </div>
+
+        {/* ✅ Bottom Navigation (จัดใหม่เหลือ 4 ไอคอน) */}
+        <div className="fixed bottom-0 w-full sm:max-w-2xl md:max-w-3xl bg-white/95 backdrop-blur-md border-t border-gray-100 px-4 py-4 flex justify-around items-center shadow-[0_-4px_25px_rgba(0,0,0,0.06)] rounded-t-[2.5rem] z-50">
+          <NavItem icon="🏠" label="หน้าแรก" active={false} onClick={() => router.push('/')} />
+          <NavItem icon="🛠️" label="บริการ" active={false} onClick={() => router.push('/services')} />
+          <NavItem icon="📋" label="งานด่วน" active={false} onClick={() => router.push('/win-online')} />
+          <NavItem icon="👤" label="ฉัน" active={true} onClick={() => {}} />
+        </div>
+
       </div>
     </div>
   );
