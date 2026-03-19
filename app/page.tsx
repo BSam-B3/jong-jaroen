@@ -57,7 +57,7 @@ export default function HomePage() {
               </div>
               
               <button 
-                onClick={() => router.push('/profile/edit')}
+                onClick={() => router.push('/profile')}
                 className="flex items-center gap-2 bg-white/10 p-1.5 pr-4 rounded-full border border-white/20 backdrop-blur-md active:scale-95 transition-transform"
               >
                 <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center text-[#EE4D2D] font-black text-sm shadow-sm">
@@ -155,7 +155,7 @@ export default function HomePage() {
           <NavItem icon="🏠" label="หน้าแรก" active={true} onClick={() => router.push('/')} />
           <NavItem icon="🛠️" label="บริการ" active={false} onClick={() => router.push('/services')} />
           <NavItem icon="📋" label="งานด่วน" active={false} onClick={() => router.push('/win-online')} />
-          <NavItem icon="👤" label="ฉัน" active={false} onClick={() => router.push('/profile/edit')} />
+          <NavItem icon="👤" label="ฉัน" active={false} onClick={() => router.push('/profile')} />
         </div>
 
       </div>
@@ -187,7 +187,7 @@ function NavItem({ icon, label, active, onClick }: any) {
     <div onClick={onClick} className={`flex flex-col items-center gap-1.5 cursor-pointer transition-all ${active ? 'scale-110' : 'opacity-40 hover:opacity-100'} w-16`}>
       <span className="text-2xl">{icon}</span>
       <span className={`text-[10px] font-bold ${active ? 'text-[#EE4D2D]' : 'text-gray-500'}`}>{label}</span>
-      {active && <div className="w-1.5 h-1.5 bg-[#EE4D2D] rounded-full shadow-sm"></div>}
+      {active && <div className="w-1.5 h-1.5 bg-[#EE4D2D] rounded-full shadow-sm mt-0.5"></div>}
     </div>
   );
 }
