@@ -1,172 +1,149 @@
+// app/profile/page.tsx
 'use client';
+
+import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase'; // ⚠️ ปรับ path ตามโปรเจกต์ของคุณ
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
-export default function ProfilePage() {
-  const router = useRouter();
-
-  // จำลองข้อมูลผู้ใช้
-  const user = {
-    name: 'สุรพงษ์ วีรวัฒน์พงศ์',
-    initial: 'ส',
-    phone: '081-234-5678',
-    email: 'surapong.b3@example.com',
-    role: 'ผู้ใช้งานทั่วไป',
-    points: 1250,
-  };
-
-  const handleLogout = async () => {
-    alert('ออกจากระบบเรียบร้อยแล้ว');
-    router.push('/login');
-  };
+// คอมโพเนนต์ย่อยสำหรับแถวเมนู (Menu Row) เพื่อความสะอาดของโค้ด
+function ProfileMenuRow({ icon, label, href, status, isPrivate = false, isLoggedIn = false }) {
+  // ✅ เงื่อนไข: ถ้าเป็นเมนูส่วนตัว และผู้ใช้ยังไม่ได้ล็อกอิน ให้ซ่อนเมนูนี้
+  if (isPrivate && !isLoggedIn) return null;
 
   return (
-    <div className="min-h-screen bg-gray-100 flex justify-center">
-      {/* 🧩 ตัวแอป Container */}
-      <div className="w-full sm:max-w-2xl md:max-w-3xl bg-[#F4F6F8] min-h-screen pb-28 shadow-xl relative flex flex-col">
-        
-        {/* 🟠 Header Profile (โทนส้มทอง Shopee) */}
-        <div className="bg-gradient-to-b from-[#EE4D2D] to-[#FF7337] rounded-b-[2.5rem] p-6 pt-16 shadow-md relative z-10 text-center">
-          
-          <div className="absolute top-6 right-6">
-            <button className="text-white/90 text-xl hover:text-white transition-colors">⚙️</button>
-          </div>
-
-          {/* รูปโปรไฟล์ */}
-          <div className="w-24 h-24 bg-white rounded-full mx-auto border-4 border-white/20 shadow-lg flex items-center justify-center text-4xl font-black text-[#EE4D2D] relative">
-            {user.initial}
-            <button 
-              onClick={() => router.push('/profile/edit')}
-              className="absolute bottom-0 right-0 bg-gray-100 border-2 border-white rounded-full p-1.5 shadow-sm active:scale-90 transition-transform cursor-pointer"
-            >
-              <span className="text-[10px]">✏️</span>
-            </button>
-          </div>
-
-          <h1 className="text-2xl font-black text-white mt-4 tracking-tight">{user.name}</h1>
-          <p className="text-white/80 text-xs mt-1 font-medium">{user.phone}</p>
-          
-          {/* ป้ายสถานะ */}
-          <div className="mt-3 inline-block bg-white/20 backdrop-blur-sm px-4 py-1.5 rounded-full border border-white/30">
-            <span className="text-white text-[10px] font-bold tracking-wide">🏷️ {user.role}</span>
-          </div>
+    <Link href={href} className="flex items-center justify-between py-4 border-b border-gray-100 last:border-0 hover:bg-gray-50 px-2 rounded-lg transition-colors">
+      <div className="flex items-center gap-3.5">
+        <span className="text-xl text-gray-700">{icon}</span>
+        <div>
+          <span className="font-bold text-gray-800 text-sm">{label}</span>
+          {status && <p className="text-[10px] text-gray-500 mt-0.5">{status}</p>}
         </div>
-
-        {/* 📋 ส่วนเนื้อหาหลัก */}
-        <div className="p-5 space-y-4 -mt-4 relative z-20">
-          
-          {/* 💰 กล่องคะแนน / กระเป๋าเงิน */}
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex justify-between items-center">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-orange-50 rounded-full flex items-center justify-center text-2xl">
-                🪙
-              </div>
-              <div>
-                <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-0.5">คะแนนสะสม จงเจริญ</p>
-                <h2 className="text-xl font-black text-[#EE4D2D] leading-none">{user.points.toLocaleString()} <span className="text-xs text-gray-500">แต้ม</span></h2>
-              </div>
-            </div>
-            <button className="bg-gray-50 text-[#EE4D2D] text-[10px] font-black px-4 py-2 rounded-xl border border-gray-200 hover:bg-orange-50 transition-colors">
-              แลกสิทธิพิเศษ
-            </button>
-          </div>
-
-          {/* 🪪 ข้อมูลส่วนตัวและเอกสาร (เพิ่มใหม่ตามคำสั่ง) */}
-          <div className="bg-white rounded-[1.5rem] shadow-sm border border-gray-100 overflow-hidden">
-            <MenuRow 
-              icon="🪪" 
-              title="จัดการข้อมูลส่วนตัวและเอกสาร" 
-              subtitle="เพิ่ม/แก้ไข ประวัติ, ใบขับขี่, ใบประกาศนียบัตร"
-              onClick={() => router.push('/profile/edit')} 
-              isHighlight={true}
-            />
-          </div>
-
-          {/* 🛠️ เมนูการจัดการ (สำหรับคนรับงาน) */}
-          <div className="bg-white rounded-[1.5rem] shadow-sm border border-gray-100 overflow-hidden">
-            <div className="px-5 py-4 bg-gray-50 border-b border-gray-100">
-              <h3 className="font-bold text-gray-800 text-xs uppercase tracking-widest">สำหรับผู้ให้บริการ</h3>
-            </div>
-            
-            <MenuRow 
-              icon="🛵" 
-              title="สมัครเปิดคิวรถ (Fast Delivery)" 
-              subtitle="ลงทะเบียนรถและยืนยันตัวตน"
-              onClick={() => router.push('/driver-register')} 
-            />
-            <MenuRow 
-              icon="📝" 
-              title="จัดการประกาศรับงานของฉัน" 
-              subtitle="แก้ไขบริการช่าง / แม่บ้าน"
-              onClick={() => alert('ฟีเจอร์กำลังพัฒนาค่ะ')} 
-            />
-          </div>
-
-          {/* ⚙️ เมนูทั่วไป */}
-          <div className="bg-white rounded-[1.5rem] shadow-sm border border-gray-100 overflow-hidden">
-             <MenuRow icon="📜" title="ประวัติการใช้งานแอป" onClick={() => router.push('/history')} />
-             <MenuRow icon="❤️" title="บริการที่บันทึกไว้ (Favorites)" onClick={() => alert('ฟีเจอร์กำลังพัฒนาค่ะ')} />
-             <MenuRow icon="🎧" title="ศูนย์ช่วยเหลือ / ติดต่อแอดมิน" onClick={() => alert('ฟีเจอร์กำลังพัฒนาค่ะ')} />
-          </div>
-
-          {/* 🚪 ปุ่มออกจากระบบ */}
-          <button 
-            onClick={handleLogout}
-            className="w-full bg-white text-red-500 font-black py-4 rounded-2xl shadow-sm border border-red-50 hover:bg-red-50 active:scale-95 transition-all text-sm mt-4"
-          >
-            ออกจากระบบ
-          </button>
-          
-          {/* Version App */}
-          <p className="text-center text-gray-400 text-[10px] font-medium mt-6 pb-4">
-            Jong Jaroen App Version 1.0.0
-          </p>
-        </div>
-
-        {/* 🧭 Bottom Nav */}
-        <div className="fixed bottom-0 w-full sm:max-w-2xl md:max-w-3xl bg-white/95 backdrop-blur-md border-t border-gray-100 px-8 py-4 flex justify-between items-center shadow-[0_-4px_25px_rgba(0,0,0,0.06)] rounded-t-[2.5rem] z-50">
-           <button onClick={() => router.push('/')} className="flex flex-col items-center gap-1 opacity-40">
-             <span className="text-xl">🏠</span><span className="text-[10px] font-bold text-gray-500">หน้าแรก</span>
-           </button>
-           <button onClick={() => router.push('/services')} className="flex flex-col items-center gap-1 opacity-40">
-             <span className="text-xl">🛠️</span><span className="text-[10px] font-bold text-gray-500">บริการ</span>
-           </button>
-           <button onClick={() => router.push('/win-online')} className="flex flex-col items-center gap-1 opacity-40">
-             <span className="text-xl">📋</span><span className="text-[10px] font-bold text-gray-500">ด่วนนน</span>
-           </button>
-           <button onClick={() => router.push('/history')} className="flex flex-col items-center gap-1 opacity-40">
-             <span className="text-xl">📜</span><span className="text-[10px] font-bold text-gray-500">ประวัติ</span>
-           </button>
-           
-           {/* ✅ Active Tab "ฉัน" */}
-           <div className="flex flex-col items-center gap-1 scale-110">
-             <span className="text-xl">👤</span>
-             <span className="text-[10px] font-bold text-[#EE4D2D]">ฉัน</span>
-             <div className="w-1.5 h-1.5 bg-[#EE4D2D] rounded-full shadow-sm"></div>
-           </div>
-        </div>
-
       </div>
-    </div>
+      <div className="flex items-center gap-2">
+        {status && <span className="text-[9px] font-bold bg-gray-100 px-2.5 py-1 rounded-full text-gray-600 shadow-inner">{status}</span>}
+        <span className="text-gray-300 text-lg">›</span>
+      </div>
+    </Link>
   );
 }
 
-// คอมโพเนนต์ย่อยสำหรับแถวเมนู
-function MenuRow({ icon, title, subtitle, onClick, isHighlight = false }: any) {
+export default function ProfilePage() {
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
+
+  useEffect(() => {
+    // 🔍 ดึงข้อมูลผู้ใช้ปัจจุบันจาก Supabase
+    async function getUserData() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        setUser(session.user);
+      }
+      setLoading(false);
+    }
+    getUserData();
+  }, []);
+
+  const isLoggedIn = !!user; // ตรวจสอบสถานะการล็อกอิน
+
+  // ฟังก์ชันสำหรับ Handle การ Log Out
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    router.push('/login'); // พากลับไปหน้า Login
+  };
+
+  if (loading) return <div className="p-10 text-center text-gray-500">กำลังโหลด...</div>;
+
   return (
-    <div 
-      onClick={onClick}
-      className="flex items-center justify-between p-4 border-b border-gray-50 last:border-0 cursor-pointer hover:bg-gray-50 active:bg-gray-100 transition-colors"
-    >
-      <div className="flex items-center gap-4">
-        <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center text-xl shadow-inner border border-gray-100">
-          {icon}
+    <div className="min-h-screen bg-gray-50 flex justify-center pb-24">
+      {/* Container หลัก */}
+      <div className="w-full sm:max-w-2xl md:max-w-3xl bg-white min-h-screen relative flex flex-col shadow-xl overflow-hidden rounded-t-[2.5rem]">
+        
+        {/* 🟠 ส่วนหัว Profile (เหมือนใน image_2.png) */}
+        <div className="bg-orange-50 p-6 pt-12 flex items-center gap-4 border-b border-orange-100">
+          <div className="w-16 h-16 bg-white rounded-full border-4 border-white shadow-md flex items-center justify-center text-2xl font-black text-orange-600 flex-shrink-0">
+            {isLoggedIn ? (user.user_metadata?.full_name?.charAt(0) || user.email?.charAt(0).toUpperCase()) : 'G'}
+          </div>
+          <div>
+            <h1 className="text-xl font-black text-gray-900 tracking-tight">
+              {isLoggedIn ? (user.user_metadata?.full_name || user.email?.split('@')[0]) : 'ผู้เยี่ยมชม'}
+            </h1>
+            <p className="text-gray-600 text-xs mt-0.5">
+              {isLoggedIn ? user.email : 'สมัครสมาชิกเพื่อใช้บริการเต็มรูปแบบ'}
+            </p>
+          </div>
+          {!isLoggedIn && (
+            <Link href="/login" className="ml-auto bg-orange-600 text-white px-5 py-2.5 rounded-full text-xs font-bold shadow-md hover:bg-orange-700 active:scale-95 transition-all">
+              เข้าสู่ระบบ
+            </Link>
+          )}
         </div>
-        <div>
-          <h4 className={`text-sm font-bold ${isHighlight ? 'text-[#EE4D2D]' : 'text-gray-800'}`}>{title}</h4>
-          {subtitle && <p className="text-[10px] text-gray-500 mt-0.5">{subtitle}</p>}
+
+        {/* 📋 ส่วนรายการเมนู */}
+        <div className="p-6 space-y-8 flex-1">
+          
+          {/* ✅ กลุ่มเมนู: ข้อมูลส่วนตัวและการเงิน */}
+          <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+            <h2 className="text-xs font-black text-gray-400 uppercase tracking-wider mb-2 px-1">ข้อมูลส่วนตัวและการเงิน</h2>
+            <div className="space-y-0.5">
+              <ProfileMenuRow 
+                icon="💳" 
+                label="บัญชีรับเงิน (Bank Account)" 
+                href="/profile/bank-account" 
+                status="ตั้งค่าช่องทางรับเงิน" 
+                isPrivate={true} 
+                isLoggedIn={isLoggedIn} // ✅ แสดงเฉพาะเมื่อล็อกอิน
+              />
+              {/* ✅ โค้ดที่บีสามต้องเพิ่ม: เมนูประวัติรายการ */}
+              <ProfileMenuRow 
+                icon="📜" // ใช้ไอคอนรูปม้วนกระดาษ หรือ 🕒 นาฬิกา ก็ได้ครับ
+                label="ประวัติรายการ" 
+                href="/history" 
+                status="บันทึกกิจกรรมทั้งหมด" 
+                isPrivate={true} // ✅ เป็นเมนูส่วนตัว
+                isLoggedIn={isLoggedIn} // ✅ แสดงเฉพาะเมื่อล็อกอินแล้วเท่านั้น
+              />
+            </div>
+          </div>
+
+          {/* กลุ่มเมนู: ยืนยันตัวตน (ตามภาพ image_2.png) */}
+          <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+            <h2 className="text-xs font-black text-gray-400 uppercase tracking-wider mb-2 px-1">ยืนยันตัวตน</h2>
+            <div className="space-y-0.5">
+              <ProfileMenuRow 
+                icon="🛡️" 
+                label="ยืนยันตัวตน (KYC)" 
+                href="/profile/kyc" 
+                status="ผ่านแล้ว" 
+                isPrivate={true} 
+                isLoggedIn={isLoggedIn} 
+              />
+              {/* เมนูอื่นๆ เช่น แฟ้มเอกสาร... */}
+            </div>
+          </div>
+
+          {/* กลุ่มเมนู: ตั้งค่าและอื่นๆ */}
+          <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+            <h2 className="text-xs font-black text-gray-400 uppercase tracking-wider mb-2 px-1">ตั้งค่า</h2>
+            <div className="space-y-0.5">
+              <ProfileMenuRow icon="⚙️" label="ตั้งค่าแอป" href="/settings" />
+              <ProfileMenuRow icon="💬" label="ศูนย์ความช่วยเหลือ" href="/help" />
+            </div>
+          </div>
+
+          {/* ✅ ปุ่ม Log Out (แสดงเฉพาะเมื่อล็อกอิน) */}
+          {isLoggedIn && (
+            <button 
+              onClick={handleSignOut}
+              className="w-full bg-gray-100 text-gray-700 py-4 rounded-xl font-bold text-sm shadow-inner hover:bg-gray-200 active:scale-[0.98] transition-all mt-6"
+            >
+              ออกจากระบบ
+            </button>
+          )}
+
         </div>
       </div>
-      <span className="text-gray-300">›</span>
     </div>
   );
 }
