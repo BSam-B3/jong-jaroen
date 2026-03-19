@@ -1,13 +1,6 @@
 'use client';
 import { useState, useMemo } from 'react';
-import Link from 'next/link';
-
-// ── Soft Shopee Palette ─────────────────────────────────────────
-const themePalette = {
-  primaryOrange: '#F05D40', 
-  lightOrange: '#FF8769',   
-  bgGray: '#F9FAFB',        
-};
+import { useRouter } from 'next/navigation';
 
 // 🌟 Mock Data: ข่าวสารและกิจกรรม 🌟
 const communityNews = [
@@ -22,6 +15,7 @@ const monthNames = ["มกราคม", "กุมภาพันธ์", "ม
 const weekDays = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
 
 export default function NewsPage() {
+  const router = useRouter();
   const today = new Date();
   const [viewDate, setViewDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1)); 
   const [activeEventId, setActiveEventId] = useState<number | null>(null);
@@ -64,7 +58,6 @@ export default function NewsPage() {
     const evs = getEventsForDay(dayStr);
     if (evs.length > 0) {
       setActiveEventId(activeEventId === evs[0].id ? null : evs[0].id);
-      // เมื่อกดเลือกวันที่มีงาน ให้สไลด์ปฏิทินเก็บลงอัตโนมัติ เพื่อให้เห็นรายละเอียดข่าว
       setIsCalendarOpen(false); 
     } else {
       setActiveEventId(null);
@@ -75,11 +68,11 @@ export default function NewsPage() {
   const renderCalendar = () => (
     <div className="bg-white/95 backdrop-blur-xl rounded-[28px] p-5 shadow-[0_10px_40px_rgba(0,0,0,0.12)] border border-white/50 relative overflow-hidden w-full h-full">
       <div className="flex items-center justify-between mb-4">
-        <button onClick={prevMonth} className="w-8 h-8 flex items-center justify-center bg-gray-50 rounded-full hover:bg-orange-50 text-gray-500 hover:text-orange-500 transition-colors shadow-sm">❮</button>
+        <button onClick={prevMonth} className="w-8 h-8 flex items-center justify-center bg-gray-50 rounded-full hover:bg-orange-50 text-gray-500 hover:text-[#EE4D2D] transition-colors shadow-sm">❮</button>
         <h2 className="text-sm font-black text-gray-800 flex items-center gap-2">
           📅 {monthNames[viewDate.getMonth()]} {viewDate.getFullYear() + 543}
         </h2>
-        <button onClick={nextMonth} className="w-8 h-8 flex items-center justify-center bg-gray-50 rounded-full hover:bg-orange-50 text-gray-500 hover:text-orange-500 transition-colors shadow-sm">❯</button>
+        <button onClick={nextMonth} className="w-8 h-8 flex items-center justify-center bg-gray-50 rounded-full hover:bg-orange-50 text-gray-500 hover:text-[#EE4D2D] transition-colors shadow-sm">❯</button>
       </div>
 
       <div className="grid grid-cols-7 gap-y-3 gap-x-1 text-center mb-1">
@@ -94,7 +87,6 @@ export default function NewsPage() {
           const isActiveEvent = activeEventId && dayEvents.some(e => e.id === activeEventId);
           const activeEvDetails = dayEvents.find(e => e.id === activeEventId);
           
-          // เช็กว่าใช่วันนี้หรือไม่
           const isToday = today.getDate() === day && today.getMonth() === viewDate.getMonth() && today.getFullYear() === viewDate.getFullYear();
 
           return (
@@ -102,9 +94,8 @@ export default function NewsPage() {
                  onClick={() => handleDayClick(dayStr)}
                  className={`flex flex-col items-center justify-center h-10 cursor-pointer relative ${dayEvents.length > 0 ? 'group' : ''}`}>
               
-              {/* 📍 หมุดเช็คอินบอก "วันนี้" */}
               {isToday && (
-                <span className="absolute -top-3.5 text-sm z-20 drop-shadow-sm animate-bounce-short">
+                <span className="absolute -top-3.5 text-sm z-20 drop-shadow-sm animate-bounce">
                   📍
                 </span>
               )}
@@ -135,139 +126,145 @@ export default function NewsPage() {
   );
 
   return (
-    <div className="min-h-screen pb-24 relative" style={{ backgroundColor: themePalette.bgGray }}>
-      
-      {/* ── Header ── */}
-      <header className="pt-10 pb-8 px-4 shadow-sm relative overflow-hidden rounded-b-[32px]"
-        style={{ background: `linear-gradient(180deg, ${themePalette.primaryOrange} 0%, ${themePalette.lightOrange} 100%)` }}>
-        <div className="max-w-xl mx-auto flex items-center gap-4 relative z-10">
-          <Link href="/" className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center text-white backdrop-blur-sm hover:bg-white/30 transition-colors">
-            ❮
-          </Link>
-          <div className="space-y-1 text-left">
-            <h1 className="text-white text-2xl font-black drop-shadow-md tracking-tight">
-              📰 ข่าวสารชุมชน
-            </h1>
-            <p className="text-white/90 text-[11px] font-medium">
-              อัปเดตทุกความเคลื่อนไหว กิจกรรม และประกาศสำคัญ
-            </p>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-xl mx-auto px-3 relative z-20">
+    <div className="min-h-screen bg-gray-100 flex justify-center pb-24">
+      <div className="w-full sm:max-w-2xl md:max-w-3xl bg-[#F4F6F8] min-h-screen relative flex flex-col shadow-xl overflow-x-hidden">
         
-        {/* ── News Feed (กินพื้นที่เต็มจอ ไม่มีปฏิทินมาเกะกะด้านบนแล้ว) ── */}
-        <section className="space-y-3 mt-4">
-          <div className="flex justify-between items-end px-1">
-            <h2 className="text-sm font-black text-gray-800">ประกาศเรียงตามวันที่</h2>
-            <span className="text-[10px] text-gray-400">พบ {monthEvents.length} รายการ</span>
-          </div>
+        {/* ส่วนเนื้อหาที่ Scroll ได้ */}
+        <div className="flex-1 overflow-y-auto pb-6 scrollbar-hide">
           
-          <div className="space-y-3">
-            {monthEvents.length === 0 ? (
-              <div className="bg-white rounded-2xl p-8 text-center border border-dashed border-gray-200">
-                <p className="text-xs text-gray-400">ไม่มีกิจกรรมในเดือนนี้</p>
+          {/* ✅ 🟠 Header ปรับเป็น "การ์ดลอย" มุมมน 4 ด้าน */}
+          <div className="bg-gradient-to-b from-[#EE4D2D] to-[#FF7337] rounded-[2.5rem] p-6 pt-8 shadow-md relative z-10 m-3 mt-4">
+            <div className="flex items-center gap-3 mb-2 px-2">
+              <button onClick={() => router.push('/')} className="text-white font-bold text-lg active:scale-90 transition-transform">←</button>
+              <div className="space-y-0.5 text-left">
+                <h1 className="text-white text-xl font-black drop-shadow-md tracking-tight">
+                  📰 ข่าวสารชุมชน
+                </h1>
+                <p className="text-white/90 text-[11px] font-medium">
+                  อัปเดตทุกความเคลื่อนไหว กิจกรรม และประกาศสำคัญ
+                </p>
               </div>
-            ) : (
-              monthEvents.map((news) => {
-                const isActive = activeEventId === news.id;
-                const startDay = parseInt(news.startDate.split('-')[2]);
-                const endDay = parseInt(news.endDate.split('-')[2]);
-                const dateDisplay = startDay === endDay ? `${startDay}` : `${startDay}-${endDay}`;
-                
-                return (
-                  <div 
-                    key={news.id} 
-                    onClick={() => setActiveEventId(isActive ? null : news.id)}
-                    className={`bg-white rounded-2xl p-4 shadow-sm border cursor-pointer transition-all duration-300 hover:shadow-md
-                      ${isActive ? `border-transparent ring-2 ring-offset-1 ${news.colorCard.replace('bg-', 'ring-').split(' ')[0]} scale-[1.02] z-10 relative` : 'border-gray-100'}
-                    `}
-                  >
-                    <div className="flex gap-4 items-start">
-                      <div className={`w-12 h-12 rounded-[16px] flex items-center justify-center text-2xl shadow-inner shrink-0 ${news.colorCard}`}>
-                        {news.icon}
-                      </div>
-                      <div className="space-y-1 flex-1">
-                        <div className="flex justify-between items-start">
-                          <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded
-                            ${isActive ? news.colorActive : 'bg-gray-100 text-gray-500'}`}>
-                            {news.category}
-                          </span>
-                          <span className="text-[10px] font-bold text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full">
-                            {dateDisplay} {monthNames[viewDate.getMonth()].slice(0, 3)}.
-                          </span>
-                        </div>
-                        <h3 className={`text-sm font-bold leading-snug transition-colors
-                          ${isActive ? news.colorCard.split(' ')[1] : 'text-gray-800'}`}>
-                          {news.title}
-                        </h3>
-                        {isActive && (
-                          <div className="pt-2 border-t border-gray-50 mt-2 animate-fade-in-up space-y-2">
-                            <p className="text-xs text-gray-500">
-                              🕒 เวลา: 09:00 - 16:00 น.
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              📍 สถานที่: ลานอเนกประสงค์ปากน้ำประแส
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
-            )}
+            </div>
           </div>
-        </section>
 
-      </main>
+          <main className="px-5 relative z-20">
+            
+            {/* ── News Feed ── */}
+            <section className="space-y-3 mt-4">
+              <div className="flex justify-between items-end px-1">
+                <h2 className="text-sm font-black text-gray-800">ประกาศเรียงตามวันที่</h2>
+                <span className="text-[10px] text-gray-400 font-bold">พบ {monthEvents.length} รายการ</span>
+              </div>
+              
+              <div className="space-y-3">
+                {monthEvents.length === 0 ? (
+                  <div className="bg-white rounded-[2rem] p-10 text-center shadow-sm border border-gray-100">
+                    <div className="text-5xl mb-3 opacity-40">📭</div>
+                    <p className="font-bold text-gray-700">ไม่มีกิจกรรมในเดือนนี้</p>
+                    <p className="text-[10px] text-gray-500 mt-1">ลองเลื่อนปฏิทินดูเดือนอื่นนะคะ</p>
+                  </div>
+                ) : (
+                  monthEvents.map((news) => {
+                    const isActive = activeEventId === news.id;
+                    const startDay = parseInt(news.startDate.split('-')[2]);
+                    const endDay = parseInt(news.endDate.split('-')[2]);
+                    const dateDisplay = startDay === endDay ? `${startDay}` : `${startDay}-${endDay}`;
+                    
+                    return (
+                      <div 
+                        key={news.id} 
+                        onClick={() => setActiveEventId(isActive ? null : news.id)}
+                        className={`bg-white rounded-3xl p-4 shadow-sm border cursor-pointer transition-all duration-300 hover:shadow-md
+                          ${isActive ? `border-transparent ring-2 ring-offset-1 ${news.colorCard.replace('bg-', 'ring-').split(' ')[0]} scale-[1.02] z-10 relative` : 'border-gray-100'}
+                        `}
+                      >
+                        <div className="flex gap-4 items-start">
+                          <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl shadow-inner shrink-0 ${news.colorCard}`}>
+                            {news.icon}
+                          </div>
+                          <div className="space-y-1 flex-1 py-0.5">
+                            <div className="flex justify-between items-start">
+                              <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full
+                                ${isActive ? news.colorActive : 'bg-gray-100 text-gray-500'}`}>
+                                {news.category}
+                              </span>
+                              <span className="text-[10px] font-bold text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full">
+                                {dateDisplay} {monthNames[viewDate.getMonth()].slice(0, 3)}.
+                              </span>
+                            </div>
+                            <h3 className={`text-sm font-bold leading-snug transition-colors mt-1
+                              ${isActive ? news.colorCard.split(' ')[1] : 'text-gray-800'}`}>
+                              {news.title}
+                            </h3>
+                            {isActive && (
+                              <div className="pt-2 border-t border-gray-50 mt-3 space-y-2">
+                                <p className="text-xs text-gray-600 font-medium">
+                                  🕒 <span className="text-gray-500">เวลา:</span> 09:00 - 16:00 น.
+                                </p>
+                                <p className="text-xs text-gray-600 font-medium">
+                                  📍 <span className="text-gray-500">สถานที่:</span> ลานอเนกประสงค์ปากน้ำประแส
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </section>
+          </main>
+        </div>
 
-      {/* 🌟 Floating Calendar Widget (สไลด์ขึ้น-ลง จากมุมขวาล่าง) 🌟 */}
-      {/* เอาระบบจอดำ (Overlay) ออกไปแล้ว ทำให้เลื่อนอ่านข่าวข้างหลังได้อิสระ */}
-      <div 
-        className={`fixed right-4 z-[90] transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] origin-bottom-right w-[90vw] max-w-[340px]
-          ${isCalendarOpen 
-            ? 'bottom-[88px] opacity-100 scale-100 translate-y-0' 
-            : 'bottom-[88px] opacity-0 scale-50 translate-y-10 pointer-events-none' // ซ่อนและย่อลงไปที่ปุ่ม
-          }`}
-      >
-        {renderCalendar()}
+        {/* 🌟 Floating Calendar Widget (สไลด์ขึ้น-ลง) 🌟 */}
+        <div 
+          className={`absolute right-4 z-[90] transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] origin-bottom-right w-[90vw] max-w-[340px]
+            ${isCalendarOpen 
+              ? 'bottom-[100px] opacity-100 scale-100 translate-y-0' 
+              : 'bottom-[100px] opacity-0 scale-50 translate-y-10 pointer-events-none'
+            }`}
+        >
+          {renderCalendar()}
+        </div>
+
+        {/* 🌟 ปุ่มเปิด/ปิด ปฏิทินลอยตัว (FAB) ปรับสีให้เข้าธีม 🌟 */}
+        <button
+          onClick={() => setIsCalendarOpen(!isCalendarOpen)}
+          className={`absolute bottom-[100px] right-4 z-[95] text-white w-14 h-14 rounded-full shadow-[0_8px_25px_rgba(238,77,45,0.4)] flex items-center justify-center text-2xl transition-all duration-300 border-2 border-white
+            ${isCalendarOpen ? 'bg-gray-800 rotate-180 hover:bg-gray-700' : 'bg-[#EE4D2D] hover:scale-110 active:scale-95'}`}
+          aria-label="Toggle Calendar"
+        >
+          {isCalendarOpen ? '↓' : '📅'}
+        </button>
+
+        {/* ✅ Bottom Navigation อัปเดตให้มี 6 ไอคอน (Active: ข่าวสาร) */}
+        <div className="fixed bottom-0 w-full sm:max-w-2xl md:max-w-3xl bg-white/95 backdrop-blur-md border-t border-gray-100 px-1 py-4 flex justify-between items-center shadow-[0_-4px_25px_rgba(0,0,0,0.06)] rounded-t-[2.5rem] z-50">
+          <NavItem icon="🏠" label="หน้าแรก" active={false} onClick={() => router.push('/')} />
+          <NavItem icon="🛠️" label="บริการ" active={false} onClick={() => router.push('/services')} />
+          <NavItem icon="📋" label="งานด่วน" active={false} onClick={() => router.push('/win-online')} />
+          <NavItem icon="📰" label="ข่าวสาร" active={true} onClick={() => {}} />
+          <NavItem icon="🎟️" label="ปองเจริญ" active={false} onClick={() => router.push('/coupons')} />
+          <NavItem icon="👤" label="ฉัน" active={false} onClick={() => router.push('/profile')} />
+        </div>
+
       </div>
 
-      {/* 🌟 ปุ่มเปิด/ปิด ปฏิทินลอยตัว (Floating Action Button) 🌟 */}
-      <button
-        onClick={() => setIsCalendarOpen(!isCalendarOpen)}
-        className={`fixed bottom-[76px] right-4 z-[95] text-white w-14 h-14 rounded-full shadow-[0_8px_25px_rgba(240,93,64,0.4)] flex items-center justify-center text-2xl transition-all duration-300 border-2 border-white
-          ${isCalendarOpen ? 'bg-gray-800 rotate-180 hover:bg-gray-700' : 'bg-[#F05D40] hover:scale-110 active:scale-95'}`}
-        aria-label="Toggle Calendar"
-      >
-        {isCalendarOpen ? '↓' : '📅'}
-      </button>
+      <style dangerouslySetInnerHTML={{__html: `
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+      `}} />
+    </div>
+  );
+}
 
-      {/* 🛠️ Bottom Nav 🛠️ */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 flex justify-around py-2 z-[100] shadow-[0_-5px_20px_rgba(0,0,0,0.05)] pb-safe">
-        <Link href="/" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-orange-400 transition-colors">
-          <span className="text-xl">🏠</span>
-          <span className="text-[10px]">หน้าแรก</span>
-        </Link>
-        <Link href="/news" className="flex flex-col items-center gap-0.5 font-bold" style={{ color: themePalette.primaryOrange }}>
-          <span className="text-xl">📰</span>
-          <span className="text-[10px]">ข่าวสาร</span>
-        </Link>
-        <Link href="/coupons" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-orange-400 transition-colors">
-          <span className="text-xl">🎟️</span>
-          <span className="text-[10px]">รางวัล</span>
-        </Link>
-        <Link href="/jobs" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-orange-400 transition-colors">
-          <span className="text-xl">📋</span>
-          <span className="text-[10px]">งาน</span>
-        </Link>
-        <Link href="/profile" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-orange-400 transition-colors">
-          <span className="text-xl">👤</span>
-          <span className="text-[10px]">ฉัน</span>
-        </Link>
-      </nav>
+// คอมโพเนนต์เมนูด้านล่าง ปรับปรุงใหม่ใช้ flex-1
+function NavItem({ icon, label, active, onClick }: any) {
+  return (
+    <div onClick={onClick} className={`flex flex-col items-center gap-1.5 cursor-pointer transition-all ${active ? 'scale-110' : 'opacity-40 hover:opacity-100'} flex-1`}>
+      <span className="text-[22px]">{icon}</span>
+      <span className={`text-[9px] font-bold ${active ? 'text-[#EE4D2D]' : 'text-gray-500'} whitespace-nowrap`}>{label}</span>
+      {active && <div className="w-1.5 h-1.5 bg-[#EE4D2D] rounded-full shadow-sm mt-0.5"></div>}
     </div>
   );
 }
