@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, Suspense } from 'react';
+import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 // --- สร้าง Component หลักแยกออกมาเพื่อใช้ Suspense ครอบ (แก้ Error ของ Next.js) ---
@@ -13,7 +13,6 @@ function ServicesContent() {
 
   const [searchQuery, setSearchQuery] = useState(initialQuery);
   const [activeCategory, setActiveCategory] = useState(initialCategory);
-  const [activeTab, setActiveTab] = useState('services');
 
   const CATEGORIES = ['ทั้งหมด', 'ล้างแอร์', 'ช่างไฟ', 'ประปา', 'แม่บ้าน', 'ซ่อมรถ', 'ขนส่ง', 'ย้ายบ้าน', 'อื่นๆ'];
 
@@ -35,17 +34,17 @@ function ServicesContent() {
 
   return (
     <div className="min-h-screen bg-gray-100 flex justify-center pb-24">
-      <div className="w-full sm:max-w-2xl md:max-w-3xl bg-[#F4F6F8] min-h-screen relative flex flex-col shadow-xl overflow-x-hidden">
+      <div className="w-full sm:max-w-2xl md:max-w-3xl bg-[#F4F6F8] min-h-screen relative flex flex-col shadow-xl overflow-x-hidden rounded-t-[2.5rem]">
         
-        {/* 🟠 Header & Search */}
-        <div className="bg-gradient-to-br from-[#EE4D2D] to-[#FF7337] rounded-b-[2.5rem] pt-12 pb-6 px-6 shadow-md relative z-10">
-          <div className="flex items-center gap-3 mb-5">
+        {/* ✅ 🟠 Header ปรับไล่สีส้ม-ทอง และข้อความ (ตามโทนสีใหม่) */}
+        <div className="bg-gradient-to-b from-[#EE4D2D] to-[#FF7337] rounded-b-[2.5rem] pt-12 pb-6 px-6 shadow-md relative z-10">
+          <div className="flex items-center gap-3 mb-5 px-2">
             <button onClick={() => router.push('/')} className="text-white font-bold text-lg active:scale-90 transition-transform">←</button>
             <h1 className="text-xl font-black text-white tracking-tight">ค้นหาบริการ</h1>
           </div>
 
           {/* Search Box */}
-          <div className="relative">
+          <div className="relative mx-2">
             <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
               <span className="text-gray-400 text-lg">🔍</span>
             </div>
@@ -54,7 +53,7 @@ function ServicesContent() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="ค้นหาช่าง, บริการ..."
-              className="w-full bg-white text-gray-800 rounded-2xl py-3.5 pl-12 pr-4 text-sm font-bold shadow-lg outline-none focus:ring-4 focus:ring-white/30 transition-all placeholder:font-medium"
+              className="w-full bg-white text-gray-800 rounded-2xl py-3.5 pl-12 pr-4 text-sm font-bold shadow-lg outline-none focus:ring-4 focus:ring-white/30 transition-all placeholder:font-medium placeholder:text-gray-400"
             />
           </div>
         </div>
@@ -82,7 +81,7 @@ function ServicesContent() {
 
           {/* 📋 รายการบริการ */}
           <div className="px-5 pb-6 space-y-4">
-            <div className="flex justify-between items-end mb-2">
+            <div className="flex justify-between items-end mb-2 px-1">
               <h2 className="text-sm font-black text-gray-800">
                 {activeCategory === 'ทั้งหมด' ? 'บริการแนะนำสำหรับคุณ' : `บริการหมวด: ${activeCategory}`}
               </h2>
@@ -107,9 +106,9 @@ function ServicesContent() {
                   <div key={service.id} className="bg-white p-4 rounded-3xl shadow-sm border border-gray-100 flex gap-4 hover:border-[#EE4D2D]/30 transition-all cursor-pointer active:scale-[0.98]">
                     
                     {/* รูปภาพ/อวาตาร์ */}
-                    <div className="w-20 h-20 bg-orange-50 rounded-2xl flex flex-col items-center justify-center text-3xl border border-orange-100 shrink-0">
+                    <div className="w-20 h-20 bg-orange-50 rounded-2xl flex flex-col items-center justify-center text-3xl border border-orange-100 shrink-0 relative">
                       {service.avatar}
-                      <span className="text-[8px] font-bold text-[#EE4D2D] mt-1 bg-white px-2 py-0.5 rounded-full border border-orange-100">{service.category}</span>
+                      <span className="absolute bottom-0 right-0 text-[7px] font-bold text-[#EE4D2D] bg-white px-1.5 py-0.5 rounded-full border border-orange-100">{service.category}</span>
                     </div>
 
                     {/* ข้อมูล */}
@@ -128,7 +127,7 @@ function ServicesContent() {
                           <span className="text-[9px] text-gray-400 ml-0.5">({service.review_count})</span>
                         </div>
                         <div className="text-right">
-                          <span className="text-[9px] text-gray-400 font-medium">เริ่มต้น</span>
+                          <span className="text-[9px] text-gray-400 font-medium shrink-0">เริ่มต้น</span>
                           <span className="text-sm font-black text-[#EE4D2D] ml-1">฿{service.starting_price.toLocaleString()}</span>
                         </div>
                       </div>
@@ -140,20 +139,16 @@ function ServicesContent() {
           </div>
         </main>
 
-        {/* 🧭 Bottom Nav (Active: บริการ) */}
-        <div className="fixed bottom-0 w-full sm:max-w-2xl md:max-w-3xl bg-white/95 backdrop-blur-md border-t border-gray-100 px-8 py-4 flex justify-between items-center shadow-[0_-4px_25px_rgba(0,0,0,0.06)] rounded-t-[2.5rem] z-50">
-           <button onClick={() => router.push('/')} className="flex flex-col items-center gap-1 opacity-40 hover:opacity-100 transition-opacity"><span className="text-xl">🏠</span><span className="text-[10px] font-bold text-gray-500">หน้าแรก</span></button>
-           
-           {/* ✅ Active: บริการ */}
-           <div className="flex flex-col items-center gap-1 scale-110">
-             <span className="text-xl">🛠️</span>
-             <span className="text-[10px] font-bold text-[#EE4D2D]">บริการ</span>
-             <div className="w-1.5 h-1.5 bg-[#EE4D2D] rounded-full shadow-sm"></div>
-           </div>
+        {/* ✅ ✅ ✅ Bottom Nav ปรับปรุงใหม่เหลือ 4 ไอคอน คลีนๆ (Active: บริการ) ✅ ✅ ✅ */}
+        <div className="fixed bottom-0 w-full sm:max-w-2xl md:max-w-3xl bg-white/95 backdrop-blur-md border-t border-gray-100 px-4 py-4 flex justify-around items-center shadow-[0_-4px_25px_rgba(0,0,0,0.06)] rounded-t-[2.5rem] z-50">
+          <NavItem icon="🏠" label="หน้าแรก" active={false} onClick={() => router.push('/')} />
+          
+          {/* ✅ Active: บริการ */}
+          <NavItem icon="🛠️" label="บริการ" active={true} onClick={() => {}} />
 
-           <button onClick={() => router.push('/win-online')} className="flex flex-col items-center gap-1 opacity-40 hover:opacity-100 transition-opacity"><span className="text-xl">📋</span><span className="text-[10px] font-bold text-gray-500">ด่วนนน</span></button>
-           <button onClick={() => router.push('/history')} className="flex flex-col items-center gap-1 opacity-40 hover:opacity-100 transition-opacity"><span className="text-xl">📜</span><span className="text-[10px] font-bold text-gray-500">ประวัติ</span></button>
-           <button onClick={() => router.push('/profile/edit')} className="flex flex-col items-center gap-1 opacity-40 hover:opacity-100 transition-opacity"><span className="text-xl">👤</span><span className="text-[10px] font-bold text-gray-500">ฉัน</span></button>
+          <NavItem icon="📋" label="งานด่วน" active={false} onClick={() => router.push('/win-online')} />
+          {/* ยุบรวม ประวัติ ไปอยู่ใน ฉัน แล้ว */}
+          <NavItem icon="👤" label="ฉัน" active={false} onClick={() => router.push('/profile')} />
         </div>
 
         <style dangerouslySetInnerHTML={{__html: `
@@ -165,11 +160,22 @@ function ServicesContent() {
   );
 }
 
+// คอมโพเนนต์เมนูด้านล่าง ปรับปรุงใหม่
+function NavItem({ icon, label, active, onClick }: any) {
+  return (
+    <div onClick={onClick} className={`flex flex-col items-center gap-1.5 cursor-pointer transition-all ${active ? 'scale-110' : 'opacity-40 hover:opacity-100'} w-16`}>
+      <span className="text-2xl">{icon}</span>
+      <span className={`text-[10px] font-bold ${active ? 'text-[#EE4D2D]' : 'text-gray-500'}`}>{label}</span>
+      {active && <div className="w-1.5 h-1.5 bg-[#EE4D2D] rounded-full shadow-sm mt-0.5"></div>}
+    </div>
+  );
+}
+
 // ครอบด้วย Suspense ตามข้อบังคับของ Next.js เวลามีการใช้ useSearchParams
 export default function ServicesPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center rounded-t-[2.5rem]">
         <div className="text-center"><div className="text-4xl animate-bounce mb-2 text-[#EE4D2D]">🛠️</div><p className="font-bold text-gray-500">กำลังโหลดบริการ...</p></div>
       </div>
     }>
