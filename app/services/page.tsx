@@ -34,10 +34,10 @@ function ServicesContent() {
 
   return (
     <div className="min-h-screen bg-gray-100 flex justify-center pb-24">
-      <div className="w-full sm:max-w-2xl md:max-w-3xl bg-[#F4F6F8] min-h-screen relative flex flex-col shadow-xl overflow-x-hidden rounded-t-[2.5rem]">
+      <div className="w-full sm:max-w-2xl md:max-w-3xl bg-[#F4F6F8] min-h-screen relative flex flex-col shadow-xl overflow-x-hidden">
         
-        {/* ✅ 🟠 Header ปรับไล่สีส้ม-ทอง และข้อความ (ตามโทนสีใหม่) */}
-        <div className="bg-gradient-to-b from-[#EE4D2D] to-[#FF7337] rounded-b-[2.5rem] pt-12 pb-6 px-6 shadow-md relative z-10">
+        {/* ✅ 🟠 Header ปรับเป็น "การ์ดลอย" มุมมน 4 ด้าน เหมือนหน้า Home */}
+        <div className="bg-gradient-to-b from-[#EE4D2D] to-[#FF7337] rounded-[2.5rem] pt-8 pb-6 px-6 shadow-md relative z-10 m-3 mt-4">
           <div className="flex items-center gap-3 mb-5 px-2">
             <button onClick={() => router.push('/')} className="text-white font-bold text-lg active:scale-90 transition-transform">←</button>
             <h1 className="text-xl font-black text-white tracking-tight">ค้นหาบริการ</h1>
@@ -61,7 +61,7 @@ function ServicesContent() {
         <main className="flex-1 relative z-20 space-y-4">
           
           {/* 🏷️ หมวดหมู่ (Horizontal Scroll) */}
-          <div className="pt-5 pb-2 pl-5">
+          <div className="pt-3 pb-2 pl-5">
             <div className="flex gap-2 overflow-x-auto pr-5 snap-x hide-scrollbar">
               {CATEGORIES.map((cat) => (
                 <button
@@ -139,15 +139,13 @@ function ServicesContent() {
           </div>
         </main>
 
-        {/* ✅ ✅ ✅ Bottom Nav ปรับปรุงใหม่เหลือ 4 ไอคอน คลีนๆ (Active: บริการ) ✅ ✅ ✅ */}
-        <div className="fixed bottom-0 w-full sm:max-w-2xl md:max-w-3xl bg-white/95 backdrop-blur-md border-t border-gray-100 px-4 py-4 flex justify-around items-center shadow-[0_-4px_25px_rgba(0,0,0,0.06)] rounded-t-[2.5rem] z-50">
+        {/* ✅ ✅ ✅ Bottom Nav อัปเดตให้มี 6 ไอคอน (Active: บริการ) ✅ ✅ ✅ */}
+        <div className="fixed bottom-0 w-full sm:max-w-2xl md:max-w-3xl bg-white/95 backdrop-blur-md border-t border-gray-100 px-1 py-4 flex justify-between items-center shadow-[0_-4px_25px_rgba(0,0,0,0.06)] rounded-t-[2.5rem] z-50">
           <NavItem icon="🏠" label="หน้าแรก" active={false} onClick={() => router.push('/')} />
-          
-          {/* ✅ Active: บริการ */}
           <NavItem icon="🛠️" label="บริการ" active={true} onClick={() => {}} />
-
           <NavItem icon="📋" label="งานด่วน" active={false} onClick={() => router.push('/win-online')} />
-          {/* ยุบรวม ประวัติ ไปอยู่ใน ฉัน แล้ว */}
+          <NavItem icon="📰" label="ข่าวสาร" active={false} onClick={() => router.push('/news')} />
+          <NavItem icon="🎟️" label="ปองเจริญ" active={false} onClick={() => router.push('/coupons')} />
           <NavItem icon="👤" label="ฉัน" active={false} onClick={() => router.push('/profile')} />
         </div>
 
@@ -160,12 +158,12 @@ function ServicesContent() {
   );
 }
 
-// คอมโพเนนต์เมนูด้านล่าง ปรับปรุงใหม่
+// คอมโพเนนต์เมนูด้านล่าง ปรับปรุงใหม่ใช้ flex-1 ให้เว้นระยะเท่าๆ กัน
 function NavItem({ icon, label, active, onClick }: any) {
   return (
-    <div onClick={onClick} className={`flex flex-col items-center gap-1.5 cursor-pointer transition-all ${active ? 'scale-110' : 'opacity-40 hover:opacity-100'} w-16`}>
-      <span className="text-2xl">{icon}</span>
-      <span className={`text-[10px] font-bold ${active ? 'text-[#EE4D2D]' : 'text-gray-500'}`}>{label}</span>
+    <div onClick={onClick} className={`flex flex-col items-center gap-1.5 cursor-pointer transition-all ${active ? 'scale-110' : 'opacity-40 hover:opacity-100'} flex-1`}>
+      <span className="text-[22px]">{icon}</span>
+      <span className={`text-[9px] font-bold ${active ? 'text-[#EE4D2D]' : 'text-gray-500'} whitespace-nowrap`}>{label}</span>
       {active && <div className="w-1.5 h-1.5 bg-[#EE4D2D] rounded-full shadow-sm mt-0.5"></div>}
     </div>
   );
@@ -175,7 +173,7 @@ function NavItem({ icon, label, active, onClick }: any) {
 export default function ServicesPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center rounded-t-[2.5rem]">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center"><div className="text-4xl animate-bounce mb-2 text-[#EE4D2D]">🛠️</div><p className="font-bold text-gray-500">กำลังโหลดบริการ...</p></div>
       </div>
     }>
