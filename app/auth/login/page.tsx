@@ -118,7 +118,7 @@ export default function LoginPage() {
         type: 'sms',
       });
       if (error) throw error;
-      if (data.session) router.push('/dashboard');
+      if (data.session) router.push('/auth/signup'); // ไปหน้าตั้งค่าโปรไฟล์
     } catch (err: any) {
       setError('รหัส OTP ไม่ถูกต้อง หรือหมดอายุแล้ว');
     } finally {
@@ -134,7 +134,7 @@ export default function LoginPage() {
     setError('');
     try {
       const { error } = await supabase.auth.signInWithOAuth({
-        provider: provider as any,
+        provider: provider as any, // แก้ Vercel TypeScript Error
         options: {
           redirectTo: `${window.location.origin}/auth/callback` 
         }
@@ -147,15 +147,20 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-yellow-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl shadow-xl w-full max-w-md p-8 relative">
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-yellow-50 flex items-center justify-center p-4 relative overflow-hidden">
+      
+      {/* Background Decor */}
+      <div className="absolute -top-20 -right-20 w-64 h-64 bg-orange-300/20 rounded-full blur-3xl pointer-events-none"></div>
+      
+      <div className="bg-white rounded-[2.5rem] shadow-xl w-full max-w-sm p-8 relative z-10 border border-orange-50">
         
         {/* 🌟 Header */}
-        <div className="text-center mb-8">
-          <div className="text-5xl mb-3">🌟</div>
-          <h1 className="text-3xl font-bold text-gray-800">จงเจริญ</h1>
-          <p className="text-gray-500 mt-1 text-sm">ตลาดแรงงานชุมชนประแส</p>
-          <h2 className="text-xl font-semibold text-orange-600 mt-4">เข้าสู่ระบบ</h2>
+        <div className="text-center mb-6">
+          <div className="text-5xl mb-3 drop-shadow-sm">🌟</div>
+          <h1 className="text-3xl font-black text-[#EE4D2D] tracking-tight">จงเจริญ</h1>
+          {/* ✅ ลบคำว่าประแสออก เปลี่ยนเป็นชื่อกลาง */}
+          <p className="text-gray-500 mt-1 text-[11px] font-bold tracking-widest uppercase">แพลตฟอร์มตลาดแรงงานชุมชน</p>
+          <h2 className="text-lg font-bold text-gray-800 mt-6">เข้าสู่ระบบ</h2>
         </div>
 
         {/* 🔘 สวิตช์เลือกวิธีล็อกอิน */}
@@ -163,16 +168,16 @@ export default function LoginPage() {
           <div className="flex bg-gray-100 p-1 rounded-xl mb-6 shadow-inner">
             <button
               onClick={() => { setLoginMethod('email'); setError(''); }}
-              className={`flex-1 py-2.5 text-sm font-semibold rounded-lg transition-all ${
-                loginMethod === 'email' ? 'bg-white text-orange-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all ${
+                loginMethod === 'email' ? 'bg-white text-[#EE4D2D] shadow-sm' : 'text-gray-500 hover:text-gray-700'
               }`}
             >
               อีเมล
             </button>
             <button
               onClick={() => { setLoginMethod('phone'); setError(''); }}
-              className={`flex-1 py-2.5 text-sm font-semibold rounded-lg transition-all ${
-                loginMethod === 'phone' ? 'bg-white text-orange-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all ${
+                loginMethod === 'phone' ? 'bg-white text-[#EE4D2D] shadow-sm' : 'text-gray-500 hover:text-gray-700'
               }`}
             >
               เบอร์โทร (OTP)
@@ -182,8 +187,8 @@ export default function LoginPage() {
 
         {/* ⚠️ Error Alert */}
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 mb-4 text-sm font-medium">
-            {error}
+          <div className="bg-red-50 border border-red-200 text-red-600 rounded-xl p-3 mb-4 text-[11px] font-bold flex items-center gap-2">
+            <span className="text-sm">⚠️</span> {error}
           </div>
         )}
 
@@ -191,36 +196,36 @@ export default function LoginPage() {
         {/* ฟอร์ม: อีเมล & รหัสผ่าน */}
         {/* ----------------------------------------------------------- */}
         {loginMethod === 'email' && (
-          <form onSubmit={handleEmailLogin} className="space-y-4">
+          <form onSubmit={handleEmailLogin} className="space-y-4 animate-fade-in">
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-gray-700 pl-1">อีเมล</label>
+              <label className="text-[11px] font-bold text-gray-500 pl-1">อีเมล</label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 placeholder="example@email.com"
-                className="w-full border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-transparent transition-all"
+                className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#EE4D2D]/30 focus:border-[#EE4D2D] transition-all"
               />
             </div>
             <div className="space-y-1.5">
               <div className="flex justify-between items-end">
-                <label className="text-sm font-medium text-gray-700 pl-1">รหัสผ่าน</label>
+                <label className="text-[11px] font-bold text-gray-500 pl-1">รหัสผ่าน</label>
+                <Link href="/auth/reset-password" className="text-[10px] text-[#EE4D2D] font-bold hover:underline">ลืมรหัสผ่าน?</Link>
               </div>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                placeholder="รหัสผ่านของคุณ"
-                className="w-full border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-transparent transition-all"
+                placeholder="••••••••"
+                className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#EE4D2D]/30 focus:border-[#EE4D2D] transition-all"
               />
             </div>
-            {/* ✅ ปุ่มล็อกอิน Email ปรับข้อความให้ถูกต้อง */}
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-2xl text-lg transition-colors mt-2"
+              className="w-full bg-[#EE4D2D] hover:bg-[#D9381E] disabled:opacity-50 disabled:cursor-not-allowed text-white font-black py-4 rounded-2xl text-sm transition-all mt-2 active:scale-[0.98] shadow-md"
             >
               {loading ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
             </button>
@@ -231,14 +236,14 @@ export default function LoginPage() {
         {/* ฟอร์ม: เบอร์โทรศัพท์ OTP */}
         {/* ----------------------------------------------------------- */}
         {loginMethod === 'phone' && (
-          <div>
+          <div className="animate-fade-in">
             {otpStep === 1 ? (
               <form onSubmit={handleRequestOTP} className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-gray-700 pl-1">เบอร์โทรศัพท์มือถือ</label>
-                  <div className="relative flex items-center bg-white border border-gray-200 rounded-2xl focus-within:ring-2 focus-within:ring-orange-300 focus-within:border-transparent transition-all overflow-hidden">
-                    <div className="px-4 py-3.5 bg-gray-50 border-r border-gray-200 text-gray-600 text-sm font-bold">
-                      +66
+                  <label className="text-[11px] font-bold text-gray-500 pl-1">เบอร์โทรศัพท์มือถือ</label>
+                  <div className="relative flex items-center bg-gray-50 border border-gray-200 rounded-2xl focus-within:border-[#EE4D2D] focus-within:ring-2 focus-within:ring-[#EE4D2D]/30 transition-all overflow-hidden">
+                    <div className="px-4 py-3.5 bg-gray-100 border-r border-gray-200 text-gray-600 text-sm font-bold flex items-center gap-1.5 shrink-0">
+                      🇹🇭 <span className="text-xs">+66</span>
                     </div>
                     <input
                       type="tel"
@@ -246,25 +251,24 @@ export default function LoginPage() {
                       onChange={handlePhoneChange}
                       required
                       placeholder="081 234 5678"
-                      className="w-full bg-transparent px-4 py-3 text-sm font-bold tracking-wide outline-none placeholder:text-gray-300 placeholder:font-normal placeholder:tracking-normal"
+                      className="w-full bg-transparent px-4 py-3.5 text-sm font-black tracking-wider outline-none placeholder:text-gray-300 placeholder:font-medium placeholder:tracking-normal"
                     />
                   </div>
-                  <p className="text-xs text-orange-500 pl-1 pt-1">กรุณากรอกให้ครบ 10 หลัก</p>
+                  <p className="text-[9px] text-[#EE4D2D] font-bold pl-1 pt-1">กรุณากรอกให้ครบ 10 หลัก</p>
                 </div>
-                {/* ✅ ปุ่มขอ OTP ปรับข้อความให้ถูกต้อง */}
                 <button
                   type="submit"
                   disabled={loading || phoneRaw.length < 10}
-                  className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-2xl text-lg transition-colors"
+                  className="w-full bg-[#EE4D2D] hover:bg-[#D9381E] disabled:opacity-50 disabled:cursor-not-allowed text-white font-black py-4 rounded-2xl text-sm transition-all shadow-md active:scale-[0.98]"
                 >
-                  {loading ? 'กำลังส่งรหัส...' : 'รับรหัส OTP'}
+                  {loading ? 'กำลังส่งรหัส...' : 'รับรหัส OTP 📱'}
                 </button>
               </form>
             ) : (
-              <form onSubmit={handleVerifyOTP} className="space-y-4">
+              <form onSubmit={handleVerifyOTP} className="space-y-4 animate-fade-in-up">
                 <div className="text-center mb-4">
-                  <p className="text-sm text-gray-500 font-medium">รหัส 6 หลักถูกส่งไปที่เบอร์</p>
-                  <p className="text-lg font-bold text-orange-600 mt-1">{phoneDisplay}</p>
+                  <p className="text-[11px] text-gray-500 font-medium">รหัส 6 หลักถูกส่งไปที่เบอร์</p>
+                  <p className="text-sm font-black text-[#EE4D2D] mt-0.5">{phoneDisplay}</p>
                 </div>
                 <input
                   type="text"
@@ -273,19 +277,18 @@ export default function LoginPage() {
                   onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
                   required
                   placeholder="------"
-                  className="w-full border border-gray-200 rounded-2xl px-4 py-4 text-center text-2xl tracking-[0.75em] font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-transparent transition-all"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-4 text-center text-2xl tracking-[0.75em] font-black text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#EE4D2D]/30 focus:border-[#EE4D2D] transition-all"
                 />
-                {/* ✅ ปุ่มตรวจสอบ OTP ปรับข้อความให้ถูกต้อง */}
                 <button
                   type="submit"
                   disabled={loading || otp.length < 6}
-                  className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-2xl text-lg transition-colors mt-2"
+                  className="w-full bg-[#EE4D2D] hover:bg-[#D9381E] disabled:opacity-50 disabled:cursor-not-allowed text-white font-black py-4 rounded-2xl text-sm transition-all mt-2 active:scale-[0.98] shadow-md"
                 >
-                  {loading ? 'กำลังตรวจสอบ...' : 'เข้าสู่ระบบ'}
+                  {loading ? 'กำลังตรวจสอบ...' : 'ยืนยันตัวตน ✅'}
                 </button>
                 <div className="flex justify-between items-center px-1">
-                  <button type="button" onClick={() => setOtpStep(1)} className="text-xs text-gray-500 hover:text-gray-700">← เปลี่ยนเบอร์</button>
-                  <button type="button" onClick={handleRequestOTP} className="text-xs text-orange-600 font-semibold hover:underline">ส่งรหัสใหม่อีกครั้ง</button>
+                  <button type="button" onClick={() => setOtpStep(1)} className="text-[10px] text-gray-400 font-bold hover:text-gray-600">← เปลี่ยนเบอร์</button>
+                  <button type="button" onClick={handleRequestOTP} className="text-[10px] text-[#EE4D2D] font-bold hover:underline">ส่งรหัสใหม่อีกครั้ง</button>
                 </div>
               </form>
             )}
@@ -293,72 +296,74 @@ export default function LoginPage() {
         )}
 
         {/* ----------------------------------------------------------- */}
-        {/* Social Login Buttons (Google, LINE, Facebook) */}
+        {/* Social Login Buttons */}
         {/* ----------------------------------------------------------- */}
         {otpStep === 1 && (
           <div className="mt-8">
             <div className="flex items-center gap-3 mb-5">
               <div className="flex-1 h-px bg-gray-200"></div>
-              <span className="text-xs text-gray-400 font-medium">หรือเข้าสู่ระบบด้วย</span>
+              <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">หรือเข้าสู่ระบบด้วย</span>
               <div className="flex-1 h-px bg-gray-200"></div>
             </div>
 
             <div className="space-y-3">
-              {/* Google */}
+              {/* ✅ สี Google */}
               <button 
                 onClick={() => handleOAuthLogin('google')}
                 type="button" 
-                className="w-full flex items-center justify-center gap-3 bg-white border border-gray-200 text-gray-700 py-3.5 rounded-2xl text-sm font-semibold shadow-sm hover:bg-gray-50 transition-colors"
+                className="w-full flex items-center justify-center gap-3 bg-white border border-gray-200 text-gray-700 py-3.5 rounded-2xl text-[11px] font-bold shadow-sm hover:bg-gray-50 active:scale-[0.98] transition-all"
               >
-                <svg className="w-5 h-5" viewBox="0 0 24 24">
-                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
-                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
-                </svg>
-                Google
+                <span className="text-lg font-black tracking-tighter">
+                  <span className="text-[#4285F4]">G</span>
+                  <span className="text-[#EA4335]">o</span>
+                  <span className="text-[#FBBC05]">o</span>
+                  <span className="text-[#4285F4]">g</span>
+                  <span className="text-[#34A853]">l</span>
+                  <span className="text-[#EA4335]">e</span>
+                </span>
+                Account
               </button>
               
-              {/* LINE */}
+              {/* ✅ สี LINE */}
               <button 
                 onClick={() => handleOAuthLogin('line')}
                 type="button" 
-                className="w-full flex items-center justify-center gap-3 bg-[#06C755] hover:bg-[#05A546] text-white py-3.5 rounded-2xl text-sm font-semibold shadow-sm transition-colors border border-transparent"
+                className="w-full flex items-center justify-center gap-3 bg-[#00C300] border border-[#00B300] text-white py-3.5 rounded-2xl text-[11px] font-bold shadow-sm hover:bg-[#00A000] active:scale-[0.98] transition-all"
               >
-                <span className="text-xl font-bold">LINE</span>
+                <span className="text-lg">💬</span> LINE Account
               </button>
 
-              {/* Facebook */}
+              {/* ✅ สี Facebook */}
               <button 
                 onClick={() => handleOAuthLogin('facebook')}
                 type="button" 
-                className="w-full flex items-center justify-center gap-3 bg-[#1877F2] hover:bg-[#166FE5] text-white py-3.5 rounded-2xl text-sm font-semibold shadow-sm transition-colors border border-transparent"
+                className="w-full flex items-center justify-center gap-3 bg-[#1877F2] border border-[#166FE5] text-white py-3.5 rounded-2xl text-[11px] font-bold shadow-sm hover:bg-[#166FE5] active:scale-[0.98] transition-all"
               >
-                <span className="text-xl font-bold font-serif">f</span> Facebook
+                <span className="text-lg font-bold font-serif">f</span> Facebook Account
               </button>
             </div>
           </div>
         )}
 
         {/* Links กลับหน้าแรก & สมัครสมาชิก */}
-        <div className="text-center mt-8 space-y-3">
-          <p className="text-sm text-gray-500">
+        <div className="text-center mt-8 space-y-4">
+          <p className="text-xs text-gray-500 font-medium">
             ยังไม่มีบัญชี?{' '}
-            <Link href="/auth/signup" className="text-orange-600 font-semibold hover:underline">
+            <Link href="/auth/signup" className="text-[#EE4D2D] font-black hover:underline">
               สมัครสมาชิก
             </Link>
           </p>
           <div>
-            <Link href="/" className="text-xs text-gray-400 font-medium hover:text-gray-600">
+            <Link href="/" className="text-[10px] text-gray-400 font-bold hover:text-gray-600">
               ← กลับหน้าหลัก
             </Link>
           </div>
         </div>
 
         {/* 🤝 Unified Account Note */}
-        <div className="mt-8 bg-orange-50 rounded-2xl border border-orange-100 p-4">
-          <p className="text-xs text-orange-700 text-center">
-            🎯 <strong>บัญชีเดียว</strong> — ใช้ได้ทั้งเป็นลูกค้าและช่าง
+        <div className="mt-8 bg-orange-50 rounded-xl border border-orange-100 p-3 shadow-sm">
+          <p className="text-[10px] text-[#EE4D2D] text-center font-bold flex items-center justify-center gap-1.5">
+            🎯 บัญชีเดียว — ใช้ได้ทั้งเป็นลูกค้าและช่าง
           </p>
         </div>
 
