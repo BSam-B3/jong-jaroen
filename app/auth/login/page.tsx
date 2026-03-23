@@ -146,12 +146,13 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F4F6F8] flex items-center justify-center p-4 relative overflow-hidden">
+    {/* ✅ นำสีพื้นหลังเดิมกลับมา */},
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-yellow-50 flex items-center justify-center p-4 relative overflow-hidden">
       
       {/* Background Decor */}
       <div className="absolute -top-20 -right-20 w-64 h-64 bg-orange-300/20 rounded-full blur-3xl pointer-events-none"></div>
       
-      <div className="bg-white rounded-[2.5rem] shadow-xl w-full max-w-sm p-8 relative z-10 border border-gray-100">
+      <div className="bg-white rounded-[2.5rem] shadow-xl w-full max-w-sm p-8 relative z-10 border border-orange-50">
         
         {/* 🌟 Header */}
         <div className="text-center mb-6">
@@ -239,9 +240,11 @@ export default function LoginPage() {
               <form onSubmit={handleRequestOTP} className="space-y-4">
                 <div className="space-y-1.5">
                   <label className="text-[11px] font-bold text-gray-500 pl-1">เบอร์โทรศัพท์มือถือ</label>
+                  
+                  {/* ✅ แก้ไข TH ซ้ำซ้อนให้เหลือแค่รูปธงและ +66 */}
                   <div className="relative flex items-center bg-gray-50 border border-gray-200 rounded-2xl focus-within:border-[#EE4D2D] focus-within:ring-2 focus-within:ring-[#EE4D2D]/30 transition-all overflow-hidden">
-                    <div className="px-4 py-3.5 bg-gray-100 border-r border-gray-200 text-gray-500 text-sm font-bold flex items-center gap-2">
-                      🇹🇭 <span className="text-[10px]">TH</span>
+                    <div className="px-4 py-3.5 bg-gray-100 border-r border-gray-200 text-gray-600 text-sm font-bold flex items-center gap-1.5 shrink-0">
+                      🇹🇭 <span className="text-xs">+66</span>
                     </div>
                     <input
                       type="tel"
@@ -249,7 +252,7 @@ export default function LoginPage() {
                       onChange={handlePhoneChange}
                       required
                       placeholder="081 234 5678"
-                      className="w-full bg-transparent px-4 py-3.5 text-sm font-black tracking-wider outline-none placeholder:text-gray-300 placeholder:font-medium"
+                      className="w-full bg-transparent px-4 py-3.5 text-sm font-black tracking-wider outline-none placeholder:text-gray-300 placeholder:font-medium placeholder:tracking-normal"
                     />
                   </div>
                   <p className="text-[9px] text-[#EE4D2D] font-bold pl-1 pt-1">กรุณากรอกให้ครบ 10 หลัก</p>
@@ -305,28 +308,39 @@ export default function LoginPage() {
             </div>
 
             <div className="space-y-3">
+              {/* ✅ สี Google */}
               <button 
                 onClick={() => handleOAuthLogin('google')}
                 type="button" 
                 className="w-full flex items-center justify-center gap-3 bg-white border border-gray-200 text-gray-700 py-3.5 rounded-2xl text-[11px] font-bold shadow-sm hover:bg-gray-50 active:scale-[0.98] transition-all"
               >
-                <span className="text-lg">G</span> Google Account
+                <span className="text-lg font-black tracking-tighter">
+                  <span className="text-[#4285F4]">G</span>
+                  <span className="text-[#EA4335]">o</span>
+                  <span className="text-[#FBBC05]">o</span>
+                  <span className="text-[#4285F4]">g</span>
+                  <span className="text-[#34A853]">l</span>
+                  <span className="text-[#EA4335]">e</span>
+                </span>
+                Account
               </button>
               
+              {/* ✅ สี LINE */}
               <button 
                 onClick={() => handleOAuthLogin('line')}
                 type="button" 
-                className="w-full flex items-center justify-center gap-3 bg-white border border-gray-200 text-gray-700 py-3.5 rounded-2xl text-[11px] font-bold shadow-sm hover:bg-gray-50 active:scale-[0.98] transition-all"
+                className="w-full flex items-center justify-center gap-3 bg-[#00C300] border border-[#00B300] text-white py-3.5 rounded-2xl text-[11px] font-bold shadow-sm hover:bg-[#00B300] active:scale-[0.98] transition-all"
               >
-                <span className="text-lg text-[#00C300]">💬</span> LINE Account
+                <span className="text-lg">💬</span> LINE Account
               </button>
 
+              {/* ✅ สี Facebook */}
               <button 
                 onClick={() => handleOAuthLogin('facebook')}
                 type="button" 
-                className="w-full flex items-center justify-center gap-3 bg-white border border-gray-200 text-gray-700 py-3.5 rounded-2xl text-[11px] font-bold shadow-sm hover:bg-gray-50 active:scale-[0.98] transition-all"
+                className="w-full flex items-center justify-center gap-3 bg-[#1877F2] border border-[#166FE5] text-white py-3.5 rounded-2xl text-[11px] font-bold shadow-sm hover:bg-[#166FE5] active:scale-[0.98] transition-all"
               >
-                <span className="text-lg text-[#1877F2]">f</span> Facebook Account
+                <span className="text-lg font-bold">f</span> Facebook Account
               </button>
             </div>
           </div>
