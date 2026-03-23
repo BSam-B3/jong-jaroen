@@ -65,7 +65,7 @@ export default function LoginPage() {
       if (authError) throw authError;
 
       if (data.user) {
-        router.push('/dashboard'); // นำไปหน้า Dashboard ตามโค้ดเดิมของคุณ
+        router.push('/dashboard');
       }
     } catch (err: any) {
       if (err.message.includes('Invalid login credentials') || err.message.includes('invalid_credentials')) {
@@ -216,12 +216,13 @@ export default function LoginPage() {
                 className="w-full border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-transparent transition-all"
               />
             </div>
+            {/* ✅ ปุ่มล็อกอิน Email ปรับข้อความให้ถูกต้อง */}
             <button
               type="submit"
               disabled={loading}
               className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-2xl text-lg transition-colors mt-2"
             >
-              {loading ? '⏳ กำลังเข้าสู่ระบบ...' : '🚀 เข้าสู่ระบบ'}
+              {loading ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
             </button>
           </form>
         )}
@@ -235,8 +236,6 @@ export default function LoginPage() {
               <form onSubmit={handleRequestOTP} className="space-y-4">
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium text-gray-700 pl-1">เบอร์โทรศัพท์มือถือ</label>
-                  
-                  {/* แก้ปัญหา TH ซ้ำซ้อน เปลี่ยนเป็น +66 เพื่อความเป็นสากล */}
                   <div className="relative flex items-center bg-white border border-gray-200 rounded-2xl focus-within:ring-2 focus-within:ring-orange-300 focus-within:border-transparent transition-all overflow-hidden">
                     <div className="px-4 py-3.5 bg-gray-50 border-r border-gray-200 text-gray-600 text-sm font-bold">
                       +66
@@ -252,12 +251,13 @@ export default function LoginPage() {
                   </div>
                   <p className="text-xs text-orange-500 pl-1 pt-1">กรุณากรอกให้ครบ 10 หลัก</p>
                 </div>
+                {/* ✅ ปุ่มขอ OTP ปรับข้อความให้ถูกต้อง */}
                 <button
                   type="submit"
                   disabled={loading || phoneRaw.length < 10}
                   className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-2xl text-lg transition-colors"
                 >
-                  {loading ? 'กำลังส่งรหัส...' : 'ส่งรหัส OTP 📱'}
+                  {loading ? 'กำลังส่งรหัส...' : 'รับรหัส OTP'}
                 </button>
               </form>
             ) : (
@@ -275,12 +275,13 @@ export default function LoginPage() {
                   placeholder="------"
                   className="w-full border border-gray-200 rounded-2xl px-4 py-4 text-center text-2xl tracking-[0.75em] font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-transparent transition-all"
                 />
+                {/* ✅ ปุ่มตรวจสอบ OTP ปรับข้อความให้ถูกต้อง */}
                 <button
                   type="submit"
                   disabled={loading || otp.length < 6}
                   className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-2xl text-lg transition-colors mt-2"
                 >
-                  {loading ? 'กำลังตรวจสอบ...' : 'ยืนยันตัวตน ✅'}
+                  {loading ? 'กำลังตรวจสอบ...' : 'เข้าสู่ระบบ'}
                 </button>
                 <div className="flex justify-between items-center px-1">
                   <button type="button" onClick={() => setOtpStep(1)} className="text-xs text-gray-500 hover:text-gray-700">← เปลี่ยนเบอร์</button>
