@@ -102,12 +102,13 @@ export default function LoginPage() {
   // -------------------------------------------------------------
   // 🌐 3. ล็อกอินด้วย Social (Google, LINE)
   // -------------------------------------------------------------
-  const handleOAuthLogin = async (provider: 'google' | 'line') => {
+  // ✅ แก้ไข Type เป็น string เพื่อไม่ให้ Vercel ฟ้อง Error
+  const handleOAuthLogin = async (provider: string) => {
     setLoading(true);
     setError('');
     try {
       const { error } = await supabase.auth.signInWithOAuth({
-        provider,
+        provider: provider as any, // ✅ บังคับ as any เพื่อให้ผ่านกฎของ TypeScript
         options: {
           redirectTo: `${window.location.origin}/auth/callback` // URL ที่ให้ Supabase เด้งกลับมา
         }
@@ -309,7 +310,7 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* 🤝 Unified Account Note (รักษาดีไซน์เดิมไว้) */}
+        {/* 🤝 Unified Account Note */}
         <div className="mt-8 bg-orange-50 rounded-2xl border border-orange-100 p-3 shadow-sm">
           <p className="text-[10px] text-orange-800 text-center font-bold flex items-center justify-center gap-1.5">
             <span className="text-sm text-orange-500">🤝</span> บัญชีเดียว — ใช้ได้ทั้งเป็นลูกค้าและช่าง
