@@ -14,26 +14,25 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   
-  // States สำหรับเบอร์โทร (แยกตัวที่โชว์ กับ ตัวที่ส่ง API)
+  // States สำหรับเบอร์โทร
   const [phoneDisplay, setPhoneDisplay] = useState(''); 
   const [phoneRaw, setPhoneRaw] = useState('');
   
   const [otp, setOtp] = useState('');
-  const [otpStep, setOtpStep] = useState<1 | 2>(1); // 1 = ขอ OTP, 2 = กรอก OTP
+  const [otpStep, setOtpStep] = useState<1 | 2>(1);
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   // -------------------------------------------------------------
-  // ✨ ฟังก์ชันจัดการ Input เบอร์โทร (Auto-spacing & Limit 10 digits)
+  // ✨ ฟังก์ชันจัดการ Input เบอร์โทร
   // -------------------------------------------------------------
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let val = e.target.value.replace(/\D/g, ''); // ลบตัวอักษรที่ไม่ใช่ตัวเลขออกให้หมด
-    if (val.length > 10) val = val.slice(0, 10); // บังคับให้ไม่เกิน 10 ตัว
+    let val = e.target.value.replace(/\D/g, '');
+    if (val.length > 10) val = val.slice(0, 10);
     
-    setPhoneRaw(val); // เก็บค่าดิบไว้ส่ง API (เช่น 0812345678)
+    setPhoneRaw(val);
 
-    // จัดฟอร์แมตโชว์บนหน้าจอ (XXX XXX XXXX)
     let formatted = val;
     if (val.length > 3 && val.length <= 6) {
       formatted = `${val.slice(0, 3)} ${val.slice(3)}`;
@@ -118,7 +117,7 @@ export default function LoginPage() {
         type: 'sms',
       });
       if (error) throw error;
-      if (data.session) router.push('/auth/signup'); // นำไปหน้ากรอกชื่อต่อ (Step 3)
+      if (data.session) router.push('/auth/signup');
     } catch (err: any) {
       setError('รหัส OTP ไม่ถูกต้อง หรือหมดอายุแล้ว');
     } finally {
@@ -281,4 +280,81 @@ export default function LoginPage() {
                 <button
                   type="submit"
                   disabled={loading || otp.length < 6}
-                  className="w-full bg-[#EE4D2D] hover:bg-[#D9381E] disabled:opacity-50 disabled
+                  className="w-full bg-[#EE4D2D] hover:bg-[#D9381E] disabled:opacity-50 disabled:cursor-not-allowed text-white font-black py-4 rounded-2xl text-sm transition-all mt-2 active:scale-[0.98] shadow-md"
+                >
+                  {loading ? 'กำลังตรวจสอบ...' : 'ยืนยันตัวตน ✅'}
+                </button>
+                <div className="flex justify-between items-center px-1">
+                  <button type="button" onClick={() => setOtpStep(1)} className="text-[10px] text-gray-400 font-bold hover:text-gray-600">← เปลี่ยนเบอร์</button>
+                  <button type="button" onClick={handleRequestOTP} className="text-[10px] text-[#EE4D2D] font-bold hover:underline">ส่งรหัสใหม่อีกครั้ง</button>
+                </div>
+              </form>
+            )}
+          </div>
+        )}
+
+        {/* ----------------------------------------------------------- */}
+        {/* Social Login Buttons */}
+        {/* ----------------------------------------------------------- */}
+        {otpStep === 1 && (
+          <div className="mt-8">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="flex-1 h-px bg-gray-200"></div>
+              <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">หรือเข้าสู่ระบบด้วย</span>
+              <div className="flex-1 h-px bg-gray-200"></div>
+            </div>
+
+            <div className="space-y-3">
+              <button 
+                onClick={() => handleOAuthLogin('google')}
+                type="button" 
+                className="w-full flex items-center justify-center gap-3 bg-white border border-gray-200 text-gray-700 py-3.5 rounded-2xl text-[11px] font-bold shadow-sm hover:bg-gray-50 active:scale-[0.98] transition-all"
+              >
+                <span className="text-lg">G</span> Google Account
+              </button>
+              
+              <button 
+                onClick={() => handleOAuthLogin('line')}
+                type="button" 
+                className="w-full flex items-center justify-center gap-3 bg-white border border-gray-200 text-gray-700 py-3.5 rounded-2xl text-[11px] font-bold shadow-sm hover:bg-gray-50 active:scale-[0.98] transition-all"
+              >
+                <span className="text-lg text-[#00C300]">💬</span> LINE Account
+              </button>
+
+              <button 
+                onClick={() => handleOAuthLogin('facebook')}
+                type="button" 
+                className="w-full flex items-center justify-center gap-3 bg-white border border-gray-200 text-gray-700 py-3.5 rounded-2xl text-[11px] font-bold shadow-sm hover:bg-gray-50 active:scale-[0.98] transition-all"
+              >
+                <span className="text-lg text-[#1877F2]">f</span> Facebook Account
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Links กลับหน้าแรก & สมัครสมาชิก */}
+        <div className="text-center mt-8 space-y-4">
+          <p className="text-xs text-gray-500 font-medium">
+            ยังไม่มีบัญชี?{' '}
+            <Link href="/auth/signup" className="text-[#EE4D2D] font-black hover:underline">
+              สมัครสมาชิก
+            </Link>
+          </p>
+          <div>
+            <Link href="/" className="text-[10px] text-gray-400 font-bold hover:text-gray-600">
+              ← กลับหน้าหลัก
+            </Link>
+          </div>
+        </div>
+
+        {/* 🤝 Unified Account Note */}
+        <div className="mt-8 bg-orange-50 rounded-xl border border-orange-100 p-3 shadow-sm">
+          <p className="text-[10px] text-[#EE4D2D] text-center font-bold flex items-center justify-center gap-1.5">
+            🎯 บัญชีเดียว — ใช้ได้ทั้งเป็นลูกค้าและช่าง
+          </p>
+        </div>
+
+      </div>
+    </div>
+  );
+}
