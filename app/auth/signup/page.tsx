@@ -13,49 +13,49 @@ export default function SignupPage() {
   const [nationalId, setNationalId] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState(''); // ✅ เพิ่ม State รหัสผ่าน
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  
+  // ✅ State เช็คว่ามาจาก OTP/Social หรือมากดสมัครใหม่ตรงๆ
+  const [hasSession, setHasSession] = useState(false); 
   const [user, setUser] = useState<any>(null);
 
   // -------------------------------------------------------------
-  // ✨ โหลดข้อมูล User ปัจจุบัน (Auto-fill ข้อมูลที่มีอยู่แล้ว)
+  // ✨ โหลดข้อมูล (แยกว่าเป็น User สมัครใหม่ หรือ User ที่ผ่าน OTP มาแล้ว)
   // -------------------------------------------------------------
   useEffect(() => {
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
+      
       if (session?.user) {
+        // กรณีที่ 2: ผ่านการยืนยันตัวตนมาแล้ว (OTP/Social)
+        setHasSession(true);
         setUser(session.user);
         const metadata = session.user.user_metadata;
         
-        // 1. ดึง Email (ถ้ามี)
         if (session.user.email) setEmail(session.user.email);
-        
-        // 2. ดึง Phone (ถ้ามี)
         if (session.user.phone) {
           let p = session.user.phone;
           if (p.startsWith('+66')) p = '0' + p.slice(3);
           setPhone(formatPhoneDisplay(p));
         }
-
-        // 3. ดึงชื่อจาก Social Login (เช่น Google) มาแยกเป็น ชื่อ-สกุล
         if (metadata?.full_name) {
           const nameParts = metadata.full_name.split(' ');
           setFirstName(nameParts[0] || '');
-          if (nameParts.length > 1) {
-            setLastName(nameParts.slice(1).join(' '));
-          }
+          if (nameParts.length > 1) setLastName(nameParts.slice(1).join(' '));
         }
       } else {
-        // ถ้าไม่มี Session ให้กลับไปล็อกอินก่อน
-        router.push('/auth/login');
+        // กรณีที่ 1: เข้ามากดสมัครใหม่ (ไม่มี Session)
+        setHasSession(false);
       }
     };
     checkUser();
-  }, [router]);
+  }, []);
 
   // -------------------------------------------------------------
-  // ✨ ฟังก์ชันจัดการ Input Masking (จัดฟอร์แมตอัตโนมัติ)
+  // ✨ ฟังก์ชันจัดการ Input Masking
   // -------------------------------------------------------------
   const formatPhoneDisplay = (val: string) => {
     const v = val.replace(/\D/g, '');
@@ -83,24 +83,17 @@ export default function SignupPage() {
   };
 
   // -------------------------------------------------------------
-  // 💾 บันทึกข้อมูลลงตาราง Profiles
+  // 💾 บันทึกข้อมูลและสร้างบัญชี
   // -------------------------------------------------------------
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    // Validate ข้อมูลเบื้องต้น
-    if (!firstName.trim() || !lastName.trim()) {
-      setError('กรุณากรอกชื่อและนามสกุลให้ครบถ้วน');
-      return;
-    }
-    if (phone.replace(/\D/g, '').length < 10) {
-      setError('กรุณากรอกเบอร์โทรศัพท์ให้ครบ 10 หลัก');
-      return;
-    }
-    if (nationalId && nationalId.replace(/\D/g, '').length < 13) {
-      setError('กรุณากรอกเลขบัตรประชาชนให้ครบ 13 หลัก');
-      return;
+    // Validate
+    if (!firstName.trim() || !lastName.trim()) return setError('กรุณากรอกชื่อและนามสกุลให้ครบถ้วน');
+    if (phone.replace(/\D/g, '').length < 10) return setError('กรุณากรอกเบอร์โทรศัพท์ให้ครบ 10 หลัก');
+    if (!hasSession && (!email.trim() || password.length < 6)) {
+      return setError('กรุณากรอกอีเมล และตั้งรหัสผ่านอย่างน้อย 6 ตัวอักษร');
     }
 
     setLoading(true);
@@ -109,12 +102,28 @@ export default function SignupPage() {
       const fullName = `${firstName.trim()} ${lastName.trim()}`;
       const cleanPhone = phone.replace(/\D/g, '');
       const cleanNationalId = nationalId.replace(/\D/g, '');
+      let finalUserId = user?.id;
 
-      // อัปเดตข้อมูลในตาราง profiles
+      // 🔴 ถ้าเป็นการสมัครใหม่ด้วย Email + Password
+      if (!hasSession) {
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+          email: email.trim(),
+          password: password,
+          options: {
+            data: { full_name: fullName, phone: cleanPhone }
+          }
+        });
+        if (signUpError) throw signUpError;
+        if (!signUpData.user) throw new Error('ไม่สามารถสร้างบัญชีได้');
+        
+        finalUserId = signUpData.user.id;
+      }
+
+      // 🟢 บันทึกข้อมูลลงตาราง Profiles
       const { error: profileError } = await supabase
         .from('profiles')
         .upsert({ 
-          id: user?.id, 
+          id: finalUserId, 
           first_name: firstName.trim(),
           last_name: lastName.trim(),
           full_name: fullName,
@@ -126,35 +135,44 @@ export default function SignupPage() {
 
       if (profileError) throw profileError;
 
-      // อัปเดต metadata ใน Auth ของ Supabase
-      await supabase.auth.updateUser({
-        data: { full_name: fullName, phone: cleanPhone }
-      });
+      // ถ้าเป็น OTP มาก่อน ให้อัปเดตข้อมูลด้วย
+      if (hasSession) {
+        await supabase.auth.updateUser({
+          data: { full_name: fullName, phone: cleanPhone }
+        });
+      }
 
+      alert('สมัครสมาชิกสำเร็จ! 🎉');
       router.push('/'); 
       
     } catch (err: any) {
-      setError(err.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล กรุณาลองใหม่');
+      if (err.message.includes('User already registered')) {
+        setError('อีเมลนี้ถูกใช้งานแล้ว กรุณาใช้อีเมลอื่น หรือเข้าสู่ระบบ');
+      } else {
+        setError(err.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล กรุณาลองใหม่');
+      }
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-yellow-50 flex items-center justify-center p-4 relative overflow-hidden">
+    <div className="min-h-screen bg-[#F4F6F8] flex items-center justify-center p-4 relative overflow-hidden">
       
-      {/* Background Decor */}
       <div className="absolute -top-20 -right-20 w-64 h-64 bg-orange-300/20 rounded-full blur-3xl pointer-events-none"></div>
       
-      <div className="bg-white rounded-[2.5rem] shadow-xl w-full max-w-md p-8 relative z-10 border border-orange-50 my-8">
+      <div className="bg-white rounded-[2.5rem] shadow-xl w-full max-w-md p-8 relative z-10 border border-gray-100 mt-8 mb-8">
         
         {/* 🌟 Header */}
         <div className="text-center mb-6">
-          <div className="text-5xl mb-3 drop-shadow-sm">📋</div>
-          <h1 className="text-2xl font-black text-gray-800 tracking-tight">ตั้งค่าโปรไฟล์</h1>
-          {/* ✅ ลบคำว่าประแสออก */}
+          <div className="w-16 h-16 bg-gradient-to-br from-[#EE4D2D] to-[#FF7337] rounded-2xl shadow-lg flex items-center justify-center text-3xl mb-4 mx-auto transform rotate-3">
+            📝
+          </div>
+          <h1 className="text-2xl font-black text-gray-800 tracking-tight">สมัครสมาชิก</h1>
           <p className="text-gray-500 mt-1 text-[11px] font-bold tracking-widest uppercase">แพลตฟอร์มตลาดแรงงานชุมชน</p>
-          <p className="text-gray-500 mt-4 text-xs font-medium">กรอกข้อมูลให้ครบถ้วนเพื่อเริ่มใช้งาน</p>
+          <p className="text-gray-500 mt-4 text-xs font-medium">
+            {hasSession ? 'กรอกข้อมูลให้ครบถ้วนเพื่อเริ่มใช้งาน' : 'สร้างบัญชีใหม่เพื่อเข้าสู่ระบบ'}
+          </p>
         </div>
 
         {/* ⚠️ Error Alert */}
@@ -169,7 +187,7 @@ export default function SignupPage() {
         {/* ----------------------------------------------------------- */}
         <form onSubmit={handleSaveProfile} className="space-y-4 animate-fade-in">
           
-          {/* ชื่อ - สกุล (แบ่ง 2 คอลัมน์) */}
+          {/* ชื่อ - สกุล */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <label className="text-[11px] font-bold text-gray-500 pl-1">ชื่อจริง <span className="text-red-500">*</span></label>
@@ -208,17 +226,34 @@ export default function SignupPage() {
             />
           </div>
 
-          {/* อีเมล */}
+          {/* อีเมล (บังคับถ้าสมัครใหม่) */}
           <div className="space-y-1.5">
-            <label className="text-[11px] font-bold text-gray-500 pl-1">อีเมล (ถ้ามี)</label>
+            <label className="text-[11px] font-bold text-gray-500 pl-1">อีเมล {!hasSession && <span className="text-red-500">*</span>}</label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              required={!hasSession}
               placeholder="example@email.com"
               className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#EE4D2D]/30 focus:border-[#EE4D2D] transition-all"
             />
           </div>
+
+          {/* 🔐 รหัสผ่าน (โชว์เฉพาะสมัครใหม่ที่ยังไม่มี Session) */}
+          {!hasSession && (
+            <div className="space-y-1.5 animate-fade-in-up">
+              <label className="text-[11px] font-bold text-gray-500 pl-1">ตั้งรหัสผ่าน <span className="text-red-500">*</span></label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={6}
+                placeholder="อย่างน้อย 6 ตัวอักษร"
+                className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#EE4D2D]/30 focus:border-[#EE4D2D] transition-all"
+              />
+            </div>
+          )}
 
           {/* เลขบัตรประชาชน */}
           <div className="space-y-1.5 pt-2">
@@ -234,25 +269,18 @@ export default function SignupPage() {
               className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm font-bold tracking-wider focus:outline-none focus:ring-2 focus:ring-[#EE4D2D]/30 focus:border-[#EE4D2D] transition-all"
             />
             <p className="text-[9px] text-gray-400 pl-1 leading-relaxed">
-              *หากคุณเป็นผู้รับงาน (ช่าง/วิน) กรุณากรอกข้อมูลนี้เพื่อยืนยันตัวตนกับทางแพลตฟอร์ม
+              *หากคุณเป็นผู้รับงาน กรุณากรอกข้อมูลนี้เพื่อยืนยันตัวตนกับทางแพลตฟอร์ม
             </p>
           </div>
 
           <button
             type="submit"
-            disabled={loading || !user}
-            className="w-full bg-[#EE4D2D] hover:bg-[#D9381E] disabled:opacity-50 disabled:cursor-not-allowed text-white font-black py-4 rounded-2xl text-sm transition-all mt-4 shadow-md active:scale-[0.98]"
+            disabled={loading}
+            className="w-full bg-gradient-to-b from-[#EE4D2D] to-[#FF7337] text-white py-4 rounded-2xl font-black text-sm shadow-md hover:shadow-lg active:scale-[0.98] transition-all mt-6 disabled:opacity-70 disabled:cursor-not-allowed"
           >
-            {loading ? 'กำลังบันทึกข้อมูล...' : 'สร้างโปรไฟล์ และเริ่มใช้งาน 🚀'}
+            {loading ? 'กำลังดำเนินการ...' : 'สมัครสมาชิก และเริ่มใช้งาน 🚀'}
           </button>
         </form>
-
-        {/* 🤝 Unified Account Note */}
-        <div className="mt-8 bg-orange-50 rounded-2xl border border-orange-100 p-4">
-          <p className="text-[10px] text-orange-700 text-center font-bold">
-            🎯 <strong>บัญชีเดียว</strong> — ใช้ได้ทั้งเป็นลูกค้าและช่าง
-          </p>
-        </div>
 
       </div>
     </div>
