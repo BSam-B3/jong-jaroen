@@ -7,25 +7,47 @@ import { supabase } from '@/lib/supabase';
 export default function SignupPage() {
   const router = useRouter();
   
-  const [fullName, setFullName] = useState('');
+  // States ข้อมูลผู้ใช้
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [nationalId, setNationalId] = useState('');
+  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
+  
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [user, setUser] = useState<any>(null);
 
   // -------------------------------------------------------------
-  // ✨ โหลดข้อมูล User ปัจจุบัน (เช็คว่าผ่านหน้า Login มาจริงไหม)
+  // ✨ โหลดข้อมูล User ปัจจุบัน (Auto-fill ข้อมูลที่มีอยู่แล้ว)
   // -------------------------------------------------------------
   useEffect(() => {
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         setUser(session.user);
-        // ถ้าผู้ใช้เคยล็อกอินด้วย Google/LINE อาจจะมีชื่อติดมาด้วย ให้เอามาใส่ช่องไว้เลย
-        if (session.user.user_metadata?.full_name) {
-          setFullName(session.user.user_metadata.full_name);
+        const metadata = session.user.user_metadata;
+        
+        // 1. ดึง Email (ถ้ามี)
+        if (session.user.email) setEmail(session.user.email);
+        
+        // 2. ดึง Phone (ถ้ามี)
+        if (session.user.phone) {
+          let p = session.user.phone;
+          if (p.startsWith('+66')) p = '0' + p.slice(3);
+          setPhone(formatPhoneDisplay(p));
+        }
+
+        // 3. ดึงชื่อจาก Social Login (เช่น Google) มาแยกเป็น ชื่อ-สกุล
+        if (metadata?.full_name) {
+          const nameParts = metadata.full_name.split(' ');
+          setFirstName(nameParts[0] || '');
+          if (nameParts.length > 1) {
+            setLastName(nameParts.slice(1).join(' '));
+          }
         }
       } else {
-        // ถ้าไม่มี Session แอบเข้ามาหน้านี้ ให้เด้งกลับไปหน้า Login
+        // ถ้าไม่มี Session ให้กลับไปล็อกอินก่อน
         router.push('/auth/login');
       }
     };
@@ -33,37 +55,82 @@ export default function SignupPage() {
   }, [router]);
 
   // -------------------------------------------------------------
+  // ✨ ฟังก์ชันจัดการ Input Masking (จัดฟอร์แมตอัตโนมัติ)
+  // -------------------------------------------------------------
+  const formatPhoneDisplay = (val: string) => {
+    const v = val.replace(/\D/g, '');
+    if (v.length > 10) return v.slice(0, 10);
+    if (v.length > 6) return `${v.slice(0, 3)}-${v.slice(3, 6)}-${v.slice(6)}`;
+    if (v.length > 3) return `${v.slice(0, 3)}-${v.slice(3)}`;
+    return v;
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPhone(formatPhoneDisplay(e.target.value));
+  };
+
+  const handleNationalIdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let v = e.target.value.replace(/\D/g, '');
+    if (v.length > 13) v = v.slice(0, 13);
+    
+    let formatted = v;
+    if (v.length > 12) formatted = `${v.slice(0,1)}-${v.slice(1,5)}-${v.slice(5,10)}-${v.slice(10,12)}-${v.slice(12)}`;
+    else if (v.length > 10) formatted = `${v.slice(0,1)}-${v.slice(1,5)}-${v.slice(5,10)}-${v.slice(10)}`;
+    else if (v.length > 5) formatted = `${v.slice(0,1)}-${v.slice(1,5)}-${v.slice(5)}`;
+    else if (v.length > 1) formatted = `${v.slice(0,1)}-${v.slice(1)}`;
+    
+    setNationalId(formatted);
+  };
+
+  // -------------------------------------------------------------
   // 💾 บันทึกข้อมูลลงตาราง Profiles
   // -------------------------------------------------------------
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fullName.trim()) {
-      setError('กรุณากรอกชื่อ-นามสกุล');
+    setError('');
+
+    // Validate ข้อมูลเบื้องต้น
+    if (!firstName.trim() || !lastName.trim()) {
+      setError('กรุณากรอกชื่อและนามสกุลให้ครบถ้วน');
+      return;
+    }
+    if (phone.replace(/\D/g, '').length < 10) {
+      setError('กรุณากรอกเบอร์โทรศัพท์ให้ครบ 10 หลัก');
+      return;
+    }
+    if (nationalId && nationalId.replace(/\D/g, '').length < 13) {
+      setError('กรุณากรอกเลขบัตรประชาชนให้ครบ 13 หลัก');
       return;
     }
 
     setLoading(true);
-    setError('');
 
     try {
-      // อัปเดตข้อมูลในตาราง profiles ของ Supabase
+      const fullName = `${firstName.trim()} ${lastName.trim()}`;
+      const cleanPhone = phone.replace(/\D/g, '');
+      const cleanNationalId = nationalId.replace(/\D/g, '');
+
+      // อัปเดตข้อมูลในตาราง profiles
       const { error: profileError } = await supabase
         .from('profiles')
         .upsert({ 
           id: user?.id, 
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
           full_name: fullName,
+          phone: cleanPhone,
+          email: email.trim(),
+          national_id: cleanNationalId,
           updated_at: new Date().toISOString(),
         });
 
       if (profileError) throw profileError;
 
-      // อัปเดต metadata ใน Auth (เผื่อเรียกใช้ง่ายๆ)
+      // อัปเดต metadata ใน Auth ของ Supabase
       await supabase.auth.updateUser({
-        data: { full_name: fullName }
+        data: { full_name: fullName, phone: cleanPhone }
       });
 
-      // เสร็จสมบูรณ์ พาเข้าแอปเลย!
-      alert('สร้างโปรไฟล์สำเร็จ! ยินดีต้อนรับสู่จงเจริญ 🎉');
       router.push('/'); 
       
     } catch (err: any) {
@@ -79,55 +146,110 @@ export default function SignupPage() {
       {/* Background Decor */}
       <div className="absolute -top-20 -right-20 w-64 h-64 bg-orange-300/20 rounded-full blur-3xl pointer-events-none"></div>
       
-      <div className="bg-white rounded-3xl shadow-xl w-full max-w-md p-8 relative z-10 border border-orange-50">
+      <div className="bg-white rounded-[2.5rem] shadow-xl w-full max-w-md p-8 relative z-10 border border-orange-50 my-8">
         
         {/* 🌟 Header */}
-        <div className="text-center mb-8">
-          <div className="text-5xl mb-3 drop-shadow-sm">🌟</div>
-          <h1 className="text-3xl font-black text-gray-800">จงเจริญ</h1>
-          <p className="text-gray-500 mt-1 text-sm">ตลาดแรงงานชุมชนประแส</p>
-          <h2 className="text-xl font-semibold text-orange-600 mt-4">สร้างโปรไฟล์ของคุณ</h2>
-          <p className="text-xs text-gray-500 mt-2">อีกเพียงขั้นตอนเดียวเพื่อเริ่มต้นใช้งาน</p>
+        <div className="text-center mb-6">
+          <div className="text-5xl mb-3 drop-shadow-sm">📋</div>
+          <h1 className="text-2xl font-black text-gray-800 tracking-tight">ตั้งค่าโปรไฟล์</h1>
+          {/* ✅ ลบคำว่าประแสออก */}
+          <p className="text-gray-500 mt-1 text-[11px] font-bold tracking-widest uppercase">แพลตฟอร์มตลาดแรงงานชุมชน</p>
+          <p className="text-gray-500 mt-4 text-xs font-medium">กรอกข้อมูลให้ครบถ้วนเพื่อเริ่มใช้งาน</p>
         </div>
 
         {/* ⚠️ Error Alert */}
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 mb-4 text-sm font-medium text-center">
-            {error}
+          <div className="bg-red-50 border border-red-200 text-red-600 rounded-xl p-3 mb-5 text-[11px] font-bold flex items-start gap-2">
+            <span className="text-sm">⚠️</span> <span>{error}</span>
           </div>
         )}
 
         {/* ----------------------------------------------------------- */}
-        {/* ฟอร์ม: กรอกข้อมูลส่วนตัว */}
+        {/* ฟอร์มกรอกข้อมูล */}
         {/* ----------------------------------------------------------- */}
-        <form onSubmit={handleSaveProfile} className="space-y-5 animate-fade-in">
+        <form onSubmit={handleSaveProfile} className="space-y-4 animate-fade-in">
           
+          {/* ชื่อ - สกุล (แบ่ง 2 คอลัมน์) */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold text-gray-500 pl-1">ชื่อจริง <span className="text-red-500">*</span></label>
+              <input
+                type="text"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                required
+                placeholder="สมชาย"
+                className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#EE4D2D]/30 focus:border-[#EE4D2D] transition-all"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold text-gray-500 pl-1">นามสกุล <span className="text-red-500">*</span></label>
+              <input
+                type="text"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                required
+                placeholder="ใจดี"
+                className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#EE4D2D]/30 focus:border-[#EE4D2D] transition-all"
+              />
+            </div>
+          </div>
+
+          {/* เบอร์โทรศัพท์ */}
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-gray-700 pl-1">
-              ชื่อ-นามสกุล <span className="text-red-500">*</span>
+            <label className="text-[11px] font-bold text-gray-500 pl-1">เบอร์โทรศัพท์ <span className="text-red-500">*</span></label>
+            <input
+              type="tel"
+              value={phone}
+              onChange={handlePhoneChange}
+              required
+              placeholder="08X-XXX-XXXX"
+              className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm font-medium tracking-wider focus:outline-none focus:ring-2 focus:ring-[#EE4D2D]/30 focus:border-[#EE4D2D] transition-all"
+            />
+          </div>
+
+          {/* อีเมล */}
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold text-gray-500 pl-1">อีเมล (ถ้ามี)</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="example@email.com"
+              className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#EE4D2D]/30 focus:border-[#EE4D2D] transition-all"
+            />
+          </div>
+
+          {/* เลขบัตรประชาชน */}
+          <div className="space-y-1.5 pt-2">
+            <label className="text-[11px] font-bold text-gray-500 pl-1 flex items-center justify-between">
+              <span>เลขประจำตัวประชาชน</span>
+              <span className="text-[9px] text-[#EE4D2D] bg-orange-50 px-2 py-0.5 rounded-full border border-orange-100">จำเป็นสำหรับผู้รับงาน</span>
             </label>
             <input
               type="text"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              required
-              placeholder="เช่น สมชาย ใจดี"
-              className="w-full border border-gray-200 rounded-2xl px-4 py-3.5 text-sm font-medium text-gray-800 focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-transparent transition-all"
+              value={nationalId}
+              onChange={handleNationalIdChange}
+              placeholder="X-XXXX-XXXXX-XX-X"
+              className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm font-bold tracking-wider focus:outline-none focus:ring-2 focus:ring-[#EE4D2D]/30 focus:border-[#EE4D2D] transition-all"
             />
+            <p className="text-[9px] text-gray-400 pl-1 leading-relaxed">
+              *หากคุณเป็นผู้รับงาน (ช่าง/วิน) กรุณากรอกข้อมูลนี้เพื่อยืนยันตัวตนกับทางแพลตฟอร์ม
+            </p>
           </div>
 
           <button
             type="submit"
             disabled={loading || !user}
-            className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-2xl text-lg transition-colors mt-4 shadow-md active:scale-[0.98]"
+            className="w-full bg-[#EE4D2D] hover:bg-[#D9381E] disabled:opacity-50 disabled:cursor-not-allowed text-white font-black py-4 rounded-2xl text-sm transition-all mt-4 shadow-md active:scale-[0.98]"
           >
-            {loading ? 'กำลังบันทึกข้อมูล...' : 'เริ่มใช้งาน 🚀'}
+            {loading ? 'กำลังบันทึกข้อมูล...' : 'สร้างโปรไฟล์ และเริ่มใช้งาน 🚀'}
           </button>
         </form>
 
         {/* 🤝 Unified Account Note */}
         <div className="mt-8 bg-orange-50 rounded-2xl border border-orange-100 p-4">
-          <p className="text-xs text-orange-700 text-center">
+          <p className="text-[10px] text-orange-700 text-center font-bold">
             🎯 <strong>บัญชีเดียว</strong> — ใช้ได้ทั้งเป็นลูกค้าและช่าง
           </p>
         </div>
