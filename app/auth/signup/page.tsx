@@ -30,7 +30,7 @@ export default function SignupPage() {
       const { data: { session } } = await supabase.auth.getSession();
       
       if (session?.user) {
-        // ✅ กรณีที่ 1: ผ่านการยืนยันตัวตนมาแล้ว (ไม่ต้องตั้งรหัสผ่าน)
+        // กรณีที่ 1: ผ่านการยืนยันตัวตนมาแล้ว (ไม่ต้องตั้งรหัสผ่าน)
         setHasSession(true);
         setUser(session.user);
         const metadata = session.user.user_metadata;
@@ -38,13 +38,12 @@ export default function SignupPage() {
         // Auto-fill ข้อมูลจาก Auth
         if (session.user.email) setEmail(session.user.email);
         if (session.user.phone) {
-          // แปลง +66 ให้กลับมาเป็น 0 เพื่อโชว์ในฟอร์มสวยๆ
           let p = session.user.phone;
           if (p.startsWith('+66')) p = '0' + p.slice(3);
           setPhone(formatPhoneDisplay(p));
         }
 
-        // ดึงชื่อจาก Social Login (เช่น Google) มาแยกเป็น ชื่อ-สกุล
+        // ดึงชื่อจาก Social Login
         if (metadata?.full_name) {
           const nameParts = metadata.full_name.split(' ');
           setFirstName(nameParts[0] || '');
@@ -53,15 +52,15 @@ export default function SignupPage() {
           }
         }
       } else {
-        // ✅ กรณีที่ 2: กดปุ่มสมัครสมาชิกมาตรงๆ (ต้องกรอก Email + Password)
+        // กรณีที่ 2: กดปุ่มสมัครสมาชิกมาตรงๆ (ต้องกรอก Email + Password)
         setHasSession(false);
       }
     };
     checkUser();
-  }, [router]);
+  }, []);
 
   // -------------------------------------------------------------
-  // ✨ ฟังก์ชันจัดการ Input Masking (จัดฟอร์แมตอัตโนมัติ)
+  // ✨ ฟังก์ชันจัดการ Input Masking
   // -------------------------------------------------------------
   const formatPhoneDisplay = (val: string) => {
     const v = val.replace(/\D/g, '');
@@ -76,7 +75,6 @@ export default function SignupPage() {
   };
 
   const handleNationalIdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // ฟอร์แมตบัตรประชาชน: X-XXXX-XXXXX-XX-X
     let v = e.target.value.replace(/\D/g, '');
     if (v.length > 13) v = v.slice(0, 13);
     
@@ -105,12 +103,6 @@ export default function SignupPage() {
       setError('กรุณากรอกเบอร์โทรศัพท์ให้ครบ 10 หลัก');
       return;
     }
-    // บังคับกรอกเลขบัตรประชาชน (KYC)
-    if (!nationalId || nationalId.replace(/\D/g, '').length < 13) {
-      setError('กรุณากรอกเลขบัตรประชาชนให้ครบ 13 หลัก');
-      return;
-    }
-    
     // Validate กรณีสมัครใหม่ (ต้องมี Email และ Password)
     if (!hasSession && (!email.trim() || password.length < 6)) {
       return setError('กรุณากรอกอีเมล และตั้งรหัสผ่านอย่างน้อย 6 ตัวอักษร');
@@ -139,7 +131,7 @@ export default function SignupPage() {
         finalUserId = signUpData.user.id;
       }
 
-      // 🟢 บันทึกข้อมูลลงตาราง Profiles (ทำทั้งคนเก่าและคนใหม่)
+      // 🟢 บันทึกข้อมูลลงตาราง Profiles
       const { error: profileError } = await supabase
         .from('profiles')
         .upsert({ 
@@ -149,26 +141,24 @@ export default function SignupPage() {
           full_name: fullName,
           phone: cleanPhone,
           email: email.trim(),
-          national_id: cleanNationalId, // ⚠️ ข้อมูลละเอียดอ่อน (KYC)
+          national_id: cleanNationalId, // ข้อมูลละเอียดอ่อน (KYC)
           updated_at: new Date().toISOString(),
         });
 
       if (profileError) throw profileError;
 
-      // ถ้าผ่าน OTP มา ให้อัปเดตข้อมูล Metadata ใน Auth ของ Supabase
+      // ถ้าผ่าน OTP มา ให้อัปเดตข้อมูล Metadata ใน Auth
       if (hasSession) {
         await supabase.auth.updateUser({
           data: { full_name: fullName, phone: cleanPhone }
         });
       }
 
-      // เสร็จสมบูรณ์!
-      alert('สร้างโปรไฟล์สำเร็จ! 🎉');
-      router.push('/'); 
+      router.push('/dashboard'); 
       
     } catch (err: any) {
       if (err.message.includes('User already registered')) {
-        setError('อีเมลนี้ถูกใช้งานแล้ว กรุณาใชอีเมลอื่น หรือเข้าสู่ระบบ');
+        setError('อีเมลนี้ถูกใช้งานแล้ว กรุณาใช้อีเมลอื่น หรือเข้าสู่ระบบ');
       } else {
         setError(err.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล กรุณาลองใหม่');
       }
@@ -178,7 +168,6 @@ export default function SignupPage() {
   };
 
   return (
-    // ✅ ใช้สีพื้นหลังส้ม-เหลือง กลับมาให้เหมือนหน้า Login
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-yellow-50 flex items-center justify-center p-4 relative overflow-hidden">
       
       {/* Background Decor */}
@@ -186,15 +175,27 @@ export default function SignupPage() {
       
       <div className="bg-white rounded-[2.5rem] shadow-xl w-full max-w-md p-8 relative z-10 border border-gray-100 my-8">
         
+        {/* ✅ ปุ่มลูกศรย้อนกลับ มุมซ้ายบน */}
+        <button 
+          onClick={() => router.back()}
+          className="absolute top-6 left-6 p-2 text-gray-400 hover:text-[#EE4D2D] hover:bg-orange-50 rounded-full transition-all active:scale-95"
+          aria-label="ย้อนกลับ"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinelinejoin="round" d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+
         {/* 🌟 Header */}
-        <div className="text-center mb-6">
+        <div className="text-center mb-6 mt-2">
           <div className="w-16 h-16 bg-gradient-to-br from-[#EE4D2D] to-[#FF7337] rounded-2xl shadow-lg flex items-center justify-center text-3xl mb-4 mx-auto transform rotate-3">
             📋
           </div>
-          <h1 className="text-2xl font-black text-gray-800 tracking-tight">ตั้งค่าโปรไฟล์</h1>
-          {/* ✅ ลบคำว่า ประแส ออกเรียบร้อยครับ */}
-          <p className="text-gray-500 mt-1 text-sm">แพลตฟอร์มตลาดแรงงานชุมชน</p>
-          <p className="text-gray-500 mt-4 text-xs font-medium">กรอกข้อมูลให้ครบถ้วนเพื่อเริ่มใช้งาน</p>
+          <h1 className="text-2xl font-black text-gray-800 tracking-tight">สมัครสมาชิก</h1>
+          <p className="text-gray-500 mt-1 text-[11px] font-bold tracking-widest uppercase">แพลตฟอร์มตลาดแรงงานชุมชน</p>
+          <p className="text-gray-500 mt-4 text-xs font-medium">
+            {hasSession ? 'กรอกข้อมูลส่วนตัวเพื่อเริ่มใช้งาน' : 'สร้างบัญชีใหม่เพื่อเข้าสู่ระบบ'}
+          </p>
         </div>
 
         {/* ⚠️ Error Alert */}
@@ -209,7 +210,7 @@ export default function SignupPage() {
         {/* ----------------------------------------------------------- */}
         <form onSubmit={handleSaveProfile} className="space-y-4 animate-fade-in">
           
-          {/* ชื่อ - สกุล (แบ่ง 2 คอลัมน์) */}
+          {/* ชื่อ - สกุล */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <label className="text-sm font-medium text-gray-700 pl-1">ชื่อจริง <span className="text-red-500">*</span></label>
@@ -248,20 +249,20 @@ export default function SignupPage() {
             />
           </div>
 
-          {/* อีเมล (บังคับกรอก) */}
+          {/* อีเมล */}
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-gray-700 pl-1">อีเมล <span className="text-red-500">*</span></label>
+            <label className="text-sm font-medium text-gray-700 pl-1">อีเมล {!hasSession && <span className="text-red-500">*</span>}</label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              required
+              required={!hasSession}
               placeholder="example@email.com"
               className="w-full border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-transparent transition-all"
             />
           </div>
 
-          {/* 🔐 รหัสผ่าน (โชว์เฉพาะคนมากดสมัครใหม่ ที่ยังไม่ได้ผ่าน OTP) */}
+          {/* 🔐 รหัสผ่าน */}
           {!hasSession && (
             <div className="space-y-1.5 animate-fade-in-up">
               <label className="text-sm font-medium text-gray-700 pl-1">ตั้งรหัสผ่าน <span className="text-red-500">*</span></label>
@@ -277,17 +278,16 @@ export default function SignupPage() {
             </div>
           )}
 
-          {/* เลขบัตรประชาชน (KYC) */}
+          {/* เลขบัตรประชาชน */}
           <div className="space-y-1.5 pt-2">
             <label className="text-sm font-medium text-gray-700 pl-1 flex items-center justify-between">
-              <span>เลขประจำตัวประชาชน <span className="text-red-500">*</span></span>
+              <span>เลขประจำตัวประชาชน</span>
               <span className="text-[9px] text-red-500 bg-red-50 px-2 py-0.5 rounded-full border border-red-100">จำเป็นสำหรับการรับงาน</span>
             </label>
             <input
               type="text"
               value={nationalId}
               onChange={handleNationalIdChange}
-              required
               placeholder="X-XXXX-XXXXX-XX-X"
               className="w-full border border-gray-200 rounded-2xl px-4 py-3 text-sm font-bold tracking-wider focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-transparent transition-all"
             />
