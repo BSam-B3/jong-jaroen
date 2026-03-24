@@ -4,13 +4,14 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
-// กำหนด Type ให้ตรงกับ Database ที่คุณ C สร้าง
 interface ExpressJob {
   id: string;
   title: string;
+  job_type: string;
   pickup_location: string;
   dropoff_location: string;
-  offered_price: number;
+  goods_price: number | null;
+  offered_price: number | null;
   status: string;
   created_at: string;
   profiles?: {
@@ -22,36 +23,31 @@ interface ExpressJob {
 export default function WinOnlinePage() {
   const router = useRouter();
   
-  // State สำหรับดึงข้อมูลงาน
   const [jobs, setJobs] = useState<ExpressJob[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  
-  // State สำหรับผู้ใช้งานปัจจุบัน (เพื่อเช็คสิทธิ์ตอนกดโพสต์งาน)
   const [currentUser, setCurrentUser] = useState<any>(null);
 
-  // State สำหรับ Modal โพสต์งาน
+  // Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // ฟอร์มโพสต์งาน
+  // Form States
+  const [jobType, setJobType] = useState<'ride' | 'buy' | 'deliver'>('ride');
   const [title, setTitle] = useState('');
   const [pickup, setPickup] = useState('');
   const [dropoff, setDropoff] = useState('');
-  const [price, setPrice] = useState('');
+  const [goodsPrice, setGoodsPrice] = useState('');
+  const [serviceFee, setServiceFee] = useState('');
 
   // -----------------------------------------------------------------
-  // 🔄 1. ดึงข้อมูลงานด่วนทั้งหมดจาก Database
+  // 🔄 ดึงข้อมูล
   // -----------------------------------------------------------------
   const fetchJobs = async () => {
     setIsLoading(true);
     try {
-      // ดึงงานด่วน และ Join ข้อมูลชื่อคนโพสต์จากตาราง profiles
       const { data, error } = await supabase
         .from('express_jobs')
-        .select(`
-          *,
-          profiles:customer_id (first_name, last_name)
-        `)
+        .select(`*, profiles:customer_id (first_name, last_name)`)
         .eq('status', 'open')
         .order('created_at', { ascending: false });
 
@@ -65,16 +61,14 @@ export default function WinOnlinePage() {
   };
 
   useEffect(() => {
-    // เช็ค Session ผู้ใช้
     supabase.auth.getSession().then(({ data: { session } }) => {
       setCurrentUser(session?.user || null);
     });
-
     fetchJobs();
   }, []);
 
   // -----------------------------------------------------------------
-  // 📝 2. ฟังก์ชันโพสต์งานด่วน (บันทึกลง Database)
+  // 📝 โพสต์งาน
   // -----------------------------------------------------------------
   const handlePostJob = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,27 +78,30 @@ export default function WinOnlinePage() {
       return;
     }
 
+    // ตรวจสอบขั้นต่ำค่าแรง (สมมติขั้นต่ำ 15 บาทเพื่อความเป็นธรรม)
+    if (serviceFee && parseFloat(serviceFee) < 15) {
+      alert('เพื่อความเป็นธรรมต่อผู้รับงาน กรุณากำหนดค่าจ้างเริ่มต้นที่ 15 บาทขึ้นไปครับ 🛵');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const { error } = await supabase.from('express_jobs').insert({
         customer_id: currentUser.id,
         title: title,
+        job_type: jobType,
         pickup_location: pickup,
         dropoff_location: dropoff || null,
-        offered_price: price ? parseFloat(price) : null,
+        goods_price: jobType === 'buy' && goodsPrice ? parseFloat(goodsPrice) : null,
+        offered_price: serviceFee ? parseFloat(serviceFee) : null,
       });
 
       if (error) throw error;
 
-      // โพสต์สำเร็จ: ปิด Modal, ล้างฟอร์ม และดึงข้อมูลใหม่
       setIsModalOpen(false);
-      setTitle('');
-      setPickup('');
-      setDropoff('');
-      setPrice('');
-      fetchJobs(); // รีเฟรชรายการงาน
-      
-      alert('โพสต์งานด่วนสำเร็จ! รอช่าง/วิน ติดต่อกลับได้เลยครับ 🚀');
+      setTitle(''); setPickup(''); setDropoff(''); setGoodsPrice(''); setServiceFee(''); setJobType('ride');
+      fetchJobs(); 
+      alert('โพสต์งานด่วนสำเร็จ! รอคนรับงานหรือทักแชทมาต่อรองได้เลยครับ 🚀');
     } catch (error: any) {
       alert('เกิดข้อผิดพลาด: ' + error.message);
     } finally {
@@ -112,16 +109,18 @@ export default function WinOnlinePage() {
     }
   };
 
-  // ฟังก์ชันคำนวณเวลาที่ผ่านไป (เช่น "10 นาทีที่แล้ว")
+  // Helper Functions
   const timeAgo = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / 60000);
-    
-    if (diffInMinutes < 1) return 'เมื่อสักครู่';
-    if (diffInMinutes < 60) return `${diffInMinutes} นาทีที่แล้ว`;
-    if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)} ชม. ที่แล้ว`;
-    return 'มากกว่า 1 วัน';
+    const diff = Math.floor((new Date().getTime() - new Date(dateString).getTime()) / 60000);
+    if (diff < 1) return 'เมื่อสักครู่';
+    if (diff < 60) return `${diff} นาทีที่แล้ว`;
+    return `${Math.floor(diff / 60)} ชม. ที่แล้ว`;
+  };
+
+  const getJobIcon = (type: string) => {
+    if (type === 'buy') return '🍜';
+    if (type === 'deliver') return '📦';
+    return '🛵';
   };
 
   return (
@@ -134,103 +133,95 @@ export default function WinOnlinePage() {
             <h1 className="text-white text-2xl font-black tracking-tight flex items-center gap-2">
               <span className="text-3xl">🛵</span> งานด่วนชุมชน
             </h1>
-            <button className="bg-white/20 p-2 rounded-full text-white hover:bg-white/30 transition-all">
-              🔔
-            </button>
           </div>
-          
-          <div className="bg-white/10 p-3 rounded-2xl backdrop-blur-sm border border-white/20 text-white text-sm font-medium">
-            📍 โพสต์ปุ๊บ วินหรือคนรับจ้างในพื้นที่เห็นปั๊บ พร้อมให้บริการทันที
+          <div className="bg-white/10 p-3 rounded-2xl backdrop-blur-sm border border-white/20 text-white text-xs font-medium">
+            💡 <strong className="text-yellow-200">ระบบราคาเป็นธรรม:</strong> ลูกค้าเสนอราคาที่พอใจ และช่างสามารถกดทักแชทเพื่อต่อรองระยะทางได้
           </div>
         </div>
 
-        {/* 📋 ส่วนเนื้อหาหลัก (Feed งาน) */}
+        {/* 📋 ฟีดงานด่วน */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-hide pb-24 z-0">
           
           <div className="flex justify-between items-end mb-2 px-1">
             <h2 className="text-sm font-black text-gray-800 tracking-tight flex items-center gap-2">
               🟢 งานที่รอคนรับ
             </h2>
-            <button onClick={fetchJobs} className="text-[10px] text-gray-500 hover:text-[#EE4D2D] font-bold">
-              🔄 รีเฟรช
-            </button>
+            <button onClick={fetchJobs} className="text-[10px] text-gray-500 hover:text-[#EE4D2D] font-bold">🔄 รีเฟรช</button>
           </div>
 
           {isLoading ? (
-            // ⏳ Skeleton Loading
             Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="bg-white rounded-[1.5rem] p-4 shadow-sm border border-gray-100 animate-pulse">
-                <div className="h-4 bg-gray-200 rounded w-1/2 mb-3"></div>
-                <div className="h-3 bg-gray-200 rounded w-3/4 mb-2"></div>
-                <div className="h-3 bg-gray-200 rounded w-1/4"></div>
-              </div>
+              <div key={i} className="bg-white rounded-[1.5rem] p-4 shadow-sm border border-gray-100 animate-pulse h-32"></div>
             ))
           ) : jobs.length === 0 ? (
-            // 📭 Empty State (ไม่มีงาน)
             <div className="bg-white rounded-[2rem] p-8 text-center shadow-sm border border-gray-100 mt-4">
               <div className="text-5xl mb-4 opacity-50">💨</div>
               <h3 className="text-sm font-bold text-gray-800 mb-1">ยังไม่มีงานด่วนในขณะนี้</h3>
-              <p className="text-[10px] text-gray-500">เป็นคนแรกที่เริ่มโพสต์เรียกวิน หรือหาคนช่วยงานสิ!</p>
+              <p className="text-[10px] text-gray-500">โพสต์เรียกวิน หรือฝากซื้อของได้เลย!</p>
             </div>
           ) : (
-            // ✅ รายการงานด่วน
             jobs.map((job) => (
               <div key={job.id} className="bg-white rounded-[1.5rem] p-4 shadow-sm border border-gray-50 relative overflow-hidden active:scale-[0.99] transition-transform">
                 
-                {/* แถบราคา (ถ้ามี) */}
-                {job.offered_price && (
-                  <div className="absolute top-0 right-0 bg-green-500 text-white text-[10px] font-black px-3 py-1 rounded-bl-xl shadow-sm">
-                    ฿{job.offered_price}
-                  </div>
-                )}
-
-                <h3 className="font-bold text-gray-800 text-sm pr-12">{job.title}</h3>
-                
-                <div className="mt-3 space-y-2">
-                  <div className="flex items-start gap-2">
-                    <span className="text-blue-500 text-xs mt-0.5">🟢</span>
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-10 h-10 bg-orange-50 rounded-full flex items-center justify-center text-xl">
+                      {getJobIcon(job.job_type)}
+                    </div>
                     <div>
-                      <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">จุดรับ / เริ่มงาน</p>
-                      <p className="text-xs text-gray-700 font-medium">{job.pickup_location}</p>
+                      <h3 className="font-bold text-gray-800 text-sm leading-tight">{job.title}</h3>
+                      <p className="text-[9px] text-gray-500 font-medium mt-0.5">
+                        ผู้โพสต์: {job.profiles?.first_name || 'ไม่ระบุ'} • {timeAgo(job.created_at)}
+                      </p>
                     </div>
                   </div>
                   
+                  {/* แสดงราคาแยกส่วน */}
+                  <div className="text-right">
+                    <div className="text-lg font-black text-[#EE4D2D] leading-none">
+                      {job.offered_price ? `฿${job.offered_price}` : 'เสนอราคา'}
+                    </div>
+                    <div className="text-[8px] text-gray-400 font-bold mt-1 uppercase tracking-wider">ค่าจ้าง / ค่าส่ง</div>
+                  </div>
+                </div>
+
+                {job.goods_price && (
+                  <div className="bg-blue-50 text-blue-700 text-[10px] font-bold px-3 py-1.5 rounded-lg inline-block mb-3 border border-blue-100">
+                    🛒 เตรียมเงินค่าของประมาณ: ฿{job.goods_price}
+                  </div>
+                )}
+
+                <div className="space-y-1.5 bg-gray-50 p-3 rounded-xl border border-gray-100 mb-4">
+                  <div className="flex items-start gap-2">
+                    <span className="text-blue-500 text-[10px] mt-0.5">🟢</span>
+                    <p className="text-xs text-gray-700 font-medium leading-tight"><span className="text-[9px] text-gray-400 font-bold block">จุดรับ</span>{job.pickup_location}</p>
+                  </div>
                   {job.dropoff_location && (
-                    <div className="flex items-start gap-2">
-                      <span className="text-red-500 text-xs mt-0.5">🔴</span>
-                      <div>
-                        <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">จุดส่ง / ปลายทาง</p>
-                        <p className="text-xs text-gray-700 font-medium">{job.dropoff_location}</p>
-                      </div>
+                    <div className="flex items-start gap-2 pt-1.5 border-t border-gray-200/50">
+                      <span className="text-red-500 text-[10px] mt-0.5">🔴</span>
+                      <p className="text-xs text-gray-700 font-medium leading-tight"><span className="text-[9px] text-gray-400 font-bold block">จุดส่ง</span>{job.dropoff_location}</p>
                     </div>
                   )}
                 </div>
 
-                <div className="mt-4 pt-3 border-t border-gray-50 flex justify-between items-center">
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center text-[10px] font-bold">
-                      {job.profiles?.first_name?.charAt(0) || '?'}
-                    </div>
-                    <span className="text-[10px] text-gray-500 font-medium">
-                      ผู้โพสต์: {job.profiles?.first_name || 'ไม่ระบุ'}
-                    </span>
-                  </div>
-                  <span className="text-[9px] text-gray-400 font-medium">
-                    {timeAgo(job.created_at)}
-                  </span>
+                {/* ปุ่ม Action 2 ฝั่ง: รับงาน VS ต่อรอง */}
+                <div className="flex gap-2">
+                  <button className="flex-1 bg-[#EE4D2D] text-white py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95 shadow-sm">
+                    รับงานนี้ ⚡
+                  </button>
+                  <button 
+                    onClick={() => alert('ฟีเจอร์แชทกำลังพัฒนาครับ! 💬')}
+                    className="flex-1 bg-white text-[#EE4D2D] border border-[#EE4D2D] py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95 shadow-sm"
+                  >
+                    💬 ทักแชทต่อรอง
+                  </button>
                 </div>
-
-                {/* ปุ่มรับงาน (สำหรับช่าง/วิน) */}
-                <button className="w-full mt-3 bg-orange-50 text-[#EE4D2D] border border-orange-100 hover:bg-orange-100 py-2.5 rounded-xl text-xs font-bold transition-colors">
-                  กดรับงานนี้ ⚡
-                </button>
               </div>
             ))
           )}
-
         </div>
 
-        {/* ➕ Floating Action Button (ปุ่มโพสต์งาน) */}
+        {/* ➕ Floating Action Button */}
         <button 
           onClick={() => setIsModalOpen(true)}
           className="fixed bottom-24 right-4 sm:right-[calc(50%-18rem)] w-14 h-14 bg-gradient-to-br from-[#EE4D2D] to-[#FF7337] rounded-full shadow-lg shadow-[#EE4D2D]/30 flex items-center justify-center text-white text-3xl active:scale-90 transition-transform z-40 border-2 border-white"
@@ -239,47 +230,66 @@ export default function WinOnlinePage() {
         </button>
 
         {/* ----------------------------------------------------------------- */}
-        {/* 🧩 Modal (หน้าต่างป๊อปอัป) สำหรับกรอกข้อมูลโพสต์งาน */}
+        {/* 🧩 Modal โพสต์งานด่วน (แยกระบบราคา) */}
         {/* ----------------------------------------------------------------- */}
         {isModalOpen && (
           <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center bg-black/50 backdrop-blur-sm animate-fade-in">
-            <div className="bg-white w-full sm:max-w-md rounded-t-[2rem] sm:rounded-[2rem] p-6 shadow-2xl animate-slide-up relative">
+            <div className="bg-white w-full sm:max-w-md rounded-t-[2rem] sm:rounded-[2rem] p-6 shadow-2xl animate-slide-up relative max-h-[90vh] overflow-y-auto scrollbar-hide">
               
-              {/* ปุ่มปิด */}
-              <button 
-                onClick={() => setIsModalOpen(false)}
-                className="absolute top-4 right-4 w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-200"
-              >
-                ✕
-              </button>
+              <button onClick={() => setIsModalOpen(false)} className="absolute top-4 right-4 w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-200">✕</button>
 
-              <h2 className="text-lg font-black text-gray-800 mb-1">โพสต์งานด่วน 🚀</h2>
-              <p className="text-[10px] text-gray-500 mb-5">ข้อมูลจะถูกส่งไปยังช่างและวินในพื้นที่ทันที</p>
+              <h2 className="text-lg font-black text-gray-800 mb-4">เรียกงานด่วน 🚀</h2>
+
+              {/* เลือกประเภทงาน */}
+              <div className="flex gap-2 mb-5">
+                <button type="button" onClick={() => setJobType('ride')} className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${jobType === 'ride' ? 'bg-orange-50 border-[#EE4D2D] text-[#EE4D2D]' : 'bg-white border-gray-200 text-gray-500'}`}>🛵 เรียกรถ</button>
+                <button type="button" onClick={() => setJobType('buy')} className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${jobType === 'buy' ? 'bg-orange-50 border-[#EE4D2D] text-[#EE4D2D]' : 'bg-white border-gray-200 text-gray-500'}`}>🍜 ฝากซื้อของ</button>
+                <button type="button" onClick={() => setJobType('deliver')} className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${jobType === 'deliver' ? 'bg-orange-50 border-[#EE4D2D] text-[#EE4D2D]' : 'bg-white border-gray-200 text-gray-500'}`}>📦 ส่งของ</button>
+              </div>
 
               <form onSubmit={handlePostJob} className="space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-gray-600 pl-1">หัวข้อ / ต้องการให้ทำอะไร? <span className="text-red-500">*</span></label>
-                  <input type="text" required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="เช่น ซื้อข้าวหมูแดง, เรียกวินไปตลาด" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-[#EE4D2D]/30 focus:border-[#EE4D2D] outline-none transition-all" />
-                </div>
                 
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-gray-600 pl-1">จุดรับ / สถานที่เริ่มงาน <span className="text-red-500">*</span></label>
-                  <input type="text" required value={pickup} onChange={(e) => setPickup(e.target.value)} placeholder="เช่น หน้าเซเว่นปากซอย 5" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-[#EE4D2D]/30 focus:border-[#EE4D2D] outline-none transition-all" />
+                  <label className="text-[11px] font-bold text-gray-600 pl-1">ให้ทำอะไร? <span className="text-red-500">*</span></label>
+                  <input type="text" required value={title} onChange={(e) => setTitle(e.target.value)} placeholder={jobType === 'buy' ? "เช่น ซื้อข้าวมันไก่ร้านเจ๊หมวย 2 ห่อ" : "เช่น ไปส่งที่ บขส."} className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-[#EE4D2D]/30 focus:border-[#EE4D2D] outline-none" />
+                </div>
+
+                {jobType === 'buy' && (
+                  <div className="space-y-1.5 bg-blue-50/50 p-3 rounded-xl border border-blue-100">
+                    <label className="text-[11px] font-bold text-blue-700 pl-1">ค่าสินค้า / ค่าอาหาร (โดยประมาณ)</label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-3 text-gray-400 font-bold">฿</span>
+                      <input type="number" value={goodsPrice} onChange={(e) => setGoodsPrice(e.target.value)} placeholder="0" className="w-full border border-gray-200 rounded-xl pl-8 pr-4 py-3 text-sm font-bold focus:ring-2 focus:ring-[#EE4D2D]/30 focus:border-[#EE4D2D] outline-none" />
+                    </div>
+                    <p className="text-[9px] text-blue-600 mt-1 pl-1">ให้วินรู้ว่าต้องเตรียมเงินสำรองจ่ายเท่าไหร่</p>
+                  </div>
+                )}
+                
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-gray-600 pl-1">จุดรับ / ร้านค้า / เริ่มต้น <span className="text-red-500">*</span></label>
+                  <input type="text" required value={pickup} onChange={(e) => setPickup(e.target.value)} placeholder="ระบุให้ชัดเจน" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-[#EE4D2D]/30 focus:border-[#EE4D2D] outline-none" />
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-gray-600 pl-1">จุดส่ง / ปลายทาง (ถ้ามี)</label>
-                  <input type="text" value={dropoff} onChange={(e) => setDropoff(e.target.value)} placeholder="เช่น บ้านเลขที่ 123/4" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-[#EE4D2D]/30 focus:border-[#EE4D2D] outline-none transition-all" />
+                  <label className="text-[11px] font-bold text-gray-600 pl-1">จุดส่ง / ปลายทาง</label>
+                  <input type="text" value={dropoff} onChange={(e) => setDropoff(e.target.value)} placeholder="ระบุปลายทาง" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-[#EE4D2D]/30 focus:border-[#EE4D2D] outline-none" />
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-gray-600 pl-1 flex justify-between">
-                    <span>ราคาที่เสนอ (บาท)</span>
-                    <span className="text-gray-400 font-normal">เว้นว่างได้ถ้าให้ช่างเสนอราคา</span>
+                {/* ส่วนค่าจ้าง + ราคากลางแนะนำ */}
+                <div className="space-y-2 pt-2 border-t border-gray-100">
+                  <label className="text-[11px] font-bold text-gray-800 pl-1 flex justify-between">
+                    <span>ค่าจ้าง / ค่าวิ่งส่ง (บาท) <span className="text-red-500">*</span></span>
                   </label>
                   <div className="relative">
-                    <span className="absolute left-4 top-3 text-gray-400 font-bold">฿</span>
-                    <input type="number" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="0.00" className="w-full border border-gray-200 rounded-xl pl-8 pr-4 py-3 text-sm font-bold focus:ring-2 focus:ring-[#EE4D2D]/30 focus:border-[#EE4D2D] outline-none transition-all" />
+                    <span className="absolute left-4 top-3 text-[#EE4D2D] font-black">฿</span>
+                    <input type="number" required min="15" value={serviceFee} onChange={(e) => setServiceFee(e.target.value)} placeholder="ระบุค่าจ้างที่เป็นธรรม..." className="w-full border-2 border-orange-100 rounded-xl pl-8 pr-4 py-3 text-base text-[#EE4D2D] font-black focus:ring-2 focus:ring-[#EE4D2D]/30 focus:border-[#EE4D2D] outline-none" />
+                  </div>
+                  
+                  {/* ปุ่มราคากลางชุมชน */}
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => setServiceFee('20')} className="flex-1 bg-gray-50 border border-gray-200 text-gray-600 text-[10px] font-bold py-1.5 rounded-lg hover:bg-orange-50 hover:text-[#EE4D2D] transition-colors">+ 20 บาท (ใกล้ๆ)</button>
+                    <button type="button" onClick={() => setServiceFee('30')} className="flex-1 bg-gray-50 border border-gray-200 text-gray-600 text-[10px] font-bold py-1.5 rounded-lg hover:bg-orange-50 hover:text-[#EE4D2D] transition-colors">+ 30 บาท (มีรอคิว)</button>
+                    <button type="button" onClick={() => setServiceFee('50')} className="flex-1 bg-gray-50 border border-gray-200 text-gray-600 text-[10px] font-bold py-1.5 rounded-lg hover:bg-orange-50 hover:text-[#EE4D2D] transition-colors">+ 50 บาท (ของเยอะ)</button>
                   </div>
                 </div>
 
