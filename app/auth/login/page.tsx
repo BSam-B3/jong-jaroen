@@ -28,7 +28,7 @@ export default function LoginPage() {
   // -------------------------------------------------------------
   // ✨ ฟังก์ชันจัดการ Input เบอร์โทร (Auto-spacing)
   // -------------------------------------------------------------
-  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhoneChange = (e: any) => {
     let val = e.target.value.replace(/\D/g, '');
     if (val.length > 10) val = val.slice(0, 10);
     
@@ -51,7 +51,7 @@ export default function LoginPage() {
   // -------------------------------------------------------------
   // 📧 1. ล็อกอินด้วย Email / Password
   // -------------------------------------------------------------
-  const handleEmailLogin = async (e: React.FormEvent) => {
+  const handleEmailLogin = async (e: any) => {
     e.preventDefault();
     setLoading(true);
     setError('');
@@ -83,7 +83,7 @@ export default function LoginPage() {
   // -------------------------------------------------------------
   // 📱 2. ล็อกอินด้วยเบอร์โทรศัพท์ (OTP)
   // -------------------------------------------------------------
-  const handleRequestOTP = async (e: React.FormEvent) => {
+  const handleRequestOTP = async (e: any) => {
     e.preventDefault();
     if (phoneRaw.length < 10) {
       setError('กรุณากรอกเบอร์โทรศัพท์ให้ครบ 10 หลัก');
@@ -105,7 +105,7 @@ export default function LoginPage() {
     }
   };
 
-  const handleVerifyOTP = async (e: React.FormEvent) => {
+  const handleVerifyOTP = async (e: any) => {
     e.preventDefault();
     setLoading(true);
     setError('');
@@ -118,7 +118,7 @@ export default function LoginPage() {
         type: 'sms',
       });
       if (error) throw error;
-      if (data.session) router.push('/auth/signup'); // ไปหน้าตั้งค่าโปรไฟล์
+      if (data.session) router.push('/dashboard');
     } catch (err: any) {
       setError('รหัส OTP ไม่ถูกต้อง หรือหมดอายุแล้ว');
     } finally {
@@ -134,7 +134,7 @@ export default function LoginPage() {
     setError('');
     try {
       const { error } = await supabase.auth.signInWithOAuth({
-        provider: provider as any, // แก้ Vercel TypeScript Error
+        provider: provider as any,
         options: {
           redirectTo: `${window.location.origin}/auth/callback` 
         }
@@ -158,7 +158,6 @@ export default function LoginPage() {
         <div className="text-center mb-6">
           <div className="text-5xl mb-3 drop-shadow-sm">🌟</div>
           <h1 className="text-3xl font-black text-[#EE4D2D] tracking-tight">จงเจริญ</h1>
-          {/* ✅ ลบคำว่าประแสออก เปลี่ยนเป็นชื่อกลาง */}
           <p className="text-gray-500 mt-1 text-[11px] font-bold tracking-widest uppercase">แพลตฟอร์มตลาดแรงงานชุมชน</p>
           <h2 className="text-lg font-bold text-gray-800 mt-6">เข้าสู่ระบบ</h2>
         </div>
@@ -243,7 +242,7 @@ export default function LoginPage() {
                   <label className="text-[11px] font-bold text-gray-500 pl-1">เบอร์โทรศัพท์มือถือ</label>
                   <div className="relative flex items-center bg-gray-50 border border-gray-200 rounded-2xl focus-within:border-[#EE4D2D] focus-within:ring-2 focus-within:ring-[#EE4D2D]/30 transition-all overflow-hidden">
                     <div className="px-4 py-3.5 bg-gray-100 border-r border-gray-200 text-gray-600 text-sm font-bold flex items-center gap-1.5 shrink-0">
-                      🇹🇭 <span className="text-xs">+66</span>
+                      +66
                     </div>
                     <input
                       type="tel"
@@ -307,7 +306,6 @@ export default function LoginPage() {
             </div>
 
             <div className="space-y-3">
-              {/* ✅ สี Google */}
               <button 
                 onClick={() => handleOAuthLogin('google')}
                 type="button" 
@@ -324,7 +322,6 @@ export default function LoginPage() {
                 Account
               </button>
               
-              {/* ✅ สี LINE */}
               <button 
                 onClick={() => handleOAuthLogin('line')}
                 type="button" 
@@ -333,7 +330,6 @@ export default function LoginPage() {
                 <span className="text-lg">💬</span> LINE Account
               </button>
 
-              {/* ✅ สี Facebook */}
               <button 
                 onClick={() => handleOAuthLogin('facebook')}
                 type="button" 
