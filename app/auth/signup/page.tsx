@@ -57,7 +57,7 @@ export default function SignupPage() {
       }
     };
     checkUser();
-  }, []);
+  }, [router]);
 
   // -------------------------------------------------------------
   // ✨ ฟังก์ชันจัดการ Input Masking
@@ -175,14 +175,14 @@ export default function SignupPage() {
       
       <div className="bg-white rounded-[2.5rem] shadow-xl w-full max-w-md p-8 relative z-10 border border-gray-100 my-8">
         
-        {/* ✅ ปุ่มลูกศรย้อนกลับ มุมซ้ายบน */}
+        {/* ✅ ปุ่มลูกศรย้อนกลับ มุมซ้ายบน (แก้ไข Syntax SVG แล้ว) */}
         <button 
           onClick={() => router.back()}
           className="absolute top-6 left-6 p-2 text-gray-400 hover:text-[#EE4D2D] hover:bg-orange-50 rounded-full transition-all active:scale-95"
           aria-label="ย้อนกลับ"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-            <path strokeLinecap="round" strokeLinelinejoin="round" d="M15 19l-7-7 7-7" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
           </svg>
         </button>
 
