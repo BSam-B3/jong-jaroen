@@ -38,7 +38,7 @@ export default function ProfilePage() {
         </div>
 
         {/* 📋 ส่วนเนื้อหาหลัก (Hub เมนูเอกสาร) */}
-        <div className="p-5 space-y-5 relative z-20">
+        <div className="flex-1 overflow-y-auto p-5 space-y-5 relative z-20 scrollbar-hide pb-24">
           
           <div className="bg-orange-50 border border-[#EE4D2D]/20 rounded-2xl p-4 flex items-start gap-3 shadow-sm">
              <span className="text-xl">💡</span>
@@ -87,7 +87,6 @@ export default function ProfilePage() {
               subtitle="ตั้งค่าช่องทางรับเงินสำหรับผู้รับงาน"
               onClick={() => router.push('/profile/bank')} 
             />
-            {/* ✅ เพิ่มเมนูประวัติต่อจาก Bank ตามที่บีสามรีเควส */}
             <MenuRow 
               icon="📜" 
               title="ประวัติรายการ (History)" 
@@ -125,15 +124,23 @@ export default function ProfilePage() {
 
         </div>
 
-        {/* ✅ Bottom Navigation (จัดใหม่เหลือ 4 ไอคอน สำหรับหน้า Profile) */}
-        <div className="fixed bottom-0 w-full sm:max-w-2xl md:max-w-3xl bg-white/95 backdrop-blur-md border-t border-gray-100 px-4 py-4 flex justify-around items-center shadow-[0_-4px_25px_rgba(0,0,0,0.06)] rounded-t-[2.5rem] z-50">
+        {/* ✅ Bottom Navigation (อัปเดตเป็น 6 เมนูตามมาตรฐานแอป) */}
+        <div className="fixed bottom-0 w-full sm:max-w-2xl md:max-w-3xl bg-white/95 backdrop-blur-md border-t border-gray-100 px-1 py-4 flex justify-between items-center shadow-[0_-4px_25px_rgba(0,0,0,0.06)] rounded-t-[2.5rem] z-50">
           <NavItem icon="🏠" label="หน้าแรก" active={false} onClick={() => router.push('/')} />
           <NavItem icon="🛠️" label="บริการ" active={false} onClick={() => router.push('/services')} />
           <NavItem icon="📋" label="งานด่วน" active={false} onClick={() => router.push('/win-online')} />
+          <NavItem icon="📰" label="ข่าวสาร" active={false} onClick={() => router.push('/news')} />
+          <NavItem icon="🎟️" label="ปองเจริญ" active={false} onClick={() => router.push('/coupons')} />
           <NavItem icon="👤" label="ฉัน" active={true} onClick={() => {}} />
         </div>
 
       </div>
+
+      {/* ซ่อน Scrollbar ของ Container หลัก */}
+      <style dangerouslySetInnerHTML={{__html: `
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+      `}} />
     </div>
   );
 }
@@ -162,12 +169,12 @@ function MenuRow({ icon, title, subtitle, onClick, status }: any) {
   );
 }
 
-// คอมโพเนนต์เมนูด้านล่าง
+// คอมโพเนนต์เมนูด้านล่าง (ปรับให้กว้างเท่าๆ กัน)
 function NavItem({ icon, label, active, onClick }: any) {
   return (
-    <div onClick={onClick} className={`flex flex-col items-center gap-1.5 cursor-pointer transition-all ${active ? 'scale-110' : 'opacity-40 hover:opacity-100'} w-16`}>
-      <span className="text-2xl">{icon}</span>
-      <span className={`text-[10px] font-bold ${active ? 'text-[#EE4D2D]' : 'text-gray-500'}`}>{label}</span>
+    <div onClick={onClick} className={`flex flex-col items-center gap-1.5 cursor-pointer transition-all ${active ? 'scale-110' : 'opacity-40 hover:opacity-100'} flex-1`}>
+      <span className="text-[22px]">{icon}</span>
+      <span className={`text-[9px] font-bold ${active ? 'text-[#EE4D2D]' : 'text-gray-500'} whitespace-nowrap`}>{label}</span>
       {active && <div className="w-1.5 h-1.5 bg-[#EE4D2D] rounded-full shadow-sm mt-0.5"></div>}
     </div>
   );
