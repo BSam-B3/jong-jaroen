@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import Link from 'next/link';
 
 export default function SignupPage() {
   const router = useRouter();
@@ -13,12 +14,12 @@ export default function SignupPage() {
   const [nationalId, setNationalId] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState(''); // ✅ เพิ่ม State รหัสผ่าน
+  const [password, setPassword] = useState(''); // รหัสผ่านสำหรับคนสมัครใหม่
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   
-  // ✅ State เช็คว่ามาจาก OTP/Social หรือมากดสมัครใหม่ตรงๆ
+  // State เช็คว่ามี Session ยืนยันตัวตนมาแล้วหรือยัง
   const [hasSession, setHasSession] = useState(false); 
   const [user, setUser] = useState<any>(null);
 
@@ -30,7 +31,7 @@ export default function SignupPage() {
       const { data: { session } } = await supabase.auth.getSession();
       
       if (session?.user) {
-        // กรณีที่ 2: ผ่านการยืนยันตัวตนมาแล้ว (OTP/Social)
+        // ✅ กรณีที่ 1: ยืนยัน OTP/Social มาแล้ว (ไม่ต้องตั้งรหัสผ่าน)
         setHasSession(true);
         setUser(session.user);
         const metadata = session.user.user_metadata;
@@ -47,7 +48,7 @@ export default function SignupPage() {
           if (nameParts.length > 1) setLastName(nameParts.slice(1).join(' '));
         }
       } else {
-        // กรณีที่ 1: เข้ามากดสมัครใหม่ (ไม่มี Session)
+        // ✅ กรณีที่ 2: กดปุ่มสมัครสมาชิกมาตรงๆ (ต้องกรอก Email + Password)
         setHasSession(false);
       }
     };
@@ -89,9 +90,11 @@ export default function SignupPage() {
     e.preventDefault();
     setError('');
 
-    // Validate
+    // Validate พื้นฐาน
     if (!firstName.trim() || !lastName.trim()) return setError('กรุณากรอกชื่อและนามสกุลให้ครบถ้วน');
     if (phone.replace(/\D/g, '').length < 10) return setError('กรุณากรอกเบอร์โทรศัพท์ให้ครบ 10 หลัก');
+    
+    // Validate กรณีสมัครใหม่ (ต้องมี Email และ Password)
     if (!hasSession && (!email.trim() || password.length < 6)) {
       return setError('กรุณากรอกอีเมล และตั้งรหัสผ่านอย่างน้อย 6 ตัวอักษร');
     }
@@ -104,7 +107,7 @@ export default function SignupPage() {
       const cleanNationalId = nationalId.replace(/\D/g, '');
       let finalUserId = user?.id;
 
-      // 🔴 ถ้าเป็นการสมัครใหม่ด้วย Email + Password
+      // 🔴 ถ้าเป็นการสมัครใหม่ด้วย Email + Password (ไม่มี Session)
       if (!hasSession) {
         const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
           email: email.trim(),
@@ -119,7 +122,7 @@ export default function SignupPage() {
         finalUserId = signUpData.user.id;
       }
 
-      // 🟢 บันทึกข้อมูลลงตาราง Profiles
+      // 🟢 บันทึกข้อมูลลงตาราง Profiles (ทำทั้งคนเก่าและคนใหม่)
       const { error: profileError } = await supabase
         .from('profiles')
         .upsert({ 
@@ -135,15 +138,14 @@ export default function SignupPage() {
 
       if (profileError) throw profileError;
 
-      // ถ้าเป็น OTP มาก่อน ให้อัปเดตข้อมูลด้วย
+      // ถ้าผ่าน OTP มา ให้อัปเดตข้อมูล Metadata ใน Auth ด้วย
       if (hasSession) {
         await supabase.auth.updateUser({
           data: { full_name: fullName, phone: cleanPhone }
         });
       }
 
-      alert('สมัครสมาชิกสำเร็จ! 🎉');
-      router.push('/'); 
+      router.push('/dashboard'); 
       
     } catch (err: any) {
       if (err.message.includes('User already registered')) {
@@ -157,92 +159,92 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F4F6F8] flex items-center justify-center p-4 relative overflow-hidden">
+    // ✅ นำสีพื้นหลังส้ม-เหลือง กลับมาให้เหมือนหน้า Login
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-yellow-50 flex items-center justify-center p-4 relative overflow-hidden">
       
+      {/* Background Decor */}
       <div className="absolute -top-20 -right-20 w-64 h-64 bg-orange-300/20 rounded-full blur-3xl pointer-events-none"></div>
       
-      <div className="bg-white rounded-[2.5rem] shadow-xl w-full max-w-md p-8 relative z-10 border border-gray-100 mt-8 mb-8">
+      <div className="bg-white rounded-3xl shadow-xl w-full max-w-md p-8 relative z-10 my-8">
         
         {/* 🌟 Header */}
         <div className="text-center mb-6">
-          <div className="w-16 h-16 bg-gradient-to-br from-[#EE4D2D] to-[#FF7337] rounded-2xl shadow-lg flex items-center justify-center text-3xl mb-4 mx-auto transform rotate-3">
-            📝
-          </div>
-          <h1 className="text-2xl font-black text-gray-800 tracking-tight">สมัครสมาชิก</h1>
+          <div className="text-5xl mb-3 drop-shadow-sm">📋</div>
+          <h1 className="text-2xl font-bold text-gray-800">สมัครสมาชิก</h1>
           <p className="text-gray-500 mt-1 text-[11px] font-bold tracking-widest uppercase">แพลตฟอร์มตลาดแรงงานชุมชน</p>
           <p className="text-gray-500 mt-4 text-xs font-medium">
-            {hasSession ? 'กรอกข้อมูลให้ครบถ้วนเพื่อเริ่มใช้งาน' : 'สร้างบัญชีใหม่เพื่อเข้าสู่ระบบ'}
+            {hasSession ? 'กรอกข้อมูลส่วนตัวเพื่อเริ่มใช้งาน' : 'สร้างบัญชีใหม่เพื่อเข้าสู่ระบบ'}
           </p>
         </div>
 
         {/* ⚠️ Error Alert */}
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-600 rounded-xl p-3 mb-5 text-[11px] font-bold flex items-start gap-2">
-            <span className="text-sm">⚠️</span> <span>{error}</span>
+          <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 mb-5 text-sm font-medium">
+            {error}
           </div>
         )}
 
         {/* ----------------------------------------------------------- */}
         {/* ฟอร์มกรอกข้อมูล */}
         {/* ----------------------------------------------------------- */}
-        <form onSubmit={handleSaveProfile} className="space-y-4 animate-fade-in">
+        <form onSubmit={handleSaveProfile} className="space-y-4">
           
           {/* ชื่อ - สกุล */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold text-gray-500 pl-1">ชื่อจริง <span className="text-red-500">*</span></label>
+              <label className="text-sm font-medium text-gray-700 pl-1">ชื่อจริง <span className="text-red-500">*</span></label>
               <input
                 type="text"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
                 required
                 placeholder="สมชาย"
-                className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#EE4D2D]/30 focus:border-[#EE4D2D] transition-all"
+                className="w-full border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-transparent transition-all"
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold text-gray-500 pl-1">นามสกุล <span className="text-red-500">*</span></label>
+              <label className="text-sm font-medium text-gray-700 pl-1">นามสกุล <span className="text-red-500">*</span></label>
               <input
                 type="text"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
                 required
                 placeholder="ใจดี"
-                className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#EE4D2D]/30 focus:border-[#EE4D2D] transition-all"
+                className="w-full border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-transparent transition-all"
               />
             </div>
           </div>
 
           {/* เบอร์โทรศัพท์ */}
           <div className="space-y-1.5">
-            <label className="text-[11px] font-bold text-gray-500 pl-1">เบอร์โทรศัพท์ <span className="text-red-500">*</span></label>
+            <label className="text-sm font-medium text-gray-700 pl-1">เบอร์โทรศัพท์ <span className="text-red-500">*</span></label>
             <input
               type="tel"
               value={phone}
               onChange={handlePhoneChange}
               required
               placeholder="08X-XXX-XXXX"
-              className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm font-medium tracking-wider focus:outline-none focus:ring-2 focus:ring-[#EE4D2D]/30 focus:border-[#EE4D2D] transition-all"
+              className="w-full border border-gray-200 rounded-2xl px-4 py-3 text-sm tracking-wider focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-transparent transition-all"
             />
           </div>
 
-          {/* อีเมล (บังคับถ้าสมัครใหม่) */}
+          {/* อีเมล (บังคับถ้าเป็นคนสมัครใหม่) */}
           <div className="space-y-1.5">
-            <label className="text-[11px] font-bold text-gray-500 pl-1">อีเมล {!hasSession && <span className="text-red-500">*</span>}</label>
+            <label className="text-sm font-medium text-gray-700 pl-1">อีเมล {!hasSession && <span className="text-red-500">*</span>}</label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required={!hasSession}
               placeholder="example@email.com"
-              className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#EE4D2D]/30 focus:border-[#EE4D2D] transition-all"
+              className="w-full border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-transparent transition-all"
             />
           </div>
 
-          {/* 🔐 รหัสผ่าน (โชว์เฉพาะสมัครใหม่ที่ยังไม่มี Session) */}
+          {/* 🔐 รหัสผ่าน (โชว์เฉพาะคนมากดสมัครใหม่ ที่ยังไม่ได้ผ่าน OTP) */}
           {!hasSession && (
-            <div className="space-y-1.5 animate-fade-in-up">
-              <label className="text-[11px] font-bold text-gray-500 pl-1">ตั้งรหัสผ่าน <span className="text-red-500">*</span></label>
+            <div className="space-y-1.5 pt-2">
+              <label className="text-sm font-medium text-gray-700 pl-1">ตั้งรหัสผ่าน <span className="text-red-500">*</span></label>
               <input
                 type="password"
                 value={password}
@@ -250,37 +252,53 @@ export default function SignupPage() {
                 required
                 minLength={6}
                 placeholder="อย่างน้อย 6 ตัวอักษร"
-                className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#EE4D2D]/30 focus:border-[#EE4D2D] transition-all"
+                className="w-full border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-transparent transition-all"
               />
             </div>
           )}
 
           {/* เลขบัตรประชาชน */}
           <div className="space-y-1.5 pt-2">
-            <label className="text-[11px] font-bold text-gray-500 pl-1 flex items-center justify-between">
+            <label className="text-sm font-medium text-gray-700 pl-1 flex items-center justify-between">
               <span>เลขประจำตัวประชาชน</span>
-              <span className="text-[9px] text-[#EE4D2D] bg-orange-50 px-2 py-0.5 rounded-full border border-orange-100">จำเป็นสำหรับผู้รับงาน</span>
             </label>
             <input
               type="text"
               value={nationalId}
               onChange={handleNationalIdChange}
               placeholder="X-XXXX-XXXXX-XX-X"
-              className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm font-bold tracking-wider focus:outline-none focus:ring-2 focus:ring-[#EE4D2D]/30 focus:border-[#EE4D2D] transition-all"
+              className="w-full border border-gray-200 rounded-2xl px-4 py-3 text-sm font-bold tracking-wider focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-transparent transition-all"
             />
-            <p className="text-[9px] text-gray-400 pl-1 leading-relaxed">
-              *หากคุณเป็นผู้รับงาน กรุณากรอกข้อมูลนี้เพื่อยืนยันตัวตนกับทางแพลตฟอร์ม
+            <p className="text-xs text-gray-500 pl-1">
+              *จำเป็นสำหรับผู้รับงานเพื่อยืนยันตัวตน
             </p>
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-gradient-to-b from-[#EE4D2D] to-[#FF7337] text-white py-4 rounded-2xl font-black text-sm shadow-md hover:shadow-lg active:scale-[0.98] transition-all mt-6 disabled:opacity-70 disabled:cursor-not-allowed"
+            className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-2xl text-lg transition-colors mt-6"
           >
             {loading ? 'กำลังดำเนินการ...' : 'สมัครสมาชิก และเริ่มใช้งาน 🚀'}
           </button>
         </form>
+
+        {/* 🤝 Unified Account Note */}
+        <div className="mt-8 bg-orange-50 rounded-2xl border border-orange-100 p-4">
+          <p className="text-xs text-orange-700 text-center">
+            🎯 <strong>บัญชีเดียว</strong> — ใช้ได้ทั้งเป็นลูกค้าและช่าง
+          </p>
+        </div>
+
+        {/* ✅ ปุ่มย้อนกลับ */}
+        <div className="mt-6 text-center">
+          <button 
+            onClick={() => router.back()} 
+            className="text-sm text-gray-400 font-medium hover:text-gray-600 transition-colors"
+          >
+            ← ย้อนกลับ
+          </button>
+        </div>
 
       </div>
     </div>
