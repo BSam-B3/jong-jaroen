@@ -1,102 +1,82 @@
 'use client';
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 
-// ---------------------------------------------------------------------------
-// 📦 ข้อมูลจำลอง (Mock Data) โครงสร้างตรงกับที่บรีฟให้คุณ C
-// ---------------------------------------------------------------------------
-const mockProviders = [
-  {
-    id: '1',
-    name: 'ช่างสมหมาย แอร์เย็นฉ่ำ',
-    category: 'ล้างแอร์',
-    avatar: '👨‍🔧',
-    rating: 4.9,
-    reviewCount: 128,
-    completedJobs: 350,
-    isSponsored: true, // 🌟 ผู้สนับสนุน
-    isNew: false,
-    price: 'เริ่มต้น 500.-',
-  },
-  {
-    id: '2',
-    name: 'ลุงชัย ซ่อมประปา',
-    category: 'ซ่อมประปา',
-    avatar: '👴',
-    rating: 4.8,
-    reviewCount: 85,
-    completedJobs: 210,
-    isSponsored: false,
-    isNew: false,
-    price: 'ประเมินหน้างาน',
-  },
-  {
-    id: '3',
-    name: 'พี่นก แม่บ้านเนี๊ยบ',
-    category: 'แม่บ้าน',
-    avatar: '👩‍🍳',
-    rating: 5.0,
-    reviewCount: 42,
-    completedJobs: 105,
-    isSponsored: true, // 🌟 ผู้สนับสนุน
-    isNew: false,
-    price: 'ชม. ละ 150.-',
-  },
-  {
-    id: '4',
-    name: 'เอกชัย ไฟฟ้าด่วน',
-    category: 'ช่างไฟ',
-    avatar: '👷',
-    rating: 4.5,
-    reviewCount: 12,
-    completedJobs: 25,
-    isSponsored: false,
-    isNew: true, // 🌱 หน้าใหม่
-    price: 'เริ่มต้น 300.-',
-  },
-  {
-    id: '5',
-    name: 'วัยรุ่น ตัดหญ้าซิ่ง',
-    category: 'ตัดหญ้า',
-    avatar: '👦',
-    rating: 0,
-    reviewCount: 0,
-    completedJobs: 2,
-    isSponsored: false,
-    isNew: true, // 🌱 หน้าใหม่
-    price: 'เริ่มต้น 200.-',
-  },
-  {
-    id: '6',
-    name: 'ช่างยอด ซ่อมทุกอย่าง',
-    category: 'ซ่อมประปา',
-    avatar: '👨‍🔧',
-    rating: 4.9,
-    reviewCount: 320,
-    completedJobs: 890,
-    isSponsored: false, // ⭐ ยอดนิยม (งานเยอะ เรทติ้งสูง)
-    isNew: false,
-    price: 'เริ่มต้น 400.-',
-  }
-];
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
+
+// กำหนด Type โครงสร้างข้อมูลที่ดึงมาจาก Database
+interface ProviderService {
+  id: string;
+  title: string;
+  price_starting: number;
+  rating: number;
+  review_count: number;
+  completed_jobs: number;
+  is_sponsored: boolean;
+  created_at: string;
+  profiles?: {
+    first_name: string;
+    last_name: string;
+  };
+  service_categories?: {
+    title: string;
+    icon: string;
+  };
+}
 
 export default function ServicesPage() {
   const router = useRouter();
   
-  // State สำหรับควบคุม Tab ที่เลือก
+  // States
+  const [providers, setProviders] = useState<ProviderService[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'all' | 'sponsored' | 'popular' | 'new'>('all');
 
-  // ลอจิกการกรองข้อมูล (Filtering Algorithm) ตามที่บีสามออกแบบ
-  const filteredProviders = mockProviders.filter((provider) => {
-    if (activeTab === 'sponsored') return provider.isSponsored;
-    if (activeTab === 'popular') return provider.rating >= 4.8 && provider.completedJobs > 100;
-    if (activeTab === 'new') return provider.isNew;
+  // -----------------------------------------------------------------
+  // 🔄 ดึงข้อมูลช่าง/ร้านค้าจาก Database
+  // -----------------------------------------------------------------
+  useEffect(() => {
+    const fetchProviders = async () => {
+      setIsLoading(true);
+      try {
+        // Query ดึงข้อมูลจากตาราง provider_services พร้อม Join ตาราง profiles และ service_categories
+        const { data, error } = await supabase
+          .from('provider_services')
+          .select(`
+            *,
+            profiles:provider_id (first_name, last_name),
+            service_categories:category_id (title, icon)
+          `)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        if (data) setProviders(data);
+      } catch (error) {
+        console.error('Error fetching providers:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchProviders();
+  }, []);
+
+  // -----------------------------------------------------------------
+  // 🎛️ ลอจิกการกรองข้อมูล (Filtering Algorithm) ตามที่บีสามออกแบบ
+  // -----------------------------------------------------------------
+  const filteredProviders = providers.filter((provider) => {
+    // เช็คหน้าใหม่: สมัครมาไม่เกิน 30 วัน
+    const isNew = new Date(provider.created_at).getTime() > Date.now() - 30 * 24 * 60 * 60 * 1000;
+    
+    if (activeTab === 'sponsored') return provider.is_sponsored;
+    if (activeTab === 'popular') return provider.rating >= 4.5 && provider.completed_jobs > 10;
+    if (activeTab === 'new') return isNew;
     return true; // 'all'
   }).sort((a, b) => {
     // ลอจิกเรียงลำดับเวลาอยู่หน้า "ทั้งหมด"
     if (activeTab === 'all') {
-      if (a.isSponsored && !b.isSponsored) return -1; // สปอนเซอร์ขึ้นก่อน
-      if (!a.isSponsored && b.isSponsored) return 1;
+      if (a.is_sponsored && !b.is_sponsored) return -1; // สปอนเซอร์ขึ้นก่อน
+      if (!a.is_sponsored && b.is_sponsored) return 1;
       return b.rating - a.rating; // ตามด้วยเรทติ้ง
     }
     return 0;
@@ -112,7 +92,6 @@ export default function ServicesPage() {
             <h1 className="text-white text-2xl font-black tracking-tight">ค้นหาช่าง / บริการ</h1>
           </div>
           
-          {/* แถบค้นหา */}
           <div className="bg-white rounded-2xl p-1.5 flex items-center shadow-lg shadow-black/5">
             <div className="pl-3 pr-2 text-gray-400">🔍</div>
             <input 
@@ -125,79 +104,82 @@ export default function ServicesPage() {
 
         {/* 📑 Filter Tabs (Bucketing Logic) */}
         <div className="bg-white px-4 py-3 shadow-sm border-b border-gray-100 sticky top-0 z-10 flex gap-2 overflow-x-auto scrollbar-hide">
-          <FilterTab 
-            label="ทั้งหมด" 
-            active={activeTab === 'all'} 
-            onClick={() => setActiveTab('all')} 
-          />
-          <FilterTab 
-            label="🌟 ผู้สนับสนุน" 
-            active={activeTab === 'sponsored'} 
-            onClick={() => setActiveTab('sponsored')} 
-          />
-          <FilterTab 
-            label="⭐ ยอดนิยม" 
-            active={activeTab === 'popular'} 
-            onClick={() => setActiveTab('popular')} 
-          />
-          <FilterTab 
-            label="🌱 หน้าใหม่" 
-            active={activeTab === 'new'} 
-            onClick={() => setActiveTab('new')} 
-          />
+          <FilterTab label="ทั้งหมด" active={activeTab === 'all'} onClick={() => setActiveTab('all')} />
+          <FilterTab label="🌟 ผู้สนับสนุน" active={activeTab === 'sponsored'} onClick={() => setActiveTab('sponsored')} />
+          <FilterTab label="⭐ ยอดนิยม" active={activeTab === 'popular'} onClick={() => setActiveTab('popular')} />
+          <FilterTab label="🌱 หน้าใหม่" active={activeTab === 'new'} onClick={() => setActiveTab('new')} />
         </div>
 
         {/* 📋 รายชื่อช่าง (Provider List) */}
         <div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-hide pb-24">
           
-          {filteredProviders.length === 0 ? (
-            <div className="text-center py-10 text-gray-400">
-              <div className="text-4xl mb-2">🤷‍♂️</div>
-              <p className="text-sm font-medium">ไม่พบช่างในหมวดหมู่นี้</p>
-            </div>
-          ) : (
-            filteredProviders.map((provider) => (
-              <div key={provider.id} className="bg-white rounded-[1.5rem] p-4 shadow-sm border border-gray-50 flex gap-4 active:scale-[0.98] transition-transform cursor-pointer hover:border-orange-100 hover:shadow-md relative overflow-hidden">
-                
-                {/* Badge 🌟 สปอนเซอร์ */}
-                {provider.isSponsored && (
-                  <div className="absolute -right-6 top-3 bg-gradient-to-r from-yellow-400 to-orange-500 text-white text-[8px] font-black px-8 py-0.5 transform rotate-45 shadow-sm">
-                    แนะนำ
-                  </div>
-                )}
-
-                {/* Avatar */}
-                <div className="w-16 h-16 bg-orange-50 rounded-2xl flex items-center justify-center text-3xl shrink-0 border border-orange-100 shadow-inner">
-                  {provider.avatar}
-                </div>
-
-                {/* ข้อมูล */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <span className="bg-gray-100 text-gray-600 text-[9px] font-bold px-2 py-0.5 rounded-md">
-                      {provider.category}
-                    </span>
-                    {provider.isNew && <span className="text-[9px] font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-md">🌱 หน้าใหม่</span>}
-                  </div>
-                  
-                  <h3 className="font-bold text-gray-800 text-sm truncate pr-4">{provider.name}</h3>
-                  
-                  {/* Rating & Jobs */}
-                  <div className="flex items-center gap-2 mt-1 text-[10px] font-medium text-gray-500">
-                    <span className="flex items-center text-orange-500 font-bold">
-                      ⭐ {provider.rating > 0 ? provider.rating : 'ไม่มีคะแนน'}
-                    </span>
-                    <span>•</span>
-                    <span>ผ่านงาน {provider.completedJobs} ครั้ง</span>
-                  </div>
-
-                  {/* ราคา */}
-                  <div className="mt-2 text-[#EE4D2D] font-bold text-[11px]">
-                    {provider.price}
-                  </div>
+          {isLoading ? (
+            // ⏳ Skeleton Loading
+            Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="bg-white rounded-[1.5rem] p-4 shadow-sm border border-gray-50 flex gap-4 animate-pulse">
+                <div className="w-16 h-16 bg-gray-200 rounded-2xl shrink-0"></div>
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 bg-gray-200 rounded w-1/3"></div>
+                  <div className="h-4 bg-gray-200 rounded w-2/3"></div>
+                  <div className="h-3 bg-gray-200 rounded w-1/2 mt-2"></div>
                 </div>
               </div>
             ))
+          ) : filteredProviders.length === 0 ? (
+            <div className="text-center py-10 text-gray-400 mt-8">
+              <div className="text-4xl mb-2">🤷‍♂️</div>
+              <p className="text-sm font-bold text-gray-600">ยังไม่มีช่างในหมวดหมู่นี้</p>
+              <p className="text-[10px] mt-1">รอคุณ C ใส่ข้อมูลจำลอง หรือลองกดสมัครเป็นช่างคนแรกสิคะ!</p>
+            </div>
+          ) : (
+            filteredProviders.map((provider) => {
+              const isNew = new Date(provider.created_at).getTime() > Date.now() - 30 * 24 * 60 * 60 * 1000;
+              
+              return (
+                <div key={provider.id} className="bg-white rounded-[1.5rem] p-4 shadow-sm border border-gray-50 flex gap-4 active:scale-[0.98] transition-transform cursor-pointer hover:border-orange-100 hover:shadow-md relative overflow-hidden">
+                  
+                  {/* Badge 🌟 สปอนเซอร์ */}
+                  {provider.is_sponsored && (
+                    <div className="absolute -right-6 top-3 bg-gradient-to-r from-yellow-400 to-orange-500 text-white text-[8px] font-black px-8 py-0.5 transform rotate-45 shadow-sm">
+                      แนะนำ
+                    </div>
+                  )}
+
+                  {/* Avatar (ดึง Icon จาก category) */}
+                  <div className="w-16 h-16 bg-orange-50 rounded-2xl flex items-center justify-center text-3xl shrink-0 border border-orange-100 shadow-inner">
+                    {provider.service_categories?.icon || '👨‍🔧'}
+                  </div>
+
+                  {/* ข้อมูล */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="bg-gray-100 text-gray-600 text-[9px] font-bold px-2 py-0.5 rounded-md">
+                        {provider.service_categories?.title || 'บริการทั่วไป'}
+                      </span>
+                      {isNew && <span className="text-[9px] font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-md">🌱 หน้าใหม่</span>}
+                    </div>
+                    
+                    <h3 className="font-bold text-gray-800 text-sm truncate pr-4">
+                      {provider.title || `ช่าง${provider.profiles?.first_name || 'ทั่วไป'}`}
+                    </h3>
+                    
+                    {/* Rating & Jobs */}
+                    <div className="flex items-center gap-2 mt-1 text-[10px] font-medium text-gray-500">
+                      <span className="flex items-center text-orange-500 font-bold">
+                        ⭐ {provider.rating > 0 ? provider.rating : 'ไม่มีคะแนน'}
+                      </span>
+                      <span>•</span>
+                      <span>ผ่านงาน {provider.completed_jobs || 0} ครั้ง</span>
+                    </div>
+
+                    {/* ราคา */}
+                    <div className="mt-2 text-[#EE4D2D] font-bold text-[11px]">
+                      เริ่มต้น {provider.price_starting ? `${provider.price_starting} บาท` : 'ประเมินหน้างาน'}
+                    </div>
+                  </div>
+                </div>
+              );
+            })
           )}
 
         </div>
@@ -214,7 +196,6 @@ export default function ServicesPage() {
 
       </div>
 
-      {/* CSS ซ่อน Scrollbar */}
       <style dangerouslySetInnerHTML={{__html: `
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
