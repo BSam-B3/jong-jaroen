@@ -1,11 +1,9 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase'; // 🔌 เสียบปลั๊ก Supabase
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase'; 
 
-// กำหนดโครงสร้างข้อมูล (Type)
-interface Service {
+// กำหนดโครงสร้างข้อมูล (Type) สำหรับหมวดหมู่บริการ
 interface ServiceCategory {
   id: string;
   title: string;
@@ -17,35 +15,28 @@ export default function HomePage() {
   const router = useRouter();
 
   // States สำหรับเก็บข้อมูลที่ดึงมาจากฐานข้อมูล
-  const [services, setServices] = useState<Service[]>([]);
   const [categories, setCategories] = useState<ServiceCategory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // ฟังก์ชันดึงข้อมูลจาก Supabase
   useEffect(() => {
-    const fetchServices = async () => {
     const fetchCategories = async () => {
       try {
-        // ✅ เปลี่ยนมาดึงข้อมูลจากตาราง service_categories
+        // ✅ ดึงข้อมูลจากตาราง service_categories
         const { data, error } = await supabase
-          .from('services')
           .from('service_categories')
           .select('*')
-          .order('created_at', { ascending: true }); // เรียงตามลำดับที่สร้าง
           .order('created_at', { ascending: true }); 
 
         if (error) throw error;
-        if (data) setServices(data);
         if (data) setCategories(data);
       } catch (error) {
-        console.error('Error fetching services:', error);
         console.error('Error fetching categories:', error);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchServices();
     fetchCategories();
   }, []);
 
@@ -74,6 +65,7 @@ export default function HomePage() {
                 <button className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center text-white relative shadow-sm border border-white/30 hover:bg-white/30 transition-all">
                   🔔
                   <span className="absolute top-0 right-0 w-3 h-3 bg-red-500 border-2 border-[#EE4D2D] rounded-full"></span>
+                </button>
                 <button 
                   onClick={() => router.push('/profile')}
                   className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center text-white relative shadow-sm border border-white/30 hover:bg-white/30 transition-all"
@@ -101,7 +93,6 @@ export default function HomePage() {
 
           <main className="px-5 mt-2 relative z-20 space-y-6">
 
-            {/* 🛠️ หมวดหมู่บริการ (ดึงข้อมูลจาก Database) */}
             {/* 🎯 Quick Guide Menu (เมนูแนะนำการใช้งานที่ชัดเจน) */}
             <section className="grid grid-cols-2 gap-3">
               {/* ปุ่ม 1: เรียกช่าง */}
@@ -145,7 +136,6 @@ export default function HomePage() {
               <div className="flex justify-between items-end mb-4 px-1">
                 <h2 className="text-sm font-black text-gray-800 tracking-tight flex items-center gap-2">
                   <span className="text-[#EE4D2D]">📌</span> บริการยอดฮิต
-                  <span className="text-yellow-500">⭐</span> บริการยอดนิยม
                 </h2>
                 <button onClick={() => router.push('/services')} className="text-[10px] font-bold text-[#EE4D2D] bg-orange-50 px-3 py-1 rounded-full border border-orange-100">
                   ดูทั้งหมด ›
@@ -155,7 +145,6 @@ export default function HomePage() {
               <div className="grid grid-cols-4 gap-3">
                 {isLoading ? (
                   // ⏳ สถานะกำลังโหลด (Skeleton Loading)
-                  Array.from({ length: 8 }).map((_, i) => (
                   Array.from({ length: 4 }).map((_, i) => (
                     <div key={i} className="bg-white rounded-[1.5rem] p-3 flex flex-col items-center gap-2 shadow-sm border border-gray-50 animate-pulse">
                       <div className="w-12 h-12 bg-gray-200 rounded-2xl"></div>
@@ -163,11 +152,6 @@ export default function HomePage() {
                     </div>
                   ))
                 ) : (
-                  // ✅ แสดงข้อมูลจริงจาก Supabase
-                  services.map((service) => (
-                    <div key={service.id} className="bg-white rounded-[1.5rem] p-3 flex flex-col items-center gap-2 shadow-sm border border-gray-50 active:scale-95 transition-transform cursor-pointer hover:border-orange-100 hover:shadow-md">
-                      <div className={`w-12 h-12 ${service.color} rounded-2xl flex items-center justify-center text-2xl shadow-inner`}>
-                        {service.icon}
                   // ✅ แสดงข้อมูลจริงจาก Supabase (ใช้ service_categories)
                   categories.slice(0, 4).map((category) => (
                     <div 
@@ -178,7 +162,6 @@ export default function HomePage() {
                       <div className={`w-12 h-12 ${category.color} rounded-2xl flex items-center justify-center text-2xl shadow-inner`}>
                         {category.icon}
                       </div>
-                      <span className="text-[10px] font-bold text-gray-700 whitespace-nowrap">{service.title}</span>
                       <span className="text-[10px] font-bold text-gray-700 whitespace-nowrap">{category.title}</span>
                     </div>
                   ))
@@ -186,7 +169,7 @@ export default function HomePage() {
               </div>
             </section>
 
-            {/* 📋 งานด่วนล่าสุด (ใช้ UI เดิมไปก่อน) */}
+            {/* 📋 งานด่วนล่าสุด */}
             <section>
               <div className="flex justify-between items-end mb-4 px-1">
                 <h2 className="text-sm font-black text-gray-800 tracking-tight flex items-center gap-2">
