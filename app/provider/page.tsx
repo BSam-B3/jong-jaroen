@@ -9,8 +9,8 @@ export default function ProviderDashboardPage() {
 
   // States
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [isOnline, setIsOnline] = useState(false); // สวิตช์พร้อมรับงาน
-  const [kycStatus, setKycStatus] = useState<'none' | 'pending' | 'approved'>('none'); // สถานะยืนยันตัวตน
+  const [isOnline, setIsOnline] = useState(false); 
+  const [kycStatus, setKycStatus] = useState<'none' | 'pending' | 'approved'>('none'); 
   
   // Mock Data: รายได้และสถิติ
   const [stats, setStats] = useState({
@@ -20,13 +20,11 @@ export default function ProviderDashboardPage() {
   });
 
   useEffect(() => {
-    // โหลดข้อมูลผู้ใช้ (ของจริงจะดึงสถานะ KYC จาก DB ด้วย)
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) {
         router.push('/auth/login');
       } else {
         setCurrentUser(session.user);
-        // จำลองว่ายังไม่ได้ทำ KYC เพื่อให้เห็นหน้าตาแจ้งเตือน
         setKycStatus('none'); 
       }
     });
@@ -36,21 +34,23 @@ export default function ProviderDashboardPage() {
     <div className="min-h-screen bg-gray-100 flex justify-center pb-24">
       <div className="w-full sm:max-w-2xl md:max-w-3xl bg-[#F4F6F8] min-h-screen relative flex flex-col shadow-xl overflow-x-hidden rounded-t-[2.5rem]">
         
-        {/* 🌑 Header ฝั่งคนรับจ้าง (ใช้สีเข้มให้ต่างจากโหมดลูกค้า) */}
-        <div className="bg-gradient-to-b from-gray-800 to-gray-900 rounded-[2.5rem] p-6 pt-10 pb-8 shadow-md relative z-10 m-3 mt-4 overflow-hidden">
-          {/* เอฟเฟกต์ตกแต่ง */}
-          <div className="absolute -right-10 -top-10 w-40 h-40 bg-orange-500/20 rounded-full blur-3xl pointer-events-none"></div>
+        {/* 🟠 Header ฝั่งคนรับจ้าง (เปลี่ยนกลับมาคุมโทนสีส้มตามแบรนด์) */}
+        <div className="bg-gradient-to-b from-[#EE4D2D] to-[#FF7337] rounded-[2.5rem] p-6 pt-10 pb-8 shadow-md relative z-10 m-3 mt-4 overflow-hidden">
+          
+          {/* เอฟเฟกต์ตกแต่งให้เข้ากับสีส้ม */}
+          <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/20 rounded-full blur-3xl pointer-events-none"></div>
+          <div className="absolute -left-10 -bottom-10 w-32 h-32 bg-yellow-300/20 rounded-full blur-2xl pointer-events-none"></div>
           
           <div className="flex justify-between items-center relative z-10 px-2 mb-4">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-gray-700 border-2 border-gray-600 rounded-full flex items-center justify-center text-xl text-white">
+              <div className="w-12 h-12 bg-white/20 border-2 border-white/30 rounded-full flex items-center justify-center text-xl text-white shadow-sm">
                 {currentUser?.user_metadata?.full_name?.charAt(0) || '👤'}
               </div>
               <div className="text-left">
-                <h1 className="text-white text-lg font-black tracking-tight leading-tight">
+                <h1 className="text-white text-lg font-black tracking-tight leading-tight drop-shadow-sm">
                   {currentUser?.user_metadata?.full_name || 'คนรับจ้าง'}
                 </h1>
-                <p className="text-gray-400 text-[10px] font-bold uppercase tracking-widest mt-0.5">
+                <p className="text-white/80 text-[10px] font-bold uppercase tracking-widest mt-0.5">
                   โหมดผู้ให้บริการ
                 </p>
               </div>
@@ -59,20 +59,20 @@ export default function ProviderDashboardPage() {
             {/* ปุ่มสลับโหมดกลับไปเป็นลูกค้า */}
             <button 
               onClick={() => router.push('/')}
-              className="bg-white/10 hover:bg-white/20 text-white text-[10px] font-bold px-3 py-1.5 rounded-full border border-white/20 transition-all active:scale-95 flex items-center gap-1.5"
+              className="bg-white/20 hover:bg-white/30 text-white text-[10px] font-bold px-3 py-1.5 rounded-full border border-white/30 transition-all active:scale-95 flex items-center gap-1.5 shadow-sm"
             >
               <span>🔄</span> โหมดลูกค้า
             </button>
           </div>
 
-          {/* 🚦 สวิตช์ เปิด-ปิด รับงาน (Online/Offline) */}
+          {/* 🚦 สวิตช์ เปิด-ปิด รับงาน (ปรับ UI ให้เข้ากับพื้นส้ม) */}
           <div className="mt-4 px-2 relative z-10">
-            <div className={`rounded-2xl p-4 flex items-center justify-between transition-colors duration-300 shadow-inner border ${isOnline ? 'bg-green-500/20 border-green-500/30' : 'bg-gray-800 border-gray-700'}`}>
+            <div className={`rounded-2xl p-4 flex items-center justify-between transition-colors duration-300 shadow-sm border ${isOnline ? 'bg-white border-white' : 'bg-white/10 border-white/20 backdrop-blur-sm'}`}>
               <div>
-                <h2 className={`text-sm font-black ${isOnline ? 'text-green-400' : 'text-gray-300'}`}>
+                <h2 className={`text-sm font-black ${isOnline ? 'text-green-500' : 'text-white'}`}>
                   {isOnline ? '🟢 พร้อมรับงาน' : '⚫ ออฟไลน์'}
                 </h2>
-                <p className="text-gray-400 text-[9px] mt-0.5">
+                <p className={`text-[9px] mt-0.5 font-medium ${isOnline ? 'text-gray-500' : 'text-white/70'}`}>
                   {isOnline ? 'ระบบกำลังกระจายงานให้คุณในรัศมี 5 กม.' : 'เปิดสวิตช์เพื่อเริ่มดูงานด่วนในพื้นที่'}
                 </p>
               </div>
@@ -80,7 +80,7 @@ export default function ProviderDashboardPage() {
               {/* Toggle UI */}
               <div 
                 onClick={() => setIsOnline(!isOnline)}
-                className={`w-14 h-8 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 ${isOnline ? 'bg-green-500' : 'bg-gray-600'}`}
+                className={`w-14 h-8 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 shadow-inner ${isOnline ? 'bg-green-500' : 'bg-black/20'}`}
               >
                 <div className={`bg-white w-6 h-6 rounded-full shadow-md transform transition-transform duration-300 ${isOnline ? 'translate-x-6' : 'translate-x-0'}`}></div>
               </div>
@@ -91,18 +91,18 @@ export default function ProviderDashboardPage() {
         {/* 📋 เนื้อหาหลัก Dashboard */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-hide pb-24 z-0">
           
-          {/* ⚠️ แจ้งเตือน KYC (ถ้ายังไม่ยืนยันตัวตน) */}
+          {/* ⚠️ แจ้งเตือน KYC */}
           {kycStatus === 'none' && (
             <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-start gap-3 shadow-sm animate-fade-in">
               <div className="text-2xl mt-0.5">🚨</div>
               <div className="flex-1">
                 <h3 className="text-sm font-black text-red-700">คุณยังไม่ได้ยืนยันตัวตน</h3>
-                <p className="text-[10px] text-red-600 mt-1 leading-relaxed">
+                <p className="text-[10px] text-red-600 mt-1 leading-relaxed font-medium">
                   เพื่อความปลอดภัยของชุมชน กรุณาอัปโหลดรูปบัตรประชาชน (KYC) ก่อนเริ่มรับงานแรกค่ะ
                 </p>
                 <button 
                   onClick={() => alert('เตรียมไปหน้าอัปโหลดเอกสาร KYC')}
-                  className="mt-2 bg-red-600 text-white text-[10px] font-bold px-4 py-2 rounded-lg shadow-sm active:scale-95 transition-transform"
+                  className="mt-2 bg-red-600 text-white text-[10px] font-bold px-4 py-2 rounded-xl shadow-sm active:scale-95 transition-transform"
                 >
                   ยืนยันตัวตนเดี๋ยวนี้ ›
                 </button>
@@ -129,7 +129,7 @@ export default function ProviderDashboardPage() {
             </div>
           </div>
 
-          {/* 🎯 กระดานงานที่รอกดรับ (สมมติว่าดึงมาจาก express_jobs ที่สถานะ open) */}
+          {/* 🎯 กระดานงานที่รอกดรับ */}
           <div className="pt-4">
             <div className="flex justify-between items-end mb-3 px-1">
               <h2 className="text-sm font-black text-gray-800 tracking-tight flex items-center gap-2">
@@ -145,7 +145,7 @@ export default function ProviderDashboardPage() {
               </div>
             ) : (
               <div className="space-y-3">
-                {/* Mock Job 1 */}
+                {/* Mock Job */}
                 <div className="bg-white rounded-[1.5rem] p-4 shadow-sm border-2 border-orange-100 relative overflow-hidden">
                   <div className="absolute top-0 right-0 bg-[#EE4D2D] text-white text-[9px] font-black px-3 py-1 rounded-bl-xl shadow-sm">
                     ด่วน!
@@ -177,7 +177,7 @@ export default function ProviderDashboardPage() {
 
         </div>
 
-        {/* ✅ Bottom Navigation (ปรับเมนูให้เข้ากับคนรับจ้าง) */}
+        {/* ✅ Bottom Navigation */}
         <div className="fixed bottom-0 w-full sm:max-w-2xl md:max-w-3xl bg-white/95 backdrop-blur-md border-t border-gray-100 px-1 py-4 flex justify-between items-center shadow-[0_-4px_25px_rgba(0,0,0,0.06)] rounded-t-[2.5rem] z-50">
           <NavItem icon="📈" label="แดชบอร์ด" active={true} onClick={() => {}} />
           <NavItem icon="📋" label="งานของฉัน" active={false} onClick={() => {}} />
@@ -201,8 +201,8 @@ function NavItem({ icon, label, active, onClick }: any) {
   return (
     <div onClick={onClick} className={`flex flex-col items-center gap-1.5 cursor-pointer transition-all ${active ? 'scale-110' : 'opacity-40 hover:opacity-100'} flex-1`}>
       <span className="text-[22px]">{icon}</span>
-      <span className={`text-[9px] font-bold ${active ? 'text-gray-800' : 'text-gray-500'} whitespace-nowrap`}>{label}</span>
-      {active && <div className="w-1.5 h-1.5 bg-gray-800 rounded-full shadow-sm mt-0.5"></div>}
+      <span className={`text-[9px] font-bold ${active ? 'text-[#EE4D2D]' : 'text-gray-500'} whitespace-nowrap`}>{label}</span>
+      {active && <div className="w-1.5 h-1.5 bg-[#EE4D2D] rounded-full shadow-sm mt-0.5"></div>}
     </div>
   );
 }
