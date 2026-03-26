@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
@@ -17,9 +17,21 @@ interface ExpressJob {
   offered_price: number | null;
   status: string;
   created_at: string;
+  customer_id: string;
+  rider_id: string | null;
   profiles?: {
     first_name: string;
     last_name: string;
+  };
+}
+
+interface ChatMessage {
+  id: string;
+  sender_id: string;
+  message: string;
+  created_at: string;
+  profiles?: {
+    first_name: string;
   };
 }
 
@@ -37,7 +49,7 @@ export default function WinOnlinePage() {
   const [pickingType, setPickingType] = useState<'pickup' | 'dropoff'>('pickup');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Form States (คลีนตัวแปรซ้ำซ้อนแล้ว)
+  // Form States
   const [jobType, setJobType] = useState<'ride' | 'buy' | 'deliver'>('ride');
   const [vehicleType, setVehicleType] = useState<'motorcycle' | 'car' | 'suv' | 'van' | 'pickup'>('motorcycle');
   const [title, setTitle] = useState('');
@@ -50,16 +62,11 @@ export default function WinOnlinePage() {
   const [showFareDetails, setShowFareDetails] = useState(false);
   const [fareBreakdown, setFareBreakdown] = useState({ base: 0, distanceFee: 0, fuelSurge: 0, gpFee: 0, total: 0 });
 
-  // 💬 Chat States
+  // 💬 Chat States (อัปเดตสำหรับข้อมูลจริง)
   const [activeChatJob, setActiveChatJob] = useState<ExpressJob | null>(null);
   const [chatMessage, setChatMessage] = useState('');
-
-  const mockPlaces = [
-    { name: 'โรงพยาบาลแกลง', detail: 'ตำบลทางเกวียน อำเภอแกลง' },
-    { name: 'ตลาดสามย่าน แกลง', detail: 'ตลาดสดเทศบาล' },
-    { name: 'เซเว่นอีเลฟเว่น สาขาตลาดแกลง', detail: 'ใกล้สี่แยกไฟแดง' },
-    { name: 'โลตัส แกลง', detail: 'ถนนสุขุมวิท' }
-  ];
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // -----------------------------------------------------------------
   // 🧮 คำนวณราคากลางอัจฉริยะ 
@@ -88,21 +95,17 @@ export default function WinOnlinePage() {
         if (mockDistance > 40) ratePerKm = 15;
       } else if (vehicleType === 'van') {
         if (jobType === 'deliver') {
-          baseFare = 200; 
-          ratePerKm = 20;
+          baseFare = 200; ratePerKm = 20;
         } else {
-          baseFare = 100; 
-          ratePerKm = 15;
+          baseFare = 100; ratePerKm = 15;
         }
       } else if (vehicleType === 'pickup') {
         if (jobType === 'deliver') {
-          baseFare = 150; 
-          ratePerKm = 20;
+          baseFare = 150; ratePerKm = 20;
           if (mockDistance > 6 && mockDistance <= 40) ratePerKm = 15;
           if (mockDistance > 40) ratePerKm = 18;
         } else {
-          baseFare = 50; 
-          ratePerKm = 12;
+          baseFare = 50; ratePerKm = 12;
           if (mockDistance > 6 && mockDistance <= 40) ratePerKm = 10;
           if (mockDistance > 40) ratePerKm = 12;
         }
@@ -110,10 +113,8 @@ export default function WinOnlinePage() {
 
       const distanceFee = mockDistance * ratePerKm;
       const fuelMultiplier = 1.0; 
-
       const rawBeforeFuel = baseFare + distanceFee;
       const fuelSurge = (rawBeforeFuel * fuelMultiplier) - rawBeforeFuel;
-
       const rawFare = rawBeforeFuel + fuelSurge;
       const gpFee = rawFare * 0.03; 
       const finalFare = Math.ceil(rawFare + gpFee); 
@@ -127,7 +128,7 @@ export default function WinOnlinePage() {
   }, [pickup, dropoff, jobType, vehicleType]); 
 
   // -----------------------------------------------------------------
-  // 🔄 ดึงข้อมูลและบันทึก
+  // 🔄 ดึงข้อมูลงานด่วน
   // -----------------------------------------------------------------
   const fetchJobs = async () => {
     setIsLoading(true);
@@ -152,6 +153,77 @@ export default function WinOnlinePage() {
     fetchJobs();
   }, []);
 
+  // -----------------------------------------------------------------
+  // 💬 ระบบแชท Real-time (ดึงข้อความ & รอรับข้อความใหม่)
+  // -----------------------------------------------------------------
+  useEffect(() => {
+    if (!activeChatJob) return;
+
+    // 1. ดึงประวัติแชทเดิมมาโชว์
+    const fetchMessages = async () => {
+      const { data, error } = await supabase
+        .from('job_chats')
+        .select(`*, profiles:sender_id(first_name)`)
+        .eq('job_id', activeChatJob.id)
+        .order('created_at', { ascending: true });
+      
+      if (!error && data) setMessages(data);
+      scrollToBottom();
+    };
+    fetchMessages();
+
+    // 2. ดักฟัง (Subscribe) ข้อความใหม่แบบสดๆ
+    const subscription = supabase
+      .channel(`chat_${activeChatJob.id}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'job_chats', filter: `job_id=eq.${activeChatJob.id}` }, 
+        (payload) => {
+          // ดึงชื่อคนส่งมาด้วย
+          supabase.from('profiles').select('first_name').eq('id', payload.new.sender_id).single()
+            .then(({ data }) => {
+              const newMessage = { ...payload.new, profiles: data } as ChatMessage;
+              setMessages((prev) => [...prev, newMessage]);
+              scrollToBottom();
+            });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscription); // ล้างการเชื่อมต่อเมื่อปิดแชท
+    };
+  }, [activeChatJob]);
+
+  // เลื่อนจอแชทลงมาล่างสุดอัตโนมัติ
+  const scrollToBottom = () => {
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 100);
+  };
+
+  // -----------------------------------------------------------------
+  // 📝 ส่งข้อความแชท
+  // -----------------------------------------------------------------
+  const handleSendChat = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatMessage.trim() || !currentUser || !activeChatJob) return;
+
+    const messageText = chatMessage.trim();
+    setChatMessage(''); // เคลียร์ช่องพิมพ์ทันทีให้รู้สึกลื่นไหล
+
+    try {
+      const { error } = await supabase.from('job_chats').insert({
+        job_id: activeChatJob.id,
+        sender_id: currentUser.id,
+        message: messageText
+      });
+      if (error) throw error;
+      // ไม่ต้อง setState เอง เพราะเดี๋ยว Real-time Subscription (ข้างบน) จะทำงานและดันข้อความเข้าจอให้เอง
+    } catch (error: any) {
+      alert('ส่งข้อความไม่สำเร็จ: ' + error.message);
+    }
+  };
+
+  // โพสต์งาน
   const handlePostJob = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser) return router.push('/auth/login');
@@ -195,13 +267,6 @@ export default function WinOnlinePage() {
     if (pickingType === 'pickup') setPickup(locationName);
     else setDropoff(locationName);
     setIsLocationPickerOpen(false);
-  };
-
-  const handleSendChat = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!chatMessage.trim()) return;
-    alert(`(จำลอง) ส่งข้อความ: ${chatMessage} \nรอคุณ C ทำตาราง job_chats เสร็จจะบันทึกจริงค่ะ!`);
-    setChatMessage('');
   };
 
   const getVehicleIcon = (type: string) => {
@@ -299,7 +364,10 @@ export default function WinOnlinePage() {
                 <div className="flex gap-2">
                   <button className="flex-1 bg-[#EE4D2D] text-white py-2.5 rounded-xl text-xs font-bold shadow-sm active:scale-95 transition-transform">รับงานนี้ ⚡</button>
                   <button 
-                    onClick={() => setActiveChatJob(job)} 
+                    onClick={() => {
+                      if (!currentUser) return router.push('/auth/login');
+                      setActiveChatJob(job);
+                    }} 
                     className="flex-1 bg-white text-[#EE4D2D] border border-[#EE4D2D] py-2.5 rounded-xl text-xs font-bold shadow-sm active:scale-95 transition-transform"
                   >
                     💬 แชทต่อรอง
@@ -310,17 +378,16 @@ export default function WinOnlinePage() {
           )}
         </div>
 
-        {/* ➕ Floating Action Button */}
         <button onClick={() => setIsModalOpen(true)} className="fixed bottom-24 right-4 sm:right-[calc(50%-18rem)] w-14 h-14 bg-gradient-to-br from-[#EE4D2D] to-[#FF7337] rounded-full shadow-lg shadow-[#EE4D2D]/30 flex items-center justify-center text-white text-3xl active:scale-90 z-40 border-2 border-white">
           +
         </button>
 
         {/* ----------------------------------------------------------------- */}
-        {/* 💬 Chat Modal (สไลด์ขึ้นมาครึ่งจอ) */}
+        {/* 💬 Chat Modal (สไลด์ขึ้นมาครึ่งจอ) เชื่อม Database จริง */}
         {/* ----------------------------------------------------------------- */}
         {activeChatJob && (
           <div className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm flex items-end justify-center sm:items-center animate-fade-in">
-            <div className="bg-white w-full sm:max-w-md h-[75vh] sm:h-[600px] rounded-t-[2rem] sm:rounded-[2rem] shadow-2xl animate-slide-up flex flex-col overflow-hidden relative">
+            <div className="bg-white w-full sm:max-w-md h-[80vh] sm:h-[600px] rounded-t-[2rem] sm:rounded-[2rem] shadow-2xl animate-slide-up flex flex-col overflow-hidden relative">
               
               {/* Chat Header */}
               <div className="bg-white border-b border-gray-100 p-4 flex items-center justify-between sticky top-0 z-10 shadow-sm">
@@ -329,31 +396,40 @@ export default function WinOnlinePage() {
                     {activeChatJob.profiles?.first_name?.charAt(0) || '?'}
                   </div>
                   <div>
-                    <h3 className="font-bold text-gray-800 text-sm">{activeChatJob.profiles?.first_name || 'ลูกค้า'}</h3>
-                    <p className="text-[10px] text-gray-500 truncate max-w-[150px]">เจรจางาน: {activeChatJob.title}</p>
+                    <h3 className="font-bold text-gray-800 text-sm">แชทเจรจางาน</h3>
+                    <p className="text-[10px] text-gray-500 truncate max-w-[200px]">{activeChatJob.title}</p>
                   </div>
                 </div>
                 <button onClick={() => setActiveChatJob(null)} className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-200">✕</button>
               </div>
 
-              {/* Chat Messages (Mock) */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
-                <div className="text-center text-[9px] text-gray-400 font-medium my-2">ระบบเริ่มการสนทนาที่ปลอดภัย</div>
+              {/* Chat Messages */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 scrollbar-hide">
+                <div className="text-center text-[9px] text-gray-400 font-medium my-2">
+                  ระบบเริ่มการสนทนาที่ปลอดภัย
+                </div>
                 
-                {/* ข้อความฝั่งลูกค้า (สมมติ) */}
-                <div className="flex justify-start">
-                  <div className="bg-white border border-gray-100 rounded-2xl rounded-tl-sm p-3 max-w-[80%] shadow-sm">
-                    <p className="text-xs text-gray-700">สวัสดีครับ สนใจรับงานนี้ไหมครับ ย้ายของนิดหน่อยครับ</p>
-                    <span className="text-[8px] text-gray-400 mt-1 block">14:00</span>
-                  </div>
-                </div>
-
-                {/* ข้อความเตือน (System Message) */}
-                <div className="flex justify-center">
-                  <div className="bg-orange-50 text-orange-600 border border-orange-100 rounded-lg p-2 text-[9px] font-medium w-full text-center">
-                    💡 <strong className="font-bold">เคล็ดลับ:</strong> คุณสามารถเจรจาขอเพิ่มค่าบริการได้ หากระยะทางหรือของเยอะกว่าที่ระบุ
-                  </div>
-                </div>
+                {/* วนลูปข้อความจากตาราง job_chats */}
+                {messages.length === 0 ? (
+                  <div className="text-center text-xs text-gray-400 mt-10">ยังไม่มีข้อความ พิมพ์ทักทายได้เลยค่ะ 👋</div>
+                ) : (
+                  messages.map((msg, idx) => {
+                    const isMe = msg.sender_id === currentUser?.id;
+                    const msgTime = new Date(msg.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+                    return (
+                      <div key={msg.id || idx} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+                        <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[80%]`}>
+                          <span className="text-[9px] text-gray-400 mb-0.5 px-1">{isMe ? 'คุณ' : msg.profiles?.first_name || 'ผู้ใช้'}</span>
+                          <div className={`rounded-2xl p-3 shadow-sm ${isMe ? 'bg-[#EE4D2D] text-white rounded-tr-sm' : 'bg-white border border-gray-100 text-gray-700 rounded-tl-sm'}`}>
+                            <p className="text-xs leading-relaxed">{msg.message}</p>
+                          </div>
+                          <span className="text-[8px] text-gray-400 mt-1 px-1">{msgTime}</span>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+                <div ref={messagesEndRef} /> {/* ตัวช่วยสำหรับเลื่อนจอลงล่างสุด */}
               </div>
 
               {/* Chat Input */}
@@ -366,7 +442,7 @@ export default function WinOnlinePage() {
                     placeholder="พิมพ์ข้อความเจรจา..." 
                     className="flex-1 bg-gray-100 border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-[#EE4D2D] outline-none"
                   />
-                  <button type="submit" disabled={!chatMessage.trim()} className="w-12 h-12 bg-[#EE4D2D] disabled:opacity-50 text-white rounded-xl flex items-center justify-center shadow-sm active:scale-95 transition-transform">
+                  <button type="submit" disabled={!chatMessage.trim() || isSubmitting} className="w-12 h-12 bg-[#EE4D2D] disabled:opacity-50 text-white rounded-xl flex items-center justify-center shadow-sm active:scale-95 transition-transform">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" /></svg>
                   </button>
                 </form>
@@ -382,7 +458,6 @@ export default function WinOnlinePage() {
         {isModalOpen && !isLocationPickerOpen && !activeChatJob && (
           <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center bg-black/60 backdrop-blur-sm animate-fade-in">
             <div className="bg-white w-full sm:max-w-md rounded-t-[2rem] sm:rounded-[2rem] p-6 shadow-2xl animate-slide-up relative max-h-[90vh] overflow-y-auto scrollbar-hide">
-
               <button onClick={() => setIsModalOpen(false)} className="absolute top-4 right-4 w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-200">✕</button>
               <h2 className="text-lg font-black text-gray-800 mb-4">เรียกงานด่วน 🚀</h2>
 
@@ -393,7 +468,6 @@ export default function WinOnlinePage() {
               </div>
 
               <form onSubmit={handlePostJob} className="space-y-4">
-
                 <div className="space-y-1.5">
                   <label className="text-[11px] font-bold text-gray-600 pl-1">ประเภทรถที่ต้องการ <span className="text-red-500">*</span></label>
                   <div className="flex gap-2 overflow-x-auto pb-2 pt-1 scrollbar-hide">
@@ -437,7 +511,6 @@ export default function WinOnlinePage() {
                       <span className="truncate pr-4">{pickup || 'ค้นหาสถานที่ หรือ ปักหมุดแผนที่'}</span><span className="text-lg">📍</span>
                     </div>
                   </div>
-
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold text-gray-600 pl-1">จุดส่ง / ปลายทาง</label>
                     <div onClick={() => openLocationPicker('dropoff')} className={`w-full border rounded-xl px-4 py-3 text-sm cursor-pointer flex items-center justify-between transition-colors ${dropoff ? 'border-orange-300 bg-orange-50 text-gray-800 font-bold' : 'border-gray-200 bg-white text-gray-400 hover:border-orange-300'}`}>
@@ -471,49 +544,6 @@ export default function WinOnlinePage() {
                     </div>
                     <div className="text-2xl font-black text-[#EE4D2D]">{fareBreakdown.total > 0 ? `฿${fareBreakdown.total}` : '-'}</div>
                   </div>
-
-                  {(vehicleType === 'pickup' || vehicleType === 'van') && (jobType === 'ride' || jobType === 'buy') && distanceKm > 0 && (
-                    <div className="mt-2 bg-red-50 text-red-600 text-[9px] p-2.5 rounded-xl border border-red-100 flex gap-1.5 items-start">
-                      <span className="text-sm">⚠️</span>
-                      <p className="leading-relaxed">ราคานี้สำหรับ <b>การโดยสาร/ฝากซื้อ</b> เท่านั้น หากนำไปใช้บรรทุกสัมภาระขนาดใหญ่หรือย้ายบ้าน คนขับมีสิทธิ์ขอปรับราคาผ่านแชท หรือยกเลิกงานได้ทันที</p>
-                    </div>
-                  )}
-
-                  {distanceKm > 0 && (
-                    <div className="mt-3">
-                      <button type="button" onClick={() => setShowFareDetails(!showFareDetails)} className="w-full flex items-center justify-center gap-1.5 text-[10px] font-bold text-gray-400 hover:text-orange-500 transition-colors">
-                        <span className="w-3.5 h-3.5 rounded-full border border-current flex items-center justify-center text-[8px] font-black">i</span>
-                        {showFareDetails ? 'ซ่อนรายละเอียด' : 'ความโปร่งใสของราคา (Fare Breakdown)'}
-                      </button>
-
-                      {showFareDetails && (
-                        <div className="mt-3 bg-white border border-gray-100 p-4 rounded-xl shadow-sm text-[10px] font-medium text-gray-600 space-y-2 animate-fade-in relative overflow-hidden">
-                          <div className="absolute left-0 top-0 w-1 h-full bg-orange-200"></div>
-                          <div className="flex justify-between items-center pl-2">
-                            <span>เริ่ม {fareBreakdown.base} บ. + ระยะทาง ({distanceKm} กม.)</span>
-                            <span className="font-bold text-gray-800">฿{(fareBreakdown.base + fareBreakdown.distanceFee).toFixed(2)}</span>
-                          </div>
-                          <div className="flex justify-between items-center pl-2">
-                            <span>ค่าปรับฐานราคาน้ำมัน (x1.0)</span>
-                            <span className="font-bold text-gray-800">฿{fareBreakdown.fuelSurge.toFixed(2)}</span>
-                          </div>
-                          <div className="flex justify-between items-center pl-2 text-orange-600 font-bold pt-1.5 border-t border-gray-50">
-                            <span>ค่าบำรุงแพลตฟอร์ม (3%)</span>
-                            <span>฿{fareBreakdown.gpFee.toFixed(2)}</span>
-                          </div>
-                          <div className="pt-2 mt-2 border-t border-gray-100 text-[9px] text-gray-400 text-center leading-relaxed">
-                            แอปทั่วไปเก็บค่าบริการ 20-30% แต่ <strong className="text-orange-500">จงเจริญ</strong> เก็บเพียง 3% <br/>
-                            <span className="text-gray-500">เพื่อให้รายได้ส่วนใหญ่ตกถึงมือคนในชุมชนมากที่สุด ❤️</span>
-                            {vehicleType === 'pickup' && jobType === 'deliver' ? (
-                              <div className="text-[#EE4D2D] font-bold mt-1">💡 ใช้เรทบรรทุกสินค้า/ย้ายของ (Heavy Load)</div>
-                            ) : (vehicleType === 'pickup' || vehicleType === 'van') && (jobType === 'ride' || jobType === 'buy') ? (
-                              <div className="text-[#EE4D2D] font-bold mt-1">💡 ใช้เรทโดยสารทั่วไป (Passenger Rate)</div>
-                            ) : null}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
                 </div>
 
                 <button type="submit" disabled={isSubmitting || (fareBreakdown.total <= 0 && jobType !== 'buy')} className="w-full bg-[#EE4D2D] text-white font-black py-4 rounded-xl text-sm mt-4 shadow-md active:scale-95 disabled:opacity-50 transition-all">
