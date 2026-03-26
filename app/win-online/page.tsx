@@ -62,11 +62,19 @@ export default function WinOnlinePage() {
   const [showFareDetails, setShowFareDetails] = useState(false);
   const [fareBreakdown, setFareBreakdown] = useState({ base: 0, distanceFee: 0, fuelSurge: 0, gpFee: 0, total: 0 });
 
-  // 💬 Chat States (อัปเดตสำหรับข้อมูลจริง)
+  // 💬 Chat States
   const [activeChatJob, setActiveChatJob] = useState<ExpressJob | null>(null);
   const [chatMessage, setChatMessage] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // ✅ พระเอกที่ทำ Vercel พังรอบก่อน อยู่นี่แล้วค่ะ!
+  const mockPlaces = [
+    { name: 'โรงพยาบาลแกลง', detail: 'ตำบลทางเกวียน อำเภอแกลง' },
+    { name: 'ตลาดสามย่าน แกลง', detail: 'ตลาดสดเทศบาล' },
+    { name: 'เซเว่นอีเลฟเว่น สาขาตลาดแกลง', detail: 'ใกล้สี่แยกไฟแดง' },
+    { name: 'โลตัส แกลง', detail: 'ถนนสุขุมวิท' }
+  ];
 
   // -----------------------------------------------------------------
   // 🧮 คำนวณราคากลางอัจฉริยะ 
@@ -84,21 +92,16 @@ export default function WinOnlinePage() {
         if (mockDistance > 6 && mockDistance <= 40) ratePerKm = 7;
         if (mockDistance > 40) ratePerKm = 10;
       } else if (vehicleType === 'car') {
-        baseFare = 40; 
-        ratePerKm = 12;
+        baseFare = 40; ratePerKm = 12;
         if (mockDistance > 6 && mockDistance <= 40) ratePerKm = 10;
         if (mockDistance > 40) ratePerKm = 12;
       } else if (vehicleType === 'suv') {
-        baseFare = 60; 
-        ratePerKm = 15;
+        baseFare = 60; ratePerKm = 15;
         if (mockDistance > 6 && mockDistance <= 40) ratePerKm = 12;
         if (mockDistance > 40) ratePerKm = 15;
       } else if (vehicleType === 'van') {
-        if (jobType === 'deliver') {
-          baseFare = 200; ratePerKm = 20;
-        } else {
-          baseFare = 100; ratePerKm = 15;
-        }
+        if (jobType === 'deliver') { baseFare = 200; ratePerKm = 20; } 
+        else { baseFare = 100; ratePerKm = 15; }
       } else if (vehicleType === 'pickup') {
         if (jobType === 'deliver') {
           baseFare = 150; ratePerKm = 20;
@@ -154,12 +157,11 @@ export default function WinOnlinePage() {
   }, []);
 
   // -----------------------------------------------------------------
-  // 💬 ระบบแชท Real-time (ดึงข้อความ & รอรับข้อความใหม่)
+  // 💬 ระบบแชท Real-time
   // -----------------------------------------------------------------
   useEffect(() => {
     if (!activeChatJob) return;
 
-    // 1. ดึงประวัติแชทเดิมมาโชว์
     const fetchMessages = async () => {
       const { data, error } = await supabase
         .from('job_chats')
@@ -172,12 +174,10 @@ export default function WinOnlinePage() {
     };
     fetchMessages();
 
-    // 2. ดักฟัง (Subscribe) ข้อความใหม่แบบสดๆ
     const subscription = supabase
       .channel(`chat_${activeChatJob.id}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'job_chats', filter: `job_id=eq.${activeChatJob.id}` }, 
         (payload) => {
-          // ดึงชื่อคนส่งมาด้วย
           supabase.from('profiles').select('first_name').eq('id', payload.new.sender_id).single()
             .then(({ data }) => {
               const newMessage = { ...payload.new, profiles: data } as ChatMessage;
@@ -188,27 +188,19 @@ export default function WinOnlinePage() {
       )
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(subscription); // ล้างการเชื่อมต่อเมื่อปิดแชท
-    };
+    return () => { supabase.removeChannel(subscription); };
   }, [activeChatJob]);
 
-  // เลื่อนจอแชทลงมาล่างสุดอัตโนมัติ
   const scrollToBottom = () => {
-    setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, 100);
+    setTimeout(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, 100);
   };
 
-  // -----------------------------------------------------------------
-  // 📝 ส่งข้อความแชท
-  // -----------------------------------------------------------------
   const handleSendChat = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatMessage.trim() || !currentUser || !activeChatJob) return;
 
     const messageText = chatMessage.trim();
-    setChatMessage(''); // เคลียร์ช่องพิมพ์ทันทีให้รู้สึกลื่นไหล
+    setChatMessage(''); 
 
     try {
       const { error } = await supabase.from('job_chats').insert({
@@ -217,13 +209,11 @@ export default function WinOnlinePage() {
         message: messageText
       });
       if (error) throw error;
-      // ไม่ต้อง setState เอง เพราะเดี๋ยว Real-time Subscription (ข้างบน) จะทำงานและดันข้อความเข้าจอให้เอง
     } catch (error: any) {
       alert('ส่งข้อความไม่สำเร็จ: ' + error.message);
     }
   };
 
-  // โพสต์งาน
   const handlePostJob = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser) return router.push('/auth/login');
@@ -383,13 +373,11 @@ export default function WinOnlinePage() {
         </button>
 
         {/* ----------------------------------------------------------------- */}
-        {/* 💬 Chat Modal (สไลด์ขึ้นมาครึ่งจอ) เชื่อม Database จริง */}
+        {/* 💬 Chat Modal */}
         {/* ----------------------------------------------------------------- */}
         {activeChatJob && (
           <div className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm flex items-end justify-center sm:items-center animate-fade-in">
             <div className="bg-white w-full sm:max-w-md h-[80vh] sm:h-[600px] rounded-t-[2rem] sm:rounded-[2rem] shadow-2xl animate-slide-up flex flex-col overflow-hidden relative">
-              
-              {/* Chat Header */}
               <div className="bg-white border-b border-gray-100 p-4 flex items-center justify-between sticky top-0 z-10 shadow-sm">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-orange-100 text-[#EE4D2D] rounded-full flex items-center justify-center font-black">
@@ -403,13 +391,8 @@ export default function WinOnlinePage() {
                 <button onClick={() => setActiveChatJob(null)} className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-200">✕</button>
               </div>
 
-              {/* Chat Messages */}
               <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 scrollbar-hide">
-                <div className="text-center text-[9px] text-gray-400 font-medium my-2">
-                  ระบบเริ่มการสนทนาที่ปลอดภัย
-                </div>
-                
-                {/* วนลูปข้อความจากตาราง job_chats */}
+                <div className="text-center text-[9px] text-gray-400 font-medium my-2">ระบบเริ่มการสนทนาที่ปลอดภัย</div>
                 {messages.length === 0 ? (
                   <div className="text-center text-xs text-gray-400 mt-10">ยังไม่มีข้อความ พิมพ์ทักทายได้เลยค่ะ 👋</div>
                 ) : (
@@ -429,16 +412,13 @@ export default function WinOnlinePage() {
                     );
                   })
                 )}
-                <div ref={messagesEndRef} /> {/* ตัวช่วยสำหรับเลื่อนจอลงล่างสุด */}
+                <div ref={messagesEndRef} />
               </div>
 
-              {/* Chat Input */}
               <div className="p-4 bg-white border-t border-gray-100">
                 <form onSubmit={handleSendChat} className="flex gap-2">
                   <input 
-                    type="text" 
-                    value={chatMessage}
-                    onChange={(e) => setChatMessage(e.target.value)}
+                    type="text" value={chatMessage} onChange={(e) => setChatMessage(e.target.value)}
                     placeholder="พิมพ์ข้อความเจรจา..." 
                     className="flex-1 bg-gray-100 border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-[#EE4D2D] outline-none"
                   />
@@ -447,7 +427,6 @@ export default function WinOnlinePage() {
                   </button>
                 </form>
               </div>
-
             </div>
           </div>
         )}
