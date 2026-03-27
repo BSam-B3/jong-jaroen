@@ -29,7 +29,7 @@ export default function ServicesPage() {
   
   const [providers, setProviders] = useState<ProviderService[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'all' | 'sponsored' | 'popular' | 'new'>('all');
+  const [activeTab, setActiveTab] = useState<string>('all');
 
   useEffect(() => {
     const fetchProviders = async () => {
