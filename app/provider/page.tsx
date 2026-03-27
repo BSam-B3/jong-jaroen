@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import BottomNav from '@/app/components/BottomNav';
 
 export default function ProviderDashboardPage() {
   const router = useRouter();
@@ -177,15 +178,7 @@ export default function ProviderDashboardPage() {
 
         </div>
 
-        {/* ✅ Bottom Navigation */}
-        <div className="fixed bottom-0 w-full sm:max-w-2xl md:max-w-3xl bg-white/95 backdrop-blur-md border-t border-gray-100 px-1 py-4 flex justify-between items-center shadow-[0_-4px_25px_rgba(0,0,0,0.06)] rounded-t-[2.5rem] z-50">
-          <NavItem icon="📈" label="แดชบอร์ด" active={true} onClick={() => {}} />
-          <NavItem icon="📋" label="งานของฉัน" active={false} onClick={() => {}} />
-          <NavItem icon="💬" label="แชท" active={false} onClick={() => {}} />
-          <NavItem icon="⚙️" label="ตั้งค่า" active={false} onClick={() => {}} />
-        </div>
-
-      </div>
+        <BottomNav />
 
       <style dangerouslySetInnerHTML={{__html: `
         .scrollbar-hide::-webkit-scrollbar { display: none; }
@@ -193,16 +186,6 @@ export default function ProviderDashboardPage() {
         .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
       `}} />
-    </div>
-  );
-}
-
-function NavItem({ icon, label, active, onClick }: any) {
-  return (
-    <div onClick={onClick} className={`flex flex-col items-center gap-1.5 cursor-pointer transition-all ${active ? 'scale-110' : 'opacity-40 hover:opacity-100'} flex-1`}>
-      <span className="text-[22px]">{icon}</span>
-      <span className={`text-[9px] font-bold ${active ? 'text-[#EE4D2D]' : 'text-gray-500'} whitespace-nowrap`}>{label}</span>
-      {active && <div className="w-1.5 h-1.5 bg-[#EE4D2D] rounded-full shadow-sm mt-0.5"></div>}
     </div>
   );
 }
