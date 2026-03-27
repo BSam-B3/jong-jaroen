@@ -159,6 +159,7 @@ export default function ServicesPage() {
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
       `}} />
     </div>
+  </div>
   );
 }
 
