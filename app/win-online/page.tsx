@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import BottomNav from '@/app/components/BottomNav';
 
 interface ExpressJob {
   id: string;
@@ -564,28 +565,10 @@ export default function WinOnlinePage() {
           </div>
         )}
 
-        {/* ✅ Bottom Navigation */}
-        <div className="fixed bottom-0 w-full sm:max-w-2xl md:max-w-3xl bg-white/95 backdrop-blur-md border-t border-gray-100 px-1 py-4 flex justify-between items-center shadow-[0_-4px_25px_rgba(0,0,0,0.06)] rounded-t-[2.5rem] z-30">
-          <NavItem icon="🏠" label="หน้าแรก" active={false} onClick={() => router.push('/')} />
-          <NavItem icon="🛠️" label="บริการ" active={false} onClick={() => router.push('/services')} />
-          <NavItem icon="📋" label="งานด่วน" active={true} onClick={() => {}} />
-          <NavItem icon="📰" label="ข่าวสาร" active={false} onClick={() => router.push('/news')} />
-          <NavItem icon="🎟️" label="ปองเจริญ" active={false} onClick={() => router.push('/coupons')} />
-          <NavItem icon="👤" label="ฉัน" active={false} onClick={() => router.push('/profile')} />
-        </div>
+        <BottomNav />
 
       </div>
       <style dangerouslySetInnerHTML={{__html: `.scrollbar-hide::-webkit-scrollbar { display: none; } .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; } .animate-slide-up { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; } .animate-fade-in { animation: fadeIn 0.2s ease-out forwards; } @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } } @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }`}} />
-    </div>
-  );
-}
-
-function NavItem({ icon, label, active, onClick }: any) {
-  return (
-    <div onClick={onClick} className={`flex flex-col items-center gap-1.5 cursor-pointer transition-all ${active ? 'scale-110' : 'opacity-40 hover:opacity-100'} flex-1`}>
-      <span className="text-[22px]">{icon}</span>
-      <span className={`text-[9px] font-bold ${active ? 'text-[#EE4D2D]' : 'text-gray-500'} whitespace-nowrap`}>{label}</span>
-      {active && <div className="w-1.5 h-1.5 bg-[#EE4D2D] rounded-full shadow-sm mt-0.5"></div>}
     </div>
   );
 }
