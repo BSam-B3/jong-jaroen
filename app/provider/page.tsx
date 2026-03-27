@@ -3,10 +3,11 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import BottomNav from '@/app/components/BottomNav';
+import { User } from '@supabase/supabase-js';
 
 export default function ProviderDashboardPage() {
   const router = useRouter();
-  const [currentUser, setCurrentUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isOnline, setIsOnline] = useState(false);
   const [kycStatus, setKycStatus] = useState('none');
   const [stats, setStats] = useState({
