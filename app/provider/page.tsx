@@ -11,7 +11,7 @@ export default function ProviderDashboardPage() {
   // States
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [isOnline, setIsOnline] = useState(false); 
-  const [kycStatus, setKycStatus] = useState<'none' | 'pending' | 'approved'>('none'); 
+  const [kycStatus, setKycStatus] = useState<string>('none');
   
   // Mock Data: รายได้และสถิติ
   const [stats, setStats] = useState({
