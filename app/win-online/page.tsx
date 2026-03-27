@@ -1,10 +1,11 @@
 'use client';
-
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import BottomNav from '@/app/components/BottomNav';
+import MapPinPicker from '@/app/components/MapPinPicker';
 
+// ─── Types ───────────────────────────────────────────────────────────────────
 interface ExpressJob {
   id: string;
   title: string;
@@ -20,10 +21,7 @@ interface ExpressJob {
   created_at: string;
   customer_id: string;
   rider_id: string | null;
-  profiles?: {
-    first_name: string;
-    last_name: string;
-  };
+  profiles?: { first_name: string; last_name: string };
 }
 
 interface ChatMessage {
@@ -31,109 +29,114 @@ interface ChatMessage {
   sender_id: string;
   message: string;
   created_at: string;
-  profiles?: {
-    first_name: string;
-  };
+  profiles?: { first_name: string };
 }
 
+interface FareResult {
+  distance_km: number;
+  duration_min: number;
+  raw_fare: number;
+  gp_amount: number;
+  final_price: number;
+}
+
+// ─── Supabase project ref for Edge Function URL ───────────────────────────────
+const SUPABASE_PROJECT_REF = 'uidkyvqjwigzidxpwort';
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
 export default function WinOnlinePage() {
   const router = useRouter();
-
   const [jobs, setJobs] = useState<ExpressJob[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<any>(null);
-
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [isLocationPickerOpen, setIsLocationPickerOpen] = useState(false);
-  const [pickingType, setPickingType] = useState<'pickup' | 'dropoff'>('pickup');
-  const [searchQuery, setSearchQuery] = useState('');
-
-  // Form States
+  // ── Form States ──
   const [jobType, setJobType] = useState<'ride' | 'buy' | 'deliver'>('ride');
   const [vehicleType, setVehicleType] = useState<'motorcycle' | 'car' | 'suv' | 'van' | 'pickup'>('motorcycle');
   const [title, setTitle] = useState('');
-  const [pickup, setPickup] = useState('');
-  const [dropoff, setDropoff] = useState('');
   const [goodsPrice, setGoodsPrice] = useState('');
   const [note, setNote] = useState('');
 
-  const [distanceKm, setDistanceKm] = useState<number>(0);
-  const [showFareDetails, setShowFareDetails] = useState(false);
-  const [fareBreakdown, setFareBreakdown] = useState({ base: 0, distanceFee: 0, fuelSurge: 0, gpFee: 0, total: 0 });
+  // ── Location States (from MapPinPicker) ──
+  const [pickup, setPickup] = useState('');
+  const [pickupLat, setPickupLat] = useState<number>(0);
+  const [pickupLng, setPickupLng] = useState<number>(0);
+  const [dropoff, setDropoff] = useState('');
+  const [dropoffLat, setDropoffLat] = useState<number>(0);
+  const [dropoffLng, setDropoffLng] = useState<number>(0);
 
-  // 💬 Chat States
+  // ── Fare States (from Edge Function) ──
+  const [isFareLoading, setIsFareLoading] = useState(false);
+  const [fareResult, setFareResult] = useState<FareResult | null>(null);
+  const [fareError, setFareError] = useState('');
+
+  // ── Chat States ──
   const [activeChatJob, setActiveChatJob] = useState<ExpressJob | null>(null);
   const [chatMessage, setChatMessage] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // ✅ พระเอกที่ทำ Vercel พังรอบก่อน อยู่นี่แล้วค่ะ!
-  const mockPlaces = [
-    { name: 'โรงพยาบาลแกลง', detail: 'ตำบลทางเกวียน อำเภอแกลง' },
-    { name: 'ตลาดสามย่าน แกลง', detail: 'ตลาดสดเทศบาล' },
-    { name: 'เซเว่นอีเลฟเว่น สาขาตลาดแกลง', detail: 'ใกล้สี่แยกไฟแดง' },
-    { name: 'โลตัส แกลง', detail: 'ถนนสุขุมวิท' }
-  ];
-
-  // -----------------------------------------------------------------
-  // 🧮 คำนวณราคากลางอัจฉริยะ 
-  // -----------------------------------------------------------------
-  useEffect(() => {
-    if (pickup && (dropoff || jobType === 'buy')) {
-      const mockDistance = Math.floor(Math.random() * 10) + 2; 
-      setDistanceKm(mockDistance);
-
-      let baseFare = 20;
-      let ratePerKm = 8;
-
-      if (vehicleType === 'motorcycle') {
-        baseFare = 20;
-        if (mockDistance > 6 && mockDistance <= 40) ratePerKm = 7;
-        if (mockDistance > 40) ratePerKm = 10;
-      } else if (vehicleType === 'car') {
-        baseFare = 40; ratePerKm = 12;
-        if (mockDistance > 6 && mockDistance <= 40) ratePerKm = 10;
-        if (mockDistance > 40) ratePerKm = 12;
-      } else if (vehicleType === 'suv') {
-        baseFare = 60; ratePerKm = 15;
-        if (mockDistance > 6 && mockDistance <= 40) ratePerKm = 12;
-        if (mockDistance > 40) ratePerKm = 15;
-      } else if (vehicleType === 'van') {
-        if (jobType === 'deliver') { baseFare = 200; ratePerKm = 20; } 
-        else { baseFare = 100; ratePerKm = 15; }
-      } else if (vehicleType === 'pickup') {
-        if (jobType === 'deliver') {
-          baseFare = 150; ratePerKm = 20;
-          if (mockDistance > 6 && mockDistance <= 40) ratePerKm = 15;
-          if (mockDistance > 40) ratePerKm = 18;
-        } else {
-          baseFare = 50; ratePerKm = 12;
-          if (mockDistance > 6 && mockDistance <= 40) ratePerKm = 10;
-          if (mockDistance > 40) ratePerKm = 12;
+  // ─── Fare Calculation via Edge Function ───────────────────────────────────
+  const calculateFare = useCallback(async (
+    oLat: number, oLng: number, dLat: number, dLng: number
+  ) => {
+    if (!oLat || !oLng || !dLat || !dLng) return;
+    setIsFareLoading(true);
+    setFareError('');
+    setFareResult(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token || '';
+      const res = await fetch(
+        `https://${SUPABASE_PROJECT_REF}.supabase.co/functions/v1/calculate-fare`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            origin_lat: oLat, origin_lng: oLng,
+            dest_lat: dLat, dest_lng: dLng,
+          }),
         }
-      }
-
-      const distanceFee = mockDistance * ratePerKm;
-      const fuelMultiplier = 1.0; 
-      const rawBeforeFuel = baseFare + distanceFee;
-      const fuelSurge = (rawBeforeFuel * fuelMultiplier) - rawBeforeFuel;
-      const rawFare = rawBeforeFuel + fuelSurge;
-      const gpFee = rawFare * 0.03; 
-      const finalFare = Math.ceil(rawFare + gpFee); 
-
-      setFareBreakdown({ base: baseFare, distanceFee: distanceFee, fuelSurge: fuelSurge, gpFee: gpFee, total: finalFare });
-    } else {
-      setDistanceKm(0);
-      setFareBreakdown({ base: 0, distanceFee: 0, fuelSurge: 0, gpFee: 0, total: 0 });
-      setShowFareDetails(false);
+      );
+      if (!res.ok) throw new Error('Edge Function error ' + res.status);
+      const json = await res.json();
+      if (json.error) throw new Error(json.error);
+      setFareResult(json as FareResult);
+    } catch (err: any) {
+      setFareError('คำนวณค่าโดยสารไม่สำเร็จ: ' + err.message);
+    } finally {
+      setIsFareLoading(false);
     }
-  }, [pickup, dropoff, jobType, vehicleType]); 
+  }, []);
 
-  // -----------------------------------------------------------------
-  // 🔄 ดึงข้อมูลงานด่วน
-  // -----------------------------------------------------------------
+  // Re-calculate when both lat/lng are set
+  useEffect(() => {
+    if (pickupLat && pickupLng && dropoffLat && dropoffLng) {
+      calculateFare(pickupLat, pickupLng, dropoffLat, dropoffLng);
+    } else {
+      setFareResult(null);
+    }
+  }, [pickupLat, pickupLng, dropoffLat, dropoffLng, calculateFare]);
+
+  // ─── Handlers for MapPinPicker ────────────────────────────────────────────
+  const handlePickupSelect = useCallback((addr: string, lat: number, lng: number) => {
+    setPickup(addr);
+    setPickupLat(lat);
+    setPickupLng(lng);
+  }, []);
+
+  const handleDropoffSelect = useCallback((addr: string, lat: number, lng: number) => {
+    setDropoff(addr);
+    setDropoffLat(lat);
+    setDropoffLng(lng);
+  }, []);
+
+  // ─── Fetch Jobs ───────────────────────────────────────────────────────────
   const fetchJobs = async () => {
     setIsLoading(true);
     try {
@@ -142,14 +145,10 @@ export default function WinOnlinePage() {
         .select(`*, profiles:customer_id (first_name, last_name)`)
         .eq('status', 'open')
         .order('created_at', { ascending: false });
-
       if (error) throw error;
       if (data) setJobs(data);
-    } catch (error) {
-      console.error('Error fetching jobs:', error);
-    } finally {
-      setIsLoading(false);
-    }
+    } catch (error) { console.error('Error fetching jobs:', error); }
+    finally { setIsLoading(false); }
   };
 
   useEffect(() => {
@@ -157,109 +156,84 @@ export default function WinOnlinePage() {
     fetchJobs();
   }, []);
 
-  // -----------------------------------------------------------------
-  // 💬 ระบบแชท Real-time
-  // -----------------------------------------------------------------
+  // ─── Chat ─────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!activeChatJob) return;
-
     const fetchMessages = async () => {
       const { data, error } = await supabase
         .from('job_chats')
         .select(`*, profiles:sender_id(first_name)`)
         .eq('job_id', activeChatJob.id)
         .order('created_at', { ascending: true });
-      
       if (!error && data) setMessages(data);
-      scrollToBottom();
+      setTimeout(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, 100);
     };
     fetchMessages();
-
     const subscription = supabase
       .channel(`chat_${activeChatJob.id}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'job_chats', filter: `job_id=eq.${activeChatJob.id}` }, 
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'job_chats', filter: `job_id=eq.${activeChatJob.id}` },
         (payload) => {
           supabase.from('profiles').select('first_name').eq('id', payload.new.sender_id).single()
             .then(({ data }) => {
-              const newMessage = { ...payload.new, profiles: data } as ChatMessage;
-              setMessages((prev) => [...prev, newMessage]);
-              scrollToBottom();
+              setMessages((prev) => [...prev, { ...payload.new, profiles: data } as ChatMessage]);
+              setTimeout(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, 100);
             });
-        }
-      )
+        })
       .subscribe();
-
     return () => { supabase.removeChannel(subscription); };
   }, [activeChatJob]);
-
-  const scrollToBottom = () => {
-    setTimeout(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, 100);
-  };
 
   const handleSendChat = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatMessage.trim() || !currentUser || !activeChatJob) return;
-
-    const messageText = chatMessage.trim();
-    setChatMessage(''); 
-
-    try {
-      const { error } = await supabase.from('job_chats').insert({
-        job_id: activeChatJob.id,
-        sender_id: currentUser.id,
-        message: messageText
-      });
-      if (error) throw error;
-    } catch (error: any) {
-      alert('ส่งข้อความไม่สำเร็จ: ' + error.message);
-    }
+    const text = chatMessage.trim();
+    setChatMessage('');
+    const { error } = await supabase.from('job_chats').insert({
+      job_id: activeChatJob.id,
+      sender_id: currentUser.id,
+      message: text,
+    });
+    if (error) alert('ส่งข้อความไม่สำเร็จ: ' + error.message);
   };
 
+  // ─── Submit Job ───────────────────────────────────────────────────────────
   const handlePostJob = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser) return router.push('/auth/login');
-    if (fareBreakdown.total <= 0 && jobType !== 'buy') return alert('กรุณาระบุจุดรับ-ส่งให้ครบค่ะ 📍');
-
+    if (!pickup || !pickupLat) return alert('กรุณาเลือกจุดรับจากแผนที่ค่ะ 📍');
+    if (jobType !== 'buy' && (!dropoff || !dropoffLat)) return alert('กรุณาเลือกจุดส่งจากแผนที่ค่ะ 📍');
+    if (!fareResult && jobType !== 'buy') return alert('กรุณารอคำนวณราคาก่อนค่ะ ⏳');
     setIsSubmitting(true);
     try {
       const { error } = await supabase.from('express_jobs').insert({
         customer_id: currentUser.id,
-        title: title,
+        title,
         job_type: jobType,
-        vehicle_type: vehicleType, 
+        vehicle_type: vehicleType,
         pickup_location: pickup,
         dropoff_location: dropoff || null,
-        note: note || null, 
-        distance_km: distanceKm, 
+        origin_lat: pickupLat,
+        origin_lng: pickupLng,
+        dest_lat: dropoffLat || null,
+        dest_lng: dropoffLng || null,
+        note: note || null,
+        distance_km: fareResult?.distance_km || null,
         goods_price: jobType === 'buy' && goodsPrice ? parseFloat(goodsPrice) : null,
-        offered_price: fareBreakdown.total, 
+        offered_price: fareResult?.final_price || null,
       });
-
       if (error) throw error;
-
       setIsModalOpen(false);
-      setTitle(''); setPickup(''); setDropoff(''); setGoodsPrice(''); setNote('');
-      fetchJobs(); 
+      setTitle(''); setPickup(''); setPickupLat(0); setPickupLng(0);
+      setDropoff(''); setDropoffLat(0); setDropoffLng(0);
+      setGoodsPrice(''); setNote(''); setFareResult(null);
+      fetchJobs();
       alert('โพสต์งานด่วนสำเร็จ! 🚀');
-    } catch (error: any) {
-      alert('เกิดข้อผิดพลาด: ' + error.message);
-    } finally {
-      setIsSubmitting(false);
-    }
+    } catch (err: any) {
+      alert('เกิดข้อผิดพลาด: ' + err.message);
+    } finally { setIsSubmitting(false); }
   };
 
-  const openLocationPicker = (type: 'pickup' | 'dropoff') => {
-    setPickingType(type);
-    setSearchQuery('');
-    setIsLocationPickerOpen(true);
-  };
-
-  const selectLocation = (locationName: string) => {
-    if (pickingType === 'pickup') setPickup(locationName);
-    else setDropoff(locationName);
-    setIsLocationPickerOpen(false);
-  };
-
+  // ─── Helpers ──────────────────────────────────────────────────────────────
   const getVehicleIcon = (type: string) => {
     if (type === 'car') return '🚗';
     if (type === 'suv') return '🚙';
@@ -267,7 +241,6 @@ export default function WinOnlinePage() {
     if (type === 'pickup') return '🛻';
     return '🛵';
   };
-
   const getVehicleName = (type: string) => {
     if (type === 'car') return 'รถเก๋ง';
     if (type === 'suv') return 'รถครอบครัว';
@@ -276,11 +249,12 @@ export default function WinOnlinePage() {
     return 'มอเตอร์ไซค์';
   };
 
+  // ─── JSX ──────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gray-100 flex justify-center pb-24">
       <div className="w-full sm:max-w-2xl md:max-w-3xl bg-[#F4F6F8] min-h-screen relative flex flex-col shadow-xl overflow-x-hidden rounded-t-[2.5rem]">
 
-        {/* 🟠 Header */}
+        {/* Header */}
         <div className="bg-gradient-to-b from-[#EE4D2D] to-[#FF7337] rounded-[2.5rem] p-6 pt-10 shadow-md relative z-10">
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-white text-2xl font-black tracking-tight flex items-center gap-2">
@@ -288,19 +262,20 @@ export default function WinOnlinePage() {
             </h1>
           </div>
           <div className="bg-white/10 p-3 rounded-2xl backdrop-blur-sm border border-white/20 text-white text-xs font-medium">
-            📍 <strong className="text-yellow-200">ระบบราคากลางอัจฉริยะ:</strong> คำนวณค่าส่งตามระยะทาง GPS และประเภทยานพาหนะ
+            📍 <strong className="text-yellow-200">ราคาตามระยะทางจริง:</strong> Google Maps + Edge Function คำนวณอัตโนมัติ (3% GP)
           </div>
         </div>
 
-        {/* 📋 ฟีดงานด่วน */}
+        {/* Job Feed */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-hide pb-24 z-0">
           <div className="flex justify-between items-end mb-2 px-1">
             <h2 className="text-sm font-black text-gray-800 tracking-tight">🟢 งานที่รอคนรับ</h2>
             <button onClick={fetchJobs} className="text-[10px] text-gray-500 hover:text-[#EE4D2D] font-bold">🔄 รีเฟรช</button>
           </div>
-
           {isLoading ? (
-            Array.from({ length: 3 }).map((_, i) => <div key={i} className="bg-white rounded-[1.5rem] p-4 shadow-sm border border-gray-100 animate-pulse h-32"></div>)
+            Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="bg-white rounded-[1.5rem] p-4 shadow-sm border border-gray-100 animate-pulse h-32"></div>
+            ))
           ) : jobs.length === 0 ? (
             <div className="bg-white rounded-[2rem] p-8 text-center shadow-sm border border-gray-100 mt-4">
               <div className="text-5xl mb-4 opacity-50">💨</div>
@@ -328,10 +303,11 @@ export default function WinOnlinePage() {
                     <div className="text-lg font-black text-[#EE4D2D] leading-none">
                       {job.offered_price ? `฿${job.offered_price}` : 'รอเสนอราคา'}
                     </div>
-                    <div className="text-[8px] text-gray-400 font-bold mt-1 uppercase tracking-wider">ระยะทาง {job.distance_km || '?'} กม.</div>
+                    <div className="text-[8px] text-gray-400 font-bold mt-1 uppercase tracking-wider">
+                      ระยะทาง {job.distance_km || '?'} กม.
+                    </div>
                   </div>
                 </div>
-
                 <div className="space-y-1.5 bg-gray-50 p-3 rounded-xl border border-gray-100 mb-3">
                   <div className="flex items-start gap-2">
                     <span className="text-blue-500 text-[10px] mt-0.5">🟢</span>
@@ -344,21 +320,18 @@ export default function WinOnlinePage() {
                     </div>
                   )}
                 </div>
-
                 {job.note && (
                   <div className="mb-4 bg-orange-50/50 p-2.5 rounded-lg border border-orange-100/50 flex items-start gap-2">
                     <span className="text-sm">📌</span>
                     <p className="text-[10px] text-gray-600 font-medium leading-relaxed italic">"{job.note}"</p>
                   </div>
                 )}
-
                 <div className="flex gap-2">
-                  <button className="flex-1 bg-[#EE4D2D] text-white py-2.5 rounded-xl text-xs font-bold shadow-sm active:scale-95 transition-transform">รับงานนี้ ⚡</button>
-                  <button 
-                    onClick={() => {
-                      if (!currentUser) return router.push('/auth/login');
-                      setActiveChatJob(job);
-                    }} 
+                  <button className="flex-1 bg-[#EE4D2D] text-white py-2.5 rounded-xl text-xs font-bold shadow-sm active:scale-95 transition-transform">
+                    รับงานนี้ ⚡
+                  </button>
+                  <button
+                    onClick={() => { if (!currentUser) return router.push('/auth/login'); setActiveChatJob(job); }}
                     className="flex-1 bg-white text-[#EE4D2D] border border-[#EE4D2D] py-2.5 rounded-xl text-xs font-bold shadow-sm active:scale-95 transition-transform"
                   >
                     💬 แชทต่อรอง
@@ -369,16 +342,18 @@ export default function WinOnlinePage() {
           )}
         </div>
 
-        <button onClick={() => setIsModalOpen(true)} className="fixed bottom-24 right-4 sm:right-[calc(50%-18rem)] w-14 h-14 bg-gradient-to-br from-[#EE4D2D] to-[#FF7337] rounded-full shadow-lg shadow-[#EE4D2D]/30 flex items-center justify-center text-white text-3xl active:scale-90 z-40 border-2 border-white">
+        {/* FAB */}
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className="fixed bottom-24 right-4 sm:right-[calc(50%-18rem)] w-14 h-14 bg-gradient-to-br from-[#EE4D2D] to-[#FF7337] rounded-full shadow-lg shadow-[#EE4D2D]/30 flex items-center justify-center text-white text-3xl active:scale-90 z-40 border-2 border-white"
+        >
           +
         </button>
 
-        {/* ----------------------------------------------------------------- */}
-        {/* 💬 Chat Modal */}
-        {/* ----------------------------------------------------------------- */}
+        {/* Chat Modal */}
         {activeChatJob && (
-          <div className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm flex items-end justify-center sm:items-center animate-fade-in">
-            <div className="bg-white w-full sm:max-w-md h-[80vh] sm:h-[600px] rounded-t-[2rem] sm:rounded-[2rem] shadow-2xl animate-slide-up flex flex-col overflow-hidden relative">
+          <div className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm flex items-end justify-center sm:items-center">
+            <div className="bg-white w-full sm:max-w-md h-[80vh] sm:h-[600px] rounded-t-[2rem] sm:rounded-[2rem] shadow-2xl flex flex-col overflow-hidden relative">
               <div className="bg-white border-b border-gray-100 p-4 flex items-center justify-between sticky top-0 z-10 shadow-sm">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-orange-100 text-[#EE4D2D] rounded-full flex items-center justify-center font-black">
@@ -391,7 +366,6 @@ export default function WinOnlinePage() {
                 </div>
                 <button onClick={() => setActiveChatJob(null)} className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-200">✕</button>
               </div>
-
               <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 scrollbar-hide">
                 <div className="text-center text-[9px] text-gray-400 font-medium my-2">ระบบเริ่มการสนทนาที่ปลอดภัย</div>
                 {messages.length === 0 ? (
@@ -415,15 +389,15 @@ export default function WinOnlinePage() {
                 )}
                 <div ref={messagesEndRef} />
               </div>
-
               <div className="p-4 bg-white border-t border-gray-100">
                 <form onSubmit={handleSendChat} className="flex gap-2">
-                  <input 
-                    type="text" value={chatMessage} onChange={(e) => setChatMessage(e.target.value)}
-                    placeholder="พิมพ์ข้อความเจรจา..." 
+                  <input
+                    type="text" value={chatMessage}
+                    onChange={(e) => setChatMessage(e.target.value)}
+                    placeholder="พิมพ์ข้อความเจรจา..."
                     className="flex-1 bg-gray-100 border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-[#EE4D2D] outline-none"
                   />
-                  <button type="submit" disabled={!chatMessage.trim() || isSubmitting} className="w-12 h-12 bg-[#EE4D2D] disabled:opacity-50 text-white rounded-xl flex items-center justify-center shadow-sm active:scale-95 transition-transform">
+                  <button type="submit" disabled={!chatMessage.trim()} className="w-12 h-12 bg-[#EE4D2D] disabled:opacity-50 text-white rounded-xl flex items-center justify-center shadow-sm active:scale-95 transition-transform">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" /></svg>
                   </button>
                 </form>
@@ -432,101 +406,113 @@ export default function WinOnlinePage() {
           </div>
         )}
 
-        {/* ----------------------------------------------------------------- */}
-        {/* 🧩 Modal โพสต์งานด่วนหลัก */}
-        {/* ----------------------------------------------------------------- */}
-        {isModalOpen && !isLocationPickerOpen && !activeChatJob && (
-          <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center bg-black/60 backdrop-blur-sm animate-fade-in">
-            <div className="bg-white w-full sm:max-w-md rounded-t-[2rem] sm:rounded-[2rem] p-6 shadow-2xl animate-slide-up relative max-h-[90vh] overflow-y-auto scrollbar-hide">
+        {/* Post Job Modal */}
+        {isModalOpen && !activeChatJob && (
+          <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center bg-black/60 backdrop-blur-sm">
+            <div className="bg-white w-full sm:max-w-md rounded-t-[2rem] sm:rounded-[2rem] p-6 shadow-2xl relative max-h-[92vh] overflow-y-auto scrollbar-hide">
               <button onClick={() => setIsModalOpen(false)} className="absolute top-4 right-4 w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-200">✕</button>
               <h2 className="text-lg font-black text-gray-800 mb-4">เรียกงานด่วน 🚀</h2>
 
+              {/* Job Type Tabs */}
               <div className="flex gap-2 mb-4">
-                <button type="button" onClick={() => setJobType('ride')} className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${jobType === 'ride' ? 'bg-orange-50 border-[#EE4D2D] text-[#EE4D2D]' : 'bg-white border-gray-200 text-gray-500'}`}>🛵 เรียกรถ</button>
-                <button type="button" onClick={() => setJobType('buy')} className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${jobType === 'buy' ? 'bg-orange-50 border-[#EE4D2D] text-[#EE4D2D]' : 'bg-white border-gray-200 text-gray-500'}`}>🍜 ฝากซื้อ</button>
-                <button type="button" onClick={() => setJobType('deliver')} className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${jobType === 'deliver' ? 'bg-orange-50 border-[#EE4D2D] text-[#EE4D2D]' : 'bg-white border-gray-200 text-gray-500'}`}>📦 ส่งของ</button>
+                {(['ride','buy','deliver'] as const).map((t) => (
+                  <button key={t} type="button" onClick={() => setJobType(t)}
+                    className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${jobType === t ? 'bg-orange-50 border-[#EE4D2D] text-[#EE4D2D]' : 'bg-white border-gray-200 text-gray-500'}`}>
+                    {t === 'ride' ? '🛵 เรียกรถ' : t === 'buy' ? '🍜 ฝากซื้อ' : '📦 ส่งของ'}
+                  </button>
+                ))}
               </div>
 
               <form onSubmit={handlePostJob} className="space-y-4">
+                {/* Vehicle Type */}
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-gray-600 pl-1">ประเภทรถที่ต้องการ <span className="text-red-500">*</span></label>
-                  <div className="flex gap-2 overflow-x-auto pb-2 pt-1 scrollbar-hide">
-                    <div onClick={() => setVehicleType('motorcycle')} className={`shrink-0 w-[4.5rem] cursor-pointer border rounded-xl py-2 flex flex-col items-center gap-1 transition-all ${vehicleType === 'motorcycle' ? 'border-[#EE4D2D] bg-orange-50 ring-1 ring-[#EE4D2D]' : 'border-gray-200 bg-white hover:bg-gray-50'}`}>
-                      <span className="text-xl">🛵</span><span className={`text-[9px] font-bold ${vehicleType === 'motorcycle' ? 'text-[#EE4D2D]' : 'text-gray-500'}`}>มอเตอร์ไซค์</span>
-                    </div>
-                    <div onClick={() => setVehicleType('car')} className={`shrink-0 w-[4.5rem] cursor-pointer border rounded-xl py-2 flex flex-col items-center gap-1 transition-all ${vehicleType === 'car' ? 'border-[#EE4D2D] bg-orange-50 ring-1 ring-[#EE4D2D]' : 'border-gray-200 bg-white hover:bg-gray-50'}`}>
-                      <span className="text-xl">🚗</span><span className={`text-[9px] font-bold ${vehicleType === 'car' ? 'text-[#EE4D2D]' : 'text-gray-500'}`}>รถเก๋ง</span>
-                    </div>
-                    <div onClick={() => setVehicleType('suv')} className={`shrink-0 w-[4.5rem] cursor-pointer border rounded-xl py-2 flex flex-col items-center gap-1 transition-all ${vehicleType === 'suv' ? 'border-[#EE4D2D] bg-orange-50 ring-1 ring-[#EE4D2D]' : 'border-gray-200 bg-white hover:bg-gray-50'}`}>
-                      <span className="text-xl">🚙</span><span className={`text-[9px] font-bold ${vehicleType === 'suv' ? 'text-[#EE4D2D]' : 'text-gray-500'}`}>รถ 7 ที่นั่ง</span>
-                    </div>
-                    <div onClick={() => setVehicleType('van')} className={`shrink-0 w-[4.5rem] cursor-pointer border rounded-xl py-2 flex flex-col items-center gap-1 transition-all ${vehicleType === 'van' ? 'border-[#EE4D2D] bg-orange-50 ring-1 ring-[#EE4D2D]' : 'border-gray-200 bg-white hover:bg-gray-50'}`}>
-                      <span className="text-xl">🚐</span><span className={`text-[9px] font-bold ${vehicleType === 'van' ? 'text-[#EE4D2D]' : 'text-gray-500'}`}>รถตู้</span>
-                    </div>
-                    <div onClick={() => setVehicleType('pickup')} className={`shrink-0 w-[4.5rem] cursor-pointer border rounded-xl py-2 flex flex-col items-center gap-1 transition-all ${vehicleType === 'pickup' ? 'border-[#EE4D2D] bg-orange-50 ring-1 ring-[#EE4D2D]' : 'border-gray-200 bg-white hover:bg-gray-50'}`}>
-                      <span className="text-xl">🛻</span><span className={`text-[9px] font-bold ${vehicleType === 'pickup' ? 'text-[#EE4D2D]' : 'text-gray-500'}`}>รถกระบะ</span>
-                    </div>
+                  <label className="text-[11px] font-bold text-gray-600 pl-1">ประเภทรถ <span className="text-red-500">*</span></label>
+                  <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                    {(['motorcycle','car','suv','van','pickup'] as const).map((v) => (
+                      <div key={v} onClick={() => setVehicleType(v)}
+                        className={`shrink-0 w-[4.5rem] cursor-pointer border rounded-xl py-2 flex flex-col items-center gap-1 transition-all ${vehicleType === v ? 'border-[#EE4D2D] bg-orange-50 ring-1 ring-[#EE4D2D]' : 'border-gray-200 bg-white hover:bg-gray-50'}`}>
+                        <span className="text-xl">{getVehicleIcon(v)}</span>
+                        <span className={`text-[9px] font-bold ${vehicleType === v ? 'text-[#EE4D2D]' : 'text-gray-500'}`}>{getVehicleName(v)}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
+                {/* Title */}
                 <div className="space-y-1.5">
                   <label className="text-[11px] font-bold text-gray-600 pl-1">ให้ทำอะไร? <span className="text-red-500">*</span></label>
-                  <input type="text" required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="เช่น ไปส่งที่ บขส." className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-[#EE4D2D] outline-none" />
+                  <input type="text" required value={title} onChange={(e) => setTitle(e.target.value)}
+                    placeholder="เช่น ไปส่งที่ บขส."
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-[#EE4D2D] outline-none" />
                 </div>
 
+                {/* Goods price for 'buy' */}
                 {jobType === 'buy' && (
                   <div className="space-y-1.5 bg-blue-50/50 p-3 rounded-xl border border-blue-100">
                     <label className="text-[11px] font-bold text-blue-700 pl-1">ค่าสินค้า (โดยประมาณ)</label>
                     <div className="relative">
                       <span className="absolute left-4 top-3 text-gray-400 font-bold">฿</span>
-                      <input type="number" value={goodsPrice} onChange={(e) => setGoodsPrice(e.target.value)} placeholder="เพื่อเตรียมเงินสดสำรอง" className="w-full border border-gray-200 rounded-xl pl-8 pr-4 py-3 text-sm font-bold outline-none focus:border-blue-500" />
+                      <input type="number" value={goodsPrice} onChange={(e) => setGoodsPrice(e.target.value)}
+                        placeholder="เพื่อเตรียมเงินสดสำรอง"
+                        className="w-full border border-gray-200 rounded-xl pl-8 pr-4 py-3 text-sm font-bold outline-none focus:border-blue-500" />
                     </div>
                   </div>
                 )}
 
+                {/* MapPinPicker - Origin & Destination */}
                 <div className="space-y-3 bg-gray-50 p-4 rounded-2xl border border-gray-200">
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-gray-600 pl-1">จุดรับ / ร้านค้า / เริ่มต้น <span className="text-red-500">*</span></label>
-                    <div onClick={() => openLocationPicker('pickup')} className={`w-full border rounded-xl px-4 py-3 text-sm cursor-pointer flex items-center justify-between transition-colors ${pickup ? 'border-orange-300 bg-orange-50 text-gray-800 font-bold' : 'border-gray-200 bg-white text-gray-400 hover:border-orange-300'}`}>
-                      <span className="truncate pr-4">{pickup || 'ค้นหาสถานที่ หรือ ปักหมุดแผนที่'}</span><span className="text-lg">📍</span>
-                    </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-gray-600 pl-1">จุดส่ง / ปลายทาง</label>
-                    <div onClick={() => openLocationPicker('dropoff')} className={`w-full border rounded-xl px-4 py-3 text-sm cursor-pointer flex items-center justify-between transition-colors ${dropoff ? 'border-orange-300 bg-orange-50 text-gray-800 font-bold' : 'border-gray-200 bg-white text-gray-400 hover:border-orange-300'}`}>
-                      <span className="truncate pr-4">{dropoff || 'ค้นหาสถานที่ หรือ ปักหมุดแผนที่'}</span><span className="text-lg">📍</span>
-                    </div>
-                  </div>
+                  <MapPinPicker
+                    label="จุดรับ / ร้านค้า / จุดเริ่มต้น *"
+                    placeholder="ค้นหาสถานที่ต้นทาง..."
+                    value={pickup}
+                    onLocationSelect={handlePickupSelect}
+                  />
+                  <MapPinPicker
+                    label="จุดส่ง / ปลายทาง"
+                    placeholder="ค้นหาสถานที่ปลายทาง..."
+                    value={dropoff}
+                    onLocationSelect={handleDropoffSelect}
+                  />
                 </div>
 
+                {/* Note */}
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-gray-600 pl-1 flex justify-between">
-                    <span>หมายเหตุถึงคนขับ (ถ้ามี)</span>
-                    <span className="text-gray-400 font-normal">เช่น จุดสังเกต, มีของใหญ่</span>
-                  </label>
-                  <textarea 
-                    value={note} onChange={(e) => setNote(e.target.value)} 
-                    placeholder="รายละเอียดเพิ่มเติมให้คนขับเห็น..." rows={2}
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-[#EE4D2D] outline-none resize-none"
-                  ></textarea>
+                  <label className="text-[11px] font-bold text-gray-600 pl-1">หมายเหตุถึงคนขับ (ถ้ามี)</label>
+                  <textarea value={note} onChange={(e) => setNote(e.target.value)}
+                    placeholder="รายละเอียดเพิ่มเติม..." rows={2}
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-[#EE4D2D] outline-none resize-none"></textarea>
                 </div>
 
-                <div className="pt-2">
-                  <div className="bg-orange-50 border border-orange-100 rounded-2xl p-4 flex items-center justify-between relative overflow-hidden">
-                    <div>
-                      <p className="text-[10px] text-orange-600 font-bold uppercase tracking-wider">ราคาอิงตามระยะทาง</p>
-                      <p className="text-xs text-gray-700 font-medium mt-0.5 flex items-center gap-1.5">
-                        {distanceKm > 0 ? `ประมาณ ${distanceKm} กม.` : 'ระบุสถานที่เพื่อคำนวณ'}
-                        <span className="bg-white border border-orange-200 text-orange-500 text-[8px] px-1.5 py-0.5 rounded-md font-bold">
-                          เรท {getVehicleName(vehicleType)}
-                        </span>
-                      </p>
+                {/* Fare Display */}
+                <div className="bg-orange-50 border border-orange-100 rounded-2xl p-4 relative overflow-hidden">
+                  {isFareLoading ? (
+                    <div className="flex items-center gap-3">
+                      <div className="w-5 h-5 border-2 border-[#EE4D2D] border-t-transparent rounded-full animate-spin"></div>
+                      <p className="text-xs text-gray-600 font-medium">กำลังคำนวณระยะทาง...</p>
                     </div>
-                    <div className="text-2xl font-black text-[#EE4D2D]">{fareBreakdown.total > 0 ? `฿${fareBreakdown.total}` : '-'}</div>
-                  </div>
+                  ) : fareError ? (
+                    <p className="text-xs text-red-500 font-medium">{fareError}</p>
+                  ) : fareResult ? (
+                    <div>
+                      <p className="text-[10px] text-orange-600 font-bold uppercase tracking-wider mb-1">ราคาตามระยะทางจริง</p>
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <p className="text-xs text-gray-600">{fareResult.distance_km.toFixed(1)} กม. • {fareResult.duration_min} นาที</p>
+                          <p className="text-[9px] text-gray-400">GP 3%: ฿{fareResult.gp_amount.toFixed(2)}</p>
+                        </div>
+                        <div className="text-2xl font-black text-[#EE4D2D]">฿{fareResult.final_price}</div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex justify-between items-center">
+                      <p className="text-xs text-gray-500">เลือกต้นทาง + ปลายทางเพื่อคำนวณ</p>
+                      <div className="text-2xl font-black text-gray-300">-</div>
+                    </div>
+                  )}
                 </div>
 
-                <button type="submit" disabled={isSubmitting || (fareBreakdown.total <= 0 && jobType !== 'buy')} className="w-full bg-[#EE4D2D] text-white font-black py-4 rounded-xl text-sm mt-4 shadow-md active:scale-95 disabled:opacity-50 transition-all">
+                <button type="submit" disabled={isSubmitting || (isFareLoading && jobType !== 'buy')}
+                  className="w-full bg-[#EE4D2D] text-white font-black py-4 rounded-xl text-sm mt-4 shadow-md active:scale-95 disabled:opacity-50 transition-all">
                   {isSubmitting ? 'กำลังประมวลผล...' : 'ยืนยันการเรียกรถ'}
                 </button>
               </form>
@@ -534,41 +520,14 @@ export default function WinOnlinePage() {
           </div>
         )}
 
-        {/* Location Picker Modal */}
-        {isLocationPickerOpen && (
-          <div className="fixed inset-0 z-[60] bg-white sm:max-w-md sm:mx-auto sm:h-screen flex flex-col animate-slide-up">
-            <div className="p-4 border-b border-gray-100 shadow-sm bg-white sticky top-0">
-              <div className="flex items-center gap-3">
-                <button onClick={() => setIsLocationPickerOpen(false)} className="p-2 text-gray-400 hover:text-gray-800 bg-gray-50 rounded-full">
-                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
-                </button>
-                <div className="flex-1 relative">
-                  <span className="absolute left-3 top-3 text-gray-400">🔍</span>
-                  <input autoFocus type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder={`ค้นหา ${pickingType === 'pickup' ? 'จุดรับ' : 'จุดส่ง'}...`} className="w-full bg-gray-100 border-none rounded-xl pl-9 pr-4 py-3 text-sm font-bold focus:ring-2 focus:ring-[#EE4D2D] outline-none" />
-                </div>
-              </div>
-            </div>
-            <div className="p-4 border-b border-gray-100 bg-orange-50/50">
-              <button onClick={() => { alert('จำลองการเปิด Google Maps 🗺️'); selectLocation('ตำแหน่งจากแผนที่ (จำลอง)'); }} className="w-full bg-white border border-orange-200 text-[#EE4D2D] flex items-center justify-center gap-2 py-3.5 rounded-xl font-black text-sm shadow-sm active:scale-95 transition-transform">
-                <span className="text-lg">📍</span> เลือกตำแหน่งบนแผนที่
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-2">
-              <p className="px-4 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest">สถานที่แนะนำ</p>
-              {mockPlaces.filter(p => p.name.includes(searchQuery)).map((place, index) => (
-                <div key={index} onClick={() => selectLocation(place.name)} className="flex items-center gap-4 p-4 hover:bg-gray-50 active:bg-gray-100 cursor-pointer border-b border-gray-50 last:border-none transition-colors">
-                  <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-gray-400 shrink-0">📍</div>
-                  <div><h4 className="text-sm font-bold text-gray-800">{place.name}</h4><p className="text-[11px] text-gray-500 mt-0.5">{place.detail}</p></div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
         <BottomNav />
-
       </div>
-      <style dangerouslySetInnerHTML={{__html: `.scrollbar-hide::-webkit-scrollbar { display: none; } .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; } .animate-slide-up { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; } .animate-fade-in { animation: fadeIn 0.2s ease-out forwards; } @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } } @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }`}} />
+
+      <style dangerouslySetInnerHTML={{__html: `
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        .pac-container { z-index: 9999 !important; border-radius: 1rem; box-shadow: 0 10px 40px rgba(0,0,0,0.12); }
+      `}} />
     </div>
   );
 }
