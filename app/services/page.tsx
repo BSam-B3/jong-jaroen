@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import BottomNav from '@/app/components/BottomNav';
+
 
 interface ProviderService {
   id: string;
@@ -152,7 +152,7 @@ export default function ServicesPage() {
           )}
         </div>
 
-        <BottomNav />
+        
 
       <style dangerouslySetInnerHTML={{__html: `
         .scrollbar-hide::-webkit-scrollbar { display: none; }
