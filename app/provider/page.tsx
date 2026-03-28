@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import BottomNav from '@/app/components/BottomNav';
+
 import { User } from '@supabase/supabase-js';
 
 export default function ProviderDashboardPage() {
@@ -146,7 +146,7 @@ export default function ProviderDashboardPage() {
             )}
           </div>
         </div>
-        <BottomNav />
+        
         <style dangerouslySetInnerHTML={{__html: `.scrollbar-hide::-webkit-scrollbar{display:none}.scrollbar-hide{-ms-overflow-style:none;scrollbar-width:none}`}} />
       </div>
     </div>
