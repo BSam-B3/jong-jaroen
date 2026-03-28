@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import BottomNav from '@/app/components/BottomNav';
+
 import MapPinPicker from '@/app/components/MapPinPicker';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -520,7 +520,7 @@ export default function WinOnlinePage() {
           </div>
         )}
 
-        <BottomNav />
+        
       </div>
 
       <style dangerouslySetInnerHTML={{__html: `
