@@ -95,8 +95,8 @@ export default function HomePage() {
                           ) : (
                             categories.slice(0, 4).map((category) => (
                                                   <div key={category.id} onClick={() => router.push('/services')} className="bg-white rounded-[1.5rem] p-3 flex flex-col items-center gap-2 shadow-sm border border-gray-50 active:scale-95 transition-transform cursor-pointer">
-                                                                        <div className={`w-12 h-12 ${category.color} rounded-2xl flex items-center justify-center text-2xl shadow-inner`}>{category.icon}/div>
-                                                                        <span className="text-[10px] font-bold text-gray-700 whitespace-nowrap">{category.title}/span>
+                                                                        <div className={`w-12 h-12 ${category.color} rounded-2xl flex items-center justify-center text-2xl shadow-inner`}>{category.icon}</div>
+                                                                        <span className="text-[10px] font-bold text-gray-700 whitespace-nowrap">{category.title}</span>
                                                   </div>
                                                 ))
                           )}
