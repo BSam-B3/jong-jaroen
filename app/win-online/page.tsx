@@ -6,7 +6,7 @@ import BottomNav from '@/app/components/BottomNav';
 import MapPinPicker from '@/app/components/MapPinPicker';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
-interface ExpressJob {
+interface ExpressJob {h
   id: string;
   title: string;
   job_type: string;
@@ -251,7 +251,7 @@ export default function WinOnlinePage() {
 
   // ─── JSX ──────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gray-100 flex justify-center pb-24">
+    <div className="min-h-screen bg-gray-100 flex justify-center pb-32">
       <div className="w-full sm:max-w-2xl md:max-w-3xl bg-[#F4F6F8] min-h-screen relative flex flex-col shadow-xl overflow-x-hidden rounded-t-[2.5rem]">
 
         {/* Header */}
@@ -443,7 +443,7 @@ export default function WinOnlinePage() {
                   <label className="text-[11px] font-bold text-gray-600 pl-1">ให้ทำอะไร? <span className="text-red-500">*</span></label>
                   <input type="text" required value={title} onChange={(e) => setTitle(e.target.value)}
                     placeholder="เช่น ไปส่งที่ บขส."
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-[#EE4D2D] outline-none" />
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-[#EE4D2D] focus:ring-2 focus:ring-[#EE4D2D]/20 outline-none" />
                 </div>
 
                 {/* Goods price for 'buy' */}
@@ -460,7 +460,7 @@ export default function WinOnlinePage() {
                 )}
 
                 {/* MapPinPicker - Origin & Destination */}
-                <div className="space-y-3 bg-gray-50 p-4 rounded-2xl border border-gray-200">
+                <div className="space-y-3 bg-gray-50 p-4 rounded-2xl border border-gray-200 focus-within:ring-2 focus-within:ring-[#EE4D2D] transition-shadow">
                   <MapPinPicker
                     label="จุดรับ / ร้านค้า / จุดเริ่มต้น *"
                     placeholder="ค้นหาสถานที่ต้นทาง..."
@@ -480,7 +480,7 @@ export default function WinOnlinePage() {
                   <label className="text-[11px] font-bold text-gray-600 pl-1">หมายเหตุถึงคนขับ (ถ้ามี)</label>
                   <textarea value={note} onChange={(e) => setNote(e.target.value)}
                     placeholder="รายละเอียดเพิ่มเติม..." rows={2}
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-[#EE4D2D] outline-none resize-none"></textarea>
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-[#EE4D2D] focus:ring-2 focus:ring-[#EE4D2D]/20 outline-none resize-none"></textarea>
                 </div>
 
                 {/* Fare Display */}
