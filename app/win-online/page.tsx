@@ -6,7 +6,7 @@ import BottomNav from '@/app/components/BottomNav';
 import MapPinPicker from '@/app/components/MapPinPicker';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
-interface ExpressJob {h
+interface ExpressJob {
   id: string;
   title: string;
   job_type: string;
