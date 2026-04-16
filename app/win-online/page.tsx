@@ -158,16 +158,16 @@ export default function WinOnlinePage() {
               {/* เส้นประเชื่อมจุดเชื่อม */}
               <div className="absolute left-[19px] top-[40px] bottom-[40px] w-0.5 border-l-2 border-dashed border-gray-300"></div>
               
-              <MapPinPicker 
-                label="📍 จุดรับ / ร้านค้า / จุดเริ่มต้น" 
-                placeholder="ค้นหาสถานที่ต้นทาง..." 
-                onLocationSelect={setOrigin} 
-              />
-              <MapPinPicker 
-                label="📍 จุดส่ง / ปลายทาง" 
-                placeholder="ค้นหาสถานที่ปลายทาง..." 
-                onLocationSelect={setDestination} 
-              />
+            <MapPinPicker 
+  label="📍 จุดรับ / ร้านค้า / จุดเริ่มต้น" 
+  placeholder="ค้นหาสถานที่ต้นทาง..." 
+  onLocationSelect={(loc: any) => setOrigin(loc)} 
+/>
+<MapPinPicker 
+  label="📍 จุดส่ง / ปลายทาง" 
+  placeholder="ค้นหาสถานที่ปลายทาง..." 
+  onLocationSelect={(loc: any) => setDestination(loc)} 
+/>
             </div>
 
             {/* กล่องแสดงราคา */}
