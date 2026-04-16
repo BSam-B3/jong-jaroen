@@ -1,65 +1,51 @@
 'use client';
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
 
-const NAV_CUSTOMER = [
-  { href: '/',           icon: '🏠', label: 'หน้าแรก' },
-  { href: '/services',   icon: '🛠️', label: 'บริการ' },
-  { href: '/win-online', icon: '📋', label: 'งานด่วน' },
-  { href: '/news',       icon: '📰', label: 'ข่าวสาร' },
-  { href: '/coupons',    icon: '🎟️', label: 'ปองเจริญ' },
-  { href: '/profile',    icon: '👤', label: 'ฉัน' },
+import React from 'react';
+import { useRouter, usePathname } from 'next/navigation';
+
+interface BottomNavProps {
+  currentMode?: 'customer' | 'provider';
+}
+
+const BottomNav = ({ currentMode = 'customer' }: BottomNavProps) => {
+  const router = useRouter();
+  const pathname = usePathname();
+
+  // ฟังก์ชันเช็กว่าตอนนี้อยู่หน้าไหน
+  const isActive = (path: string) => pathname === path;
+  
+  // [UX/UI Update]: ลดเหลือ 4 เมนูหลัก เพื่อให้ Touch Target ใหญ่ขึ้นและใช้งานง่ายขึ้น
+  const navItems = [
+    { label: 'หน้าแรก', icon: '🏠', path: currentMode === 'provider' ? '/provider' : '/' },
+    { label: 'งานด่วน', icon: '🛵', path: '/win-online' },
+    { label: 'บริการ', icon: '🛠️', path: '/services' },
+    { label: 'โปรไฟล์', icon: '👤', path: '/profile' },
   ];
-
-const NAV_PROVIDER = [
-  { href: '/provider',   icon: '🏠', label: 'หน้าแรก' },
-  { href: '/services',   icon: '🛠️', label: 'บริการ' },
-  { href: '/win-online', icon: '📋', label: 'งานด่วน' },
-  { href: '/news',       icon: '📰', label: 'ข่าวสาร' },
-  { href: '/coupons',    icon: '🎟️', label: 'ปองเจริญ' },
-  { href: '/profile',    icon: '👤', label: 'ฉัน' },
-  ];
-
-export default function BottomNav() {
-    const pathname = usePathname();
-    const [isProvider, setIsProvider] = useState(false);
-
-  useEffect(() => {
-        supabase.auth.getUser().then(({ data: { user } }) => {
-                if (!user) return;
-                supabase.from('profiles').select('mode').eq('id', user.id).single()
-                  .then(({ data }) => {
-                              if (data?.mode === 'provider') setIsProvider(true);
-                  });
-        });
-  }, []);
-
-  const navItems = isProvider ? NAV_PROVIDER : NAV_CUSTOMER;
 
   return (
-        <nav className="fixed bottom-0 w-full sm:max-w-2xl md:max-w-3xl bg-white/95 backdrop-blur-md border-t border-gray-100 px-1 py-4 flex justify-between items-center shadow-[0_-4px_25px_rgba(0,0,0,0.06)] rounded-t-[2.5rem] z-50">
-          {navItems.map(({ href, icon, label }) => {
-                  const active = pathname === href;
-                  return (
-                              <Link
-                                            key={href}
-                                            href={href}
-                                            className={`flex flex-col items-center gap-0.5 flex-1 transition-all duration-200 ${
-                                                            active
-                                                              ? 'scale-110 text-[#EE4D2D]'
-                                                              : 'opacity-40 hover:opacity-100 text-gray-500'
-                                            }`}
-                                          >
-                                          <span className="text-[22px] leading-none">{icon}</span>
-                                          <span className="text-[9px] font-bold tracking-tight">{label}</span>
-                                {active && (
-                                                          <div className="w-1.5 h-1.5 bg-[#EE4D2D] rounded-full shadow-sm mt-0.5" />
-                                                        )}
-                              </Link>
-                            );
-        })}
-        </nav>
-      );
-}
+    <div className="fixed bottom-0 w-full sm:max-w-2xl md:max-w-3xl bg-white/95 backdrop-blur-md border-t border-gray-100 px-2 py-4 flex justify-between items-center shadow-[0_-4px_25px_rgba(0,0,0,0.06)] rounded-t-[2.5rem] z-50">
+      {navItems.map((item) => {
+        const active = isActive(item.path);
+        
+        return (
+          <div 
+            key={item.label}
+            onClick={() => router.push(item.path)} 
+            className={`flex flex-col items-center gap-1.5 cursor-pointer transition-all duration-300 ${
+              active ? 'scale-110' : 'opacity-40 hover:opacity-100'
+            } flex-1`}
+          >
+            <span className="text-[24px]">{item.icon}</span>
+            <span className={`text-[10px] font-bold ${active ? 'text-[#EE4D2D]' : 'text-gray-500'} whitespace-nowrap`}>
+              {item.label}
+            </span>
+            {/* จุด Indicator สีส้มด้านล่าง */}
+            {active && <div className="w-1.5 h-1.5 bg-[#EE4D2D] rounded-full shadow-sm mt-0.5"></div>}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+export default BottomNav;
