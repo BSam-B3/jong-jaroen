@@ -322,30 +322,49 @@ export default function WinOnlinePage() {
               <button onClick={() => setIsLocationPickerOpen(false)} className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center text-gray-400">←</button>
               <input autoFocus type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder={`ค้นหาจุด ${pickingType === 'pickup' ? 'รับ' : 'ส่ง'}...`} className="flex-1 bg-gray-100 border-none rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-[#EE4D2D] outline-none" />
             </div>
-            <div className="flex-1 overflow-y-auto p-2">
-              <div onClick={() => selectLocation('ปักหมุดบนแผนที่ (เร็วๆ นี้)')} className="p-4 border-b border-gray-50 text-[#EE4D2D] font-bold text-sm flex items-center gap-2">📍 เลือกพิกัดจากแผนที่</div>
-              {mockPlaces.filter(p => p.name.includes(searchQuery)).map((place, i) => (
-                <div key={i} onClick={() => selectLocation(place.name)} className="p-4 border-b border-gray-50 cursor-pointer active:bg-gray-50">
-                  <h4 className="text-sm font-bold text-gray-800">{place.name}</h4>
-                  <p className="text-[11px] text-gray-500">{place.detail}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+            {/* ส่วนสรุปราคาโฉมใหม่ มีปุ่ม ( i ) */}
+                <div className="pt-2">
+                  <div className="bg-orange-50 border border-orange-100 rounded-2xl p-4 flex justify-between items-center shadow-inner relative">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-[10px] text-orange-600 font-bold uppercase tracking-wider">ราคาประเมิน</p>
+                        {/* ปุ่ม ( i ) สำหรับกดดูรายละเอียด */}
+                        {distanceKm > 0 && (
+                          <button 
+                            type="button" 
+                            onClick={() => setShowFareDetails(!showFareDetails)} 
+                            className="w-4 h-4 rounded-full bg-orange-200 text-orange-700 flex items-center justify-center text-[10px] font-black hover:bg-orange-300 transition-colors shadow-sm"
+                          >
+                            i
+                          </button>
+                        )}
+                      </div>
+                      <p className="text-[9px] text-gray-400 font-medium italic">ไม่มีบวกค่าเรียกแอปเพิ่มเติม</p>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-2xl font-black text-[#EE4D2D]">{fareBreakdown.total > 0 ? `฿${fareBreakdown.total}` : '-'}</div>
+                      {distanceKm > 0 && <div className="text-[8px] text-gray-400 font-bold mt-1 uppercase">ระยะทาง ~ {distanceKm} กม.</div>}
+                    </div>
+                  </div>
 
-        {/* 🌟 แสดง BottomNav เฉพาะตอนที่ไม่ได้เปิด Modal หรือแผนที่ 🌟 */}
-        {!isModalOpen && !isLocationPickerOpen && <BottomNav />}
-        
-      </div>
-      <style dangerouslySetInnerHTML={{__html: `
-        .scrollbar-hide::-webkit-scrollbar { display: none; }
-        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
-        .animate-fade-in { animation: fadeIn 0.3s ease-out; }
-        .animate-slide-up { animation: slideUp 0.3s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-      `}} />
-    </div>
+                  {/* กล่องแสดงรายละเอียดที่เด้งลงมาเมื่อกดปุ่ม ( i ) */}
+                  {showFareDetails && distanceKm > 0 && (
+                    <div className="mt-2 bg-white border border-gray-100 p-4 rounded-xl shadow-sm text-[10px] font-medium text-gray-600 space-y-2 relative animate-fade-in">
+                      <div className="absolute left-0 top-0 w-1 h-full bg-[#EE4D2D] rounded-l-xl"></div>
+                      <div className="flex justify-between">
+                        <span>เริ่มต้น {fareBreakdown.base} บ. + ระยะทาง ({distanceKm} กม.)</span>
+                        <span className="font-bold text-gray-800">฿{(fareBreakdown.base + fareBreakdown.distanceFee).toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-orange-600">
+                        <span>ค่าความผันผวนต้นทุนพลังงาน</span>
+                        <span>+ ฿{fareBreakdown.fuelSurge.toFixed(2)}</span>
+                      </div>
+                      <div className="pt-2 mt-2 border-t border-gray-100 text-[9px] text-gray-500 text-center leading-relaxed">
+                        ราคาประเมินอิงตามมาตรฐานชุมชน เพื่อให้คนขับมีรายได้ที่ยั่งยืน <br/>
+                        <span className="text-[#EE4D2D] font-bold">จงเจริญ หักค่าแพลตฟอร์มจากคนขับเพียง 3% เท่านั้น ❤️</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
   );
 }
