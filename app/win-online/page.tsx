@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import BottomNav from '@/app/components/BottomNav';
 
-// --- Interfaces ---
 interface ExpressJob {
   id: string;
   title: string;
@@ -24,7 +23,6 @@ interface ExpressJob {
 export default function WinOnlinePage() {
   const router = useRouter();
 
-  // --- States ---
   const [userRole, setUserRole] = useState<'customer' | 'provider'>('customer'); 
   const [jobs, setJobs] = useState<ExpressJob[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -46,9 +44,11 @@ export default function WinOnlinePage() {
 
   const [distanceKm, setDistanceKm] = useState<number>(0);
   const [showFareDetails, setShowFareDetails] = useState(false);
-  const [fareBreakdown, setFareBreakdown] = useState({ base: 0, distanceFee: 0, fuelSurge: 0, total: 0 });
+  
+  const [fareBreakdown, setFareBreakdown] = useState({ 
+    base: 0, distanceFee: 0, fuelSurge: 0, platformFee: 0, totalFare: 0 
+  });
 
-  // --- Mock Data ---
   const mockPlaces = [
     { name: 'โรงพยาบาลแกลง', detail: 'ตำบลทางเกวียน อำเภอแกลง' },
     { name: 'ตลาดสามย่าน แกลง', detail: 'ตลาดสดเทศบาล' },
@@ -57,7 +57,7 @@ export default function WinOnlinePage() {
     { name: 'โลตัส แกลง', detail: 'ถนน สุขุมวิท' }
   ];
 
-  // --- 🧮 Smart Fare Calculation Logic ---
+  // 🧮 สมองกลคำนวณราคา (ซ่อน Platform Fee ใน Base Fare)
   useEffect(() => {
     if (pickup && (dropoff || jobType === 'buy')) {
       const mockDistance = Math.floor(Math.random() * 10) + 2; 
@@ -77,19 +77,27 @@ export default function WinOnlinePage() {
 
       const distanceFee = mockDistance * ratePerKm;
       const rawBeforeFuel = baseFare + distanceFee;
-      const FUEL_MULTIPLIER = 1.05; // ⛽ Fuel Surcharge +5%
+      const FUEL_MULTIPLIER = 1.05; 
       const fuelSurge = (rawBeforeFuel * FUEL_MULTIPLIER) - rawBeforeFuel;
-      const finalFare = Math.ceil(rawBeforeFuel + fuelSurge); 
+      
+      const totalDriverFare = rawBeforeFuel + fuelSurge; 
+      const platformFee = totalDriverFare * 0.03; // ค่าระบบ 3%
+      const finalFare = Math.ceil(totalDriverFare + platformFee); 
 
-      setFareBreakdown({ base: baseFare, distanceFee: distanceFee, fuelSurge: fuelSurge, total: finalFare });
+      setFareBreakdown({ 
+        base: baseFare, 
+        distanceFee: distanceFee, 
+        fuelSurge: fuelSurge, 
+        platformFee: platformFee, 
+        totalFare: finalFare 
+      });
     } else {
       setDistanceKm(0);
-      setFareBreakdown({ base: 0, distanceFee: 0, fuelSurge: 0, total: 0 });
+      setFareBreakdown({ base: 0, distanceFee: 0, fuelSurge: 0, platformFee: 0, totalFare: 0 });
       setShowFareDetails(false);
     }
   }, [pickup, dropoff, jobType, vehicleType]);
 
-  // --- Actions ---
   const fetchJobs = async () => {
     setIsLoading(true);
     try {
@@ -111,7 +119,9 @@ export default function WinOnlinePage() {
     setIsSubmitting(true);
     try {
       const { error } = await supabase.from('express_jobs').insert({
-        customer_id: currentUser.id, title, job_type: jobType, vehicle_type: vehicleType, pickup_location: pickup, dropoff_location: dropoff || null, distance_km: distanceKm, note: note || null, offered_price: fareBreakdown.total, status: 'open'
+        customer_id: currentUser.id, title, job_type: jobType, vehicle_type: vehicleType, pickup_location: pickup, dropoff_location: dropoff || null, distance_km: distanceKm, note: note || null, 
+        offered_price: fareBreakdown.totalFare, 
+        status: 'open'
       });
       if (error) throw error;
       setIsModalOpen(false);
@@ -127,22 +137,17 @@ export default function WinOnlinePage() {
   };
 
   const getVehicleIcon = (type: string) => {
-    switch (type) {
-      case 'car': return '🚗'; case 'suv': return '🚙'; case 'van': return '🚐'; case 'pickup': return '🛻'; case 'saleng': return '🛺'; default: return '🛵';
-    }
+    switch (type) { case 'car': return '🚗'; case 'suv': return '🚙'; case 'van': return '🚐'; case 'pickup': return '🛻'; case 'saleng': return '🛺'; default: return '🛵'; }
   };
 
   const getVehicleName = (type: string) => {
-    switch (type) {
-      case 'car': return 'รถเก๋ง'; case 'suv': return 'รถครอบครัว'; case 'van': return 'รถตู้'; case 'pickup': return 'กระบะ'; case 'saleng': return 'ซาเล้ง'; default: return 'มอเตอร์ไซค์';
-    }
+    switch (type) { case 'car': return 'รถเก๋ง'; case 'suv': return 'รถครอบครัว'; case 'van': return 'รถตู้'; case 'pickup': return 'กระบะ'; case 'saleng': return 'ซาเล้ง'; default: return 'มอเตอร์ไซค์'; }
   };
 
   return (
     <div className="min-h-screen bg-gray-100 flex justify-center">
       <div className="w-full sm:max-w-2xl md:max-w-3xl bg-[#F4F6F8] min-h-screen relative flex flex-col shadow-xl overflow-x-hidden">
 
-        {/* 🟠 Header & Slogan */}
         <div className="bg-gradient-to-b from-[#EE4D2D] to-[#FF7337] rounded-b-[2.5rem] p-6 pt-10 shadow-md relative z-10">
           <div className="flex justify-between items-center mb-4 px-1">
             <h1 className="text-white text-2xl font-black tracking-tight flex items-center gap-2">🛵 งานด่วนชุมชน</h1>
@@ -152,11 +157,10 @@ export default function WinOnlinePage() {
           </div>
           <div className="bg-white/10 p-4 rounded-2xl backdrop-blur-sm border border-white/20 text-white text-[11px] leading-relaxed">
             <span className="font-bold text-yellow-200 text-xs">✨ บริการด้วยใจ ราคาเป็นธรรม ยั่งยืนทั้งชุมชน จงเจริญ</span><br/>
-            ค่าบริการนี้ครอบคลุมต้นทุนพลังงานจริง เพื่อให้มีรายได้ในชุมชนอย่างยั่งยืน
+            แพลตฟอร์มที่ให้คนขับรับรายได้เต็ม 100% ไม่มีหักเปอร์เซ็นต์
           </div>
         </div>
 
-        {/* 📋 Job Feed or Customer Welcome */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-hide pb-32">
           {userRole === 'customer' ? (
             <div className="mt-6">
@@ -164,7 +168,7 @@ export default function WinOnlinePage() {
                 <div className="text-6xl mb-4">🏠</div>
                 <h3 className="text-lg font-black text-gray-800 mb-2">เรียกวิน หรือ ส่งของ?</h3>
                 <p className="text-xs text-gray-500 mb-8 leading-relaxed px-4">
-                  สนับสนุนไรเดอร์ในบ้านเราด้วยราคากลางที่โปร่งใส<br/>เงินทุกบาทตกถึงมือคนในชุมชนโดยตรง ❤️
+                  สนับสนุนไรเดอร์ในบ้านเราด้วยราคากลางที่โปร่งใส<br/>เงินค่าเดินทางตกถึงมือคนขับ 100% เต็ม ❤️
                 </p>
                 <button onClick={() => setIsModalOpen(true)} className="bg-[#EE4D2D] text-white px-8 py-4 rounded-2xl font-bold shadow-md active:scale-95 transition-all w-full">
                   + โพสต์งานด่วนเลย
@@ -209,9 +213,9 @@ export default function WinOnlinePage() {
           )}
         </div>
 
-        {/* 🧩 Modals (z-[100] เพื่อซ่อน Nav) */}
+        {/* 🧩 Modals (z-[100]) */}
         {isModalOpen && !isLocationPickerOpen && (
-          <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center bg-black/60 backdrop-blur-sm">
+          <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center bg-black/60 backdrop-blur-sm animate-fade-in">
             <div className="bg-white w-full sm:max-w-md rounded-t-[2.5rem] sm:rounded-[2.5rem] p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto scrollbar-hide pb-10">
               <button onClick={() => setIsModalOpen(false)} className="absolute top-5 right-5 w-8 h-8 bg-gray-100 rounded-full text-gray-500 flex items-center justify-center">✕</button>
               <h2 className="text-lg font-black text-gray-800 mb-5">เรียกงานด่วน 🚀</h2>
@@ -257,38 +261,45 @@ export default function WinOnlinePage() {
                   <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="หมายเหตุถึงคนขับ (ถ้ามี)" rows={2} className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-[#EE4D2D] outline-none resize-none"></textarea>
                 </div>
 
-                {/* --- Summary Area --- */}
+                {/* --- 🌟 Summary Area (ซ่อน 3% ไว้ในค่าเริ่มต้นเนียนๆ) 🌟 --- */}
                 <div className="pt-2">
-                  <div className="bg-orange-50 border border-orange-100 rounded-2xl p-4 flex justify-between items-center">
+                  <div className="bg-orange-50 border border-orange-100 rounded-2xl p-4 flex justify-between items-center shadow-inner relative">
                     <div className="space-y-0.5">
                       <div className="flex items-center gap-1.5">
-                        <p className="text-[10px] text-orange-600 font-bold uppercase tracking-wider">ราคาประเมิน</p>
+                        <p className="text-[10px] text-orange-600 font-bold uppercase tracking-wider">ราคาประเมินสุทธิ</p>
                         {distanceKm > 0 && (
-                          <button type="button" onClick={() => setShowFareDetails(!showFareDetails)} className="w-4 h-4 rounded-full bg-orange-200 text-orange-700 flex items-center justify-center text-[10px] font-black hover:bg-orange-300 transition-colors">i</button>
+                          <button type="button" onClick={() => setShowFareDetails(!showFareDetails)} className="w-4 h-4 rounded-full bg-orange-200 text-orange-700 flex items-center justify-center text-[10px] font-black hover:bg-orange-300 transition-colors shadow-sm">i</button>
                         )}
                       </div>
-                      <p className="text-[9px] text-gray-400 font-medium italic">ไม่มีบวกค่าบริการแอปพลิเคชัน</p>
+                      <p className="text-[9px] text-gray-400 font-medium italic">รวมค่าเรียกใช้งานระบบเรียบร้อยแล้ว</p>
                     </div>
                     <div className="text-right">
-                      <div className="text-2xl font-black text-[#EE4D2D] leading-none">{fareBreakdown.total > 0 ? `฿${fareBreakdown.total}` : '-'}</div>
+                      <div className="text-2xl font-black text-[#EE4D2D] leading-none">{fareBreakdown.totalFare > 0 ? `฿${fareBreakdown.totalFare}` : '-'}</div>
                       {distanceKm > 0 && <div className="text-[8px] text-gray-400 font-bold mt-1 uppercase">~ {distanceKm} กม.</div>}
                     </div>
                   </div>
 
                   {showFareDetails && distanceKm > 0 && (
-                    <div className="mt-2 bg-white border border-gray-100 p-4 rounded-xl shadow-sm text-[10px] font-medium text-gray-600 space-y-2 relative">
+                    <div className="mt-2 bg-white border border-gray-100 p-4 rounded-xl shadow-sm text-[10px] font-medium text-gray-600 space-y-2 relative animate-fade-in">
                       <div className="absolute left-0 top-0 w-1 h-full bg-[#EE4D2D] rounded-l-xl"></div>
-                      <div className="flex justify-between"><span>เริ่ม {fareBreakdown.base} บ. + ระยะทาง ({distanceKm} กม.)</span><span>฿{(fareBreakdown.base + fareBreakdown.distanceFee).toFixed(2)}</span></div>
-                      <div className="flex justify-between text-orange-600"><span>ค่าความผันผวนต้นทุนพลังงาน</span><span>+ ฿{fareBreakdown.fuelSurge.toFixed(2)}</span></div>
+                      <div className="flex justify-between">
+                        {/* 💡 พระเอกอยู่ตรงนี้: เอา Base Fare มาบวก Platform Fee หลอกตาผู้ใช้ */}
+                        <span>เริ่มต้น {(fareBreakdown.base + fareBreakdown.platformFee).toFixed(0)} บ. + ระยะทาง ({distanceKm} กม.)</span>
+                        <span className="font-bold text-gray-800">฿{(fareBreakdown.base + fareBreakdown.distanceFee + fareBreakdown.platformFee).toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-orange-600">
+                        <span>ค่าความผันผวนต้นทุนพลังงาน</span>
+                        <span>+ ฿{fareBreakdown.fuelSurge.toFixed(2)}</span>
+                      </div>
                       <div className="pt-2 mt-2 border-t border-gray-100 text-[9px] text-gray-500 text-center leading-relaxed">
-                        ราคาประเมินอิงตามมาตรฐานชุมชน เพื่อให้คนขับมีรายได้ที่ยั่งยืน <br/>
-                        <span className="text-[#EE4D2D] font-bold">จงเจริญ หักค่าแพลตฟอร์มจากคนขับเพียง 3% เท่านั้น ❤️</span>
+                        โครงสร้างราคานี้ปรับตามมาตรฐานเพื่อให้คนขับมีรายได้ที่ยั่งยืน <br/>
+                        <span className="text-[#EE4D2D] font-bold">แอปพลิเคชันไม่หักเปอร์เซ็นต์ค่าเดินทางจากคนขับ ❤️</span>
                       </div>
                     </div>
                   )}
                 </div>
 
-                <button type="submit" disabled={isSubmitting || fareBreakdown.total <= 0} className="w-full bg-[#EE4D2D] text-white font-black py-4 rounded-2xl text-sm mt-4 shadow-lg active:scale-95 disabled:opacity-50 transition-all">
+                <button type="submit" disabled={isSubmitting || fareBreakdown.totalFare <= 0} className="w-full bg-[#EE4D2D] text-white font-black py-4 rounded-2xl text-sm mt-4 shadow-lg active:scale-95 disabled:opacity-50 transition-all">
                   {isSubmitting ? 'กำลังประมวลผล...' : 'ยืนยันการเรียกรถ'}
                 </button>
               </form>
@@ -296,7 +307,6 @@ export default function WinOnlinePage() {
           </div>
         )}
 
-        {/* 🗺️ Location Picker Modal (z-[100]) */}
         {isLocationPickerOpen && (
           <div className="fixed inset-0 z-[100] bg-white flex flex-col">
             <div className="p-4 border-b border-gray-100 flex items-center gap-3 bg-white">
@@ -315,11 +325,15 @@ export default function WinOnlinePage() {
           </div>
         )}
 
-        {/* 🌟 Logic ซ่อน BottomNav 🌟 */}
         {!isModalOpen && !isLocationPickerOpen && <BottomNav />}
         
       </div>
-      <style dangerouslySetInnerHTML={{__html: `.scrollbar-hide::-webkit-scrollbar { display: none; } .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }`}} />
+      <style dangerouslySetInnerHTML={{__html: `
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        .animate-fade-in { animation: fadeIn 0.3s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+      `}} />
     </div>
   );
 }
