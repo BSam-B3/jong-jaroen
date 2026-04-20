@@ -4,11 +4,10 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import BottomNav from '@/app/components/BottomNav';
-// 🌟 นำเข้าอาวุธใหม่จาก Google Maps
 import { useLoadScript } from '@react-google-maps/api';
 import usePlacesAutocomplete, { getGeocode, getLatLng } from 'use-places-autocomplete';
 
-// กำหนดให้ Google โหลดระบบ "ค้นหาสถานที่ (places)"
+// กำหนดให้ Google โหลดระบบค้นหาสถานที่ (เอาไว้ข้างนอกเพื่อไม่ให้โหลดซ้ำ)
 const libraries: ("places")[] = ["places"];
 
 interface ExpressJob {
@@ -45,20 +44,28 @@ export default function WinOnlinePage() {
   const [isLocationPickerOpen, setIsLocationPickerOpen] = useState(false);
   const [pickingType, setPickingType] = useState<'pickup' | 'dropoff'>('pickup');
 
-  // 🌟 ระบบค้นหาสถานที่อัจฉริยะ (แทนที่ searchQuery เดิม)
+  // 🌟 ระบบค้นหาสถานที่อัจฉริยะ (แก้บัคพิมพ์ไม่ได้)
   const {
     ready,
     value,
     suggestions: { status, data },
     setValue,
     clearSuggestions,
+    init
   } = usePlacesAutocomplete({
+    initOnMount: false, // ป้องกันการล็อกช่องพิมพ์ก่อน Google พร้อม
     requestOptions: {
-      // จำกัดขอบเขตการค้นหาให้อยู่ในประเทศไทย
       componentRestrictions: { country: 'th' },
     },
-    debounce: 300, // หน่วงเวลา 0.3 วิ ค่อยถาม Google (ประหยัดโควต้า API)
+    debounce: 300,
   });
+
+  // ปลุกระบบค้นหาเมื่อ Google Maps โหลดเสร็จ
+  useEffect(() => {
+    if (isLoaded) {
+      init();
+    }
+  }, [isLoaded, init]);
 
   const [jobType, setJobType] = useState<'ride' | 'buy' | 'deliver'>('ride');
   const [vehicleType, setVehicleType] = useState<'motorcycle' | 'saleng' | 'car' | 'suv' | 'van' | 'pickup'>('motorcycle');
@@ -71,7 +78,16 @@ export default function WinOnlinePage() {
   const [showFareDetails, setShowFareDetails] = useState(false);
   const [fareBreakdown, setFareBreakdown] = useState({ base: 0, distanceFee: 0, fuelSurge: 0, platformFee: 0, totalFare: 0 });
 
-  // 🧮 คำนวณราคา (ตอนนี้ยังใช้ระยะทางจำลองอยู่ เดี๋ยวสเต็ปถัดไปจะดึงพิกัดจริงมาคำนวณ)
+  // 🗂️ ข้อมูลประวัติการค้นหา / สถานที่ยอดฮิต (ดึงจากฐานข้อมูลในอนาคตได้)
+  const popularPlaces = [
+    { name: 'โรงพยาบาลแกลง', detail: 'ตำบลทางเกวียน อำเภอแกลง' },
+    { name: 'ตลาดสามย่าน แกลง', detail: 'ตลาดสดเทศบาล' },
+    { name: 'เซเว่นอีเลฟเว่น สาขาตลาดแกลง', detail: 'ใกล้สี่แยกไฟแดง' },
+    { name: 'โรงเรียนแกลง "วิทยสถาวร"', detail: 'อำเภอแกลง' },
+    { name: 'บขส. แกลง', detail: 'สถานีขนส่งผู้โดยสาร' }
+  ];
+
+  // 🧮 คำนวณราคา 
   useEffect(() => {
     if (pickup && (dropoff || jobType === 'buy')) {
       const mockDistance = Math.floor(Math.random() * 10) + 2; 
@@ -135,10 +151,10 @@ export default function WinOnlinePage() {
     finally { setIsSubmitting(false); }
   };
 
-  // 🌟 ฟังก์ชันเมื่อลูกค้ากดเลือกสถานที่จาก Google Maps
+  // 🌟 ฟังก์ชันเมื่อลูกค้ากดเลือกสถานที่
   const handleSelectLocation = async (address: string) => {
-    setValue(address, false); // เซ็ตชื่อสถานที่ลงในช่องค้นหา
-    clearSuggestions(); // ล้างรายการแนะนำ
+    setValue('', false); // ล้างช่องค้นหาหลังจากเลือกเสร็จ
+    clearSuggestions();
 
     if (pickingType === 'pickup') setPickup(address); 
     else setDropoff(address);
@@ -256,11 +272,11 @@ export default function WinOnlinePage() {
                 </div>
 
                 <div className="space-y-3 bg-gray-50 p-4 rounded-2xl border border-gray-200">
-                  <div onClick={() => { setPickingType('pickup'); setValue(pickup); setIsLocationPickerOpen(true); }} className={`w-full border rounded-xl px-4 py-3 text-sm cursor-pointer flex justify-between items-center bg-white ${pickup ? 'border-orange-200 text-gray-800 font-bold' : 'text-gray-400'}`}>
+                  <div onClick={() => { setPickingType('pickup'); setValue(''); setIsLocationPickerOpen(true); }} className={`w-full border rounded-xl px-4 py-3 text-sm cursor-pointer flex justify-between items-center bg-white ${pickup ? 'border-orange-200 text-gray-800 font-bold' : 'text-gray-400'}`}>
                     <span className="truncate pr-4">{pickup || '📍 เลือกจุดรับต้นทาง'}</span>
                     <span className="text-gray-300">›</span>
                   </div>
-                  <div onClick={() => { setPickingType('dropoff'); setValue(dropoff); setIsLocationPickerOpen(true); }} className={`w-full border rounded-xl px-4 py-3 text-sm cursor-pointer flex justify-between items-center bg-white ${dropoff ? 'border-orange-200 text-gray-800 font-bold' : 'text-gray-400'}`}>
+                  <div onClick={() => { setPickingType('dropoff'); setValue(''); setIsLocationPickerOpen(true); }} className={`w-full border rounded-xl px-4 py-3 text-sm cursor-pointer flex justify-between items-center bg-white ${dropoff ? 'border-orange-200 text-gray-800 font-bold' : 'text-gray-400'}`}>
                     <span className="truncate pr-4">{dropoff || '📍 เลือกจุดส่งปลายทาง'}</span>
                     <span className="text-gray-300">›</span>
                   </div>
@@ -314,31 +330,33 @@ export default function WinOnlinePage() {
           </div>
         )}
 
-        {/* 🗺️ Location Picker Modal แบบใหม่ (ดึงข้อมูล Google Places จริง) */}
+        {/* 🗺️ Location Picker Modal (แก้บัคพิมพ์ไม่ได้ + เพิ่มประวัติ) */}
         {isLocationPickerOpen && (
           <div className="fixed inset-0 z-[100] bg-white flex flex-col">
-            <div className="p-4 border-b border-gray-100 flex items-center gap-3 bg-white shadow-sm">
-              <button onClick={() => setIsLocationPickerOpen(false)} className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center text-gray-400 hover:bg-gray-100">←</button>
-              <input 
-                autoFocus 
-                type="text" 
-                value={value} 
-                onChange={(e) => setValue(e.target.value)} 
-                disabled={!ready || !isLoaded}
-                placeholder={!isLoaded ? "กำลังโหลดระบบแผนที่..." : `พิมพ์ค้นหาจุด ${pickingType === 'pickup' ? 'รับ' : 'ส่ง'}...`} 
-                className="flex-1 bg-gray-100 border-none rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-[#EE4D2D] outline-none" 
-              />
+            <div className="p-4 border-b border-gray-100 flex items-center gap-3 bg-white shadow-sm relative">
+              <button onClick={() => setIsLocationPickerOpen(false)} className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center text-gray-400 hover:bg-gray-100 shrink-0">←</button>
+              
+              <div className="flex-1 relative">
+                <input 
+                  autoFocus 
+                  type="text" 
+                  value={value} 
+                  onChange={(e) => setValue(e.target.value)} 
+                  placeholder={`พิมพ์ค้นหาจุด ${pickingType === 'pickup' ? 'รับ' : 'ส่ง'}...`} 
+                  className="w-full bg-gray-100 border-none rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-[#EE4D2D] outline-none" 
+                />
+                {value && (
+                  <button onClick={() => setValue('')} className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 bg-gray-300 rounded-full text-white text-[10px] flex items-center justify-center">✕</button>
+                )}
+              </div>
             </div>
             
             <div className="flex-1 overflow-y-auto p-2 bg-gray-50">
-              {/* รายการค้นหาที่ดึงมาจาก Google Maps ของจริง */}
-              {status === "OK" && data.map(({ place_id, description, structured_formatting: { main_text, secondary_text } }) => (
-                <div 
-                  key={place_id} 
-                  onClick={() => handleSelectLocation(description)} 
-                  className="p-4 mb-2 bg-white rounded-xl shadow-sm cursor-pointer active:bg-orange-50 border border-gray-100 flex items-center gap-3"
-                >
-                  <div className="w-8 h-8 rounded-full bg-orange-100 text-orange-500 flex items-center justify-center shrink-0">📍</div>
+              
+              {/* 🌟 1. กรณีผู้ใช้เริ่มพิมพ์: โชว์ผลลัพธ์จาก Google Maps */}
+              {value.length > 0 && status === "OK" && data.map(({ place_id, description, structured_formatting: { main_text, secondary_text } }) => (
+                <div key={place_id} onClick={() => handleSelectLocation(description)} className="p-4 mb-2 bg-white rounded-xl shadow-sm cursor-pointer active:bg-orange-50 border border-gray-100 flex items-center gap-3 transition-colors">
+                  <div className="w-8 h-8 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center shrink-0 text-sm">📍</div>
                   <div>
                     <h4 className="text-sm font-bold text-gray-800">{main_text}</h4>
                     <p className="text-[10px] text-gray-500 mt-0.5 line-clamp-1">{secondary_text}</p>
@@ -346,9 +364,31 @@ export default function WinOnlinePage() {
                 </div>
               ))}
 
-              {status !== "OK" && value.length > 0 && (
-                <div className="p-8 text-center text-gray-400 text-sm font-medium">กำลังค้นหาสถานที่...</div>
+              {/* 🌟 2. กรณีผู้ใช้เริ่มพิมพ์ แต่ระบบกำลังหา/ไม่พบข้อมูล */}
+              {value.length > 0 && status !== "OK" && (
+                <div className="p-8 text-center text-gray-400 text-sm font-medium">กำลังค้นหา หรือ ไม่พบสถานที่นี้...</div>
               )}
+
+              {/* 🌟 3. กรณีช่องว่างเปล่า: โชว์ "ประวัติ / สถานที่ยอดฮิต" */}
+              {value.length === 0 && (
+                <div className="animate-fade-in">
+                  <div className="px-4 py-3 flex items-center gap-2">
+                    <span className="text-[#EE4D2D] text-sm">⭐</span>
+                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">สถานที่ยอดฮิต / ประวัติของคุณ</span>
+                  </div>
+                  
+                  {popularPlaces.map((place, i) => (
+                    <div key={i} onClick={() => handleSelectLocation(place.name)} className="p-4 mb-2 mx-2 bg-white rounded-xl shadow-sm cursor-pointer active:bg-orange-50 border border-orange-100/50 flex items-center gap-3 transition-colors">
+                      <div className="w-8 h-8 rounded-full bg-orange-50 text-orange-400 flex items-center justify-center shrink-0 text-sm">🕒</div>
+                      <div>
+                        <h4 className="text-sm font-bold text-gray-800">{place.name}</h4>
+                        <p className="text-[10px] text-gray-400 mt-0.5">{place.detail}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
             </div>
           </div>
         )}
