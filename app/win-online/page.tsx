@@ -4,6 +4,12 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import BottomNav from '@/app/components/BottomNav';
+// 🌟 นำเข้าอาวุธใหม่จาก Google Maps
+import { useLoadScript } from '@react-google-maps/api';
+import usePlacesAutocomplete, { getGeocode, getLatLng } from 'use-places-autocomplete';
+
+// กำหนดให้ Google โหลดระบบ "ค้นหาสถานที่ (places)"
+const libraries: ("places")[] = ["places"];
 
 interface ExpressJob {
   id: string;
@@ -23,6 +29,12 @@ interface ExpressJob {
 export default function WinOnlinePage() {
   const router = useRouter();
 
+  // 🌟 โหลด Google Maps API
+  const { isLoaded } = useLoadScript({
+    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY as string,
+    libraries,
+  });
+
   const [userRole, setUserRole] = useState<'customer' | 'provider'>('customer'); 
   const [jobs, setJobs] = useState<ExpressJob[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -32,40 +44,40 @@ export default function WinOnlinePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLocationPickerOpen, setIsLocationPickerOpen] = useState(false);
   const [pickingType, setPickingType] = useState<'pickup' | 'dropoff'>('pickup');
-  const [searchQuery, setSearchQuery] = useState('');
+
+  // 🌟 ระบบค้นหาสถานที่อัจฉริยะ (แทนที่ searchQuery เดิม)
+  const {
+    ready,
+    value,
+    suggestions: { status, data },
+    setValue,
+    clearSuggestions,
+  } = usePlacesAutocomplete({
+    requestOptions: {
+      // จำกัดขอบเขตการค้นหาให้อยู่ในประเทศไทย
+      componentRestrictions: { country: 'th' },
+    },
+    debounce: 300, // หน่วงเวลา 0.3 วิ ค่อยถาม Google (ประหยัดโควต้า API)
+  });
 
   const [jobType, setJobType] = useState<'ride' | 'buy' | 'deliver'>('ride');
   const [vehicleType, setVehicleType] = useState<'motorcycle' | 'saleng' | 'car' | 'suv' | 'van' | 'pickup'>('motorcycle');
   const [title, setTitle] = useState('');
   const [pickup, setPickup] = useState('');
   const [dropoff, setDropoff] = useState('');
-  const [goodsPrice, setGoodsPrice] = useState('');
   const [note, setNote] = useState('');
 
   const [distanceKm, setDistanceKm] = useState<number>(0);
   const [showFareDetails, setShowFareDetails] = useState(false);
-  
-  const [fareBreakdown, setFareBreakdown] = useState({ 
-    base: 0, distanceFee: 0, fuelSurge: 0, platformFee: 0, totalFare: 0 
-  });
+  const [fareBreakdown, setFareBreakdown] = useState({ base: 0, distanceFee: 0, fuelSurge: 0, platformFee: 0, totalFare: 0 });
 
-  const mockPlaces = [
-    { name: 'โรงพยาบาลแกลง', detail: 'ตำบลทางเกวียน อำเภอแกลง' },
-    { name: 'ตลาดสามย่าน แกลง', detail: 'ตลาดสดเทศบาล' },
-    { name: 'เซเว่นอีเลฟเว่น สาขาตลาดแกลง', detail: 'ใกล้สี่แยกไฟแดง' },
-    { name: 'โรงเรียนแกลง "วิทยสถาวร"', detail: 'อำเภอแกลง' },
-    { name: 'โลตัส แกลง', detail: 'ถนน สุขุมวิท' }
-  ];
-
-  // 🧮 สมองกลคำนวณราคา (ซ่อน Platform Fee ใน Base Fare)
+  // 🧮 คำนวณราคา (ตอนนี้ยังใช้ระยะทางจำลองอยู่ เดี๋ยวสเต็ปถัดไปจะดึงพิกัดจริงมาคำนวณ)
   useEffect(() => {
     if (pickup && (dropoff || jobType === 'buy')) {
       const mockDistance = Math.floor(Math.random() * 10) + 2; 
       setDistanceKm(mockDistance);
 
-      let baseFare = 0;
-      let ratePerKm = 0;
-
+      let baseFare = 0; let ratePerKm = 0;
       switch (vehicleType) {
         case 'motorcycle': baseFare = 20; ratePerKm = mockDistance > 5 ? 10 : 8; break;
         case 'saleng': baseFare = 30; ratePerKm = 10; break;
@@ -81,16 +93,10 @@ export default function WinOnlinePage() {
       const fuelSurge = (rawBeforeFuel * FUEL_MULTIPLIER) - rawBeforeFuel;
       
       const totalDriverFare = rawBeforeFuel + fuelSurge; 
-      const platformFee = totalDriverFare * 0.03; // ค่าระบบ 3%
+      const platformFee = totalDriverFare * 0.03; 
       const finalFare = Math.ceil(totalDriverFare + platformFee); 
 
-      setFareBreakdown({ 
-        base: baseFare, 
-        distanceFee: distanceFee, 
-        fuelSurge: fuelSurge, 
-        platformFee: platformFee, 
-        totalFare: finalFare 
-      });
+      setFareBreakdown({ base: baseFare, distanceFee: distanceFee, fuelSurge: fuelSurge, platformFee: platformFee, totalFare: finalFare });
     } else {
       setDistanceKm(0);
       setFareBreakdown({ base: 0, distanceFee: 0, fuelSurge: 0, platformFee: 0, totalFare: 0 });
@@ -119,9 +125,7 @@ export default function WinOnlinePage() {
     setIsSubmitting(true);
     try {
       const { error } = await supabase.from('express_jobs').insert({
-        customer_id: currentUser.id, title, job_type: jobType, vehicle_type: vehicleType, pickup_location: pickup, dropoff_location: dropoff || null, distance_km: distanceKm, note: note || null, 
-        offered_price: fareBreakdown.totalFare, 
-        status: 'open'
+        customer_id: currentUser.id, title, job_type: jobType, vehicle_type: vehicleType, pickup_location: pickup, dropoff_location: dropoff || null, distance_km: distanceKm, note: note || null, offered_price: fareBreakdown.totalFare, status: 'open'
       });
       if (error) throw error;
       setIsModalOpen(false);
@@ -131,8 +135,14 @@ export default function WinOnlinePage() {
     finally { setIsSubmitting(false); }
   };
 
-  const selectLocation = (locationName: string) => {
-    if (pickingType === 'pickup') setPickup(locationName); else setDropoff(locationName);
+  // 🌟 ฟังก์ชันเมื่อลูกค้ากดเลือกสถานที่จาก Google Maps
+  const handleSelectLocation = async (address: string) => {
+    setValue(address, false); // เซ็ตชื่อสถานที่ลงในช่องค้นหา
+    clearSuggestions(); // ล้างรายการแนะนำ
+
+    if (pickingType === 'pickup') setPickup(address); 
+    else setDropoff(address);
+    
     setIsLocationPickerOpen(false);
   };
 
@@ -213,7 +223,6 @@ export default function WinOnlinePage() {
           )}
         </div>
 
-        {/* 🧩 Modals (z-[100]) */}
         {isModalOpen && !isLocationPickerOpen && (
           <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center bg-black/60 backdrop-blur-sm animate-fade-in">
             <div className="bg-white w-full sm:max-w-md rounded-t-[2.5rem] sm:rounded-[2.5rem] p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto scrollbar-hide pb-10">
@@ -247,11 +256,11 @@ export default function WinOnlinePage() {
                 </div>
 
                 <div className="space-y-3 bg-gray-50 p-4 rounded-2xl border border-gray-200">
-                  <div onClick={() => { setPickingType('pickup'); setIsLocationPickerOpen(true); }} className={`w-full border rounded-xl px-4 py-3 text-sm cursor-pointer flex justify-between items-center bg-white ${pickup ? 'border-orange-200 text-gray-800 font-bold' : 'text-gray-400'}`}>
+                  <div onClick={() => { setPickingType('pickup'); setValue(pickup); setIsLocationPickerOpen(true); }} className={`w-full border rounded-xl px-4 py-3 text-sm cursor-pointer flex justify-between items-center bg-white ${pickup ? 'border-orange-200 text-gray-800 font-bold' : 'text-gray-400'}`}>
                     <span className="truncate pr-4">{pickup || '📍 เลือกจุดรับต้นทาง'}</span>
                     <span className="text-gray-300">›</span>
                   </div>
-                  <div onClick={() => { setPickingType('dropoff'); setIsLocationPickerOpen(true); }} className={`w-full border rounded-xl px-4 py-3 text-sm cursor-pointer flex justify-between items-center bg-white ${dropoff ? 'border-orange-200 text-gray-800 font-bold' : 'text-gray-400'}`}>
+                  <div onClick={() => { setPickingType('dropoff'); setValue(dropoff); setIsLocationPickerOpen(true); }} className={`w-full border rounded-xl px-4 py-3 text-sm cursor-pointer flex justify-between items-center bg-white ${dropoff ? 'border-orange-200 text-gray-800 font-bold' : 'text-gray-400'}`}>
                     <span className="truncate pr-4">{dropoff || '📍 เลือกจุดส่งปลายทาง'}</span>
                     <span className="text-gray-300">›</span>
                   </div>
@@ -261,7 +270,6 @@ export default function WinOnlinePage() {
                   <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="หมายเหตุถึงคนขับ (ถ้ามี)" rows={2} className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-[#EE4D2D] outline-none resize-none"></textarea>
                 </div>
 
-                {/* --- 🌟 Summary Area (ซ่อน 3% ไว้ในค่าเริ่มต้นเนียนๆ) 🌟 --- */}
                 <div className="pt-2">
                   <div className="bg-orange-50 border border-orange-100 rounded-2xl p-4 flex justify-between items-center shadow-inner relative">
                     <div className="space-y-0.5">
@@ -283,7 +291,6 @@ export default function WinOnlinePage() {
                     <div className="mt-2 bg-white border border-gray-100 p-4 rounded-xl shadow-sm text-[10px] font-medium text-gray-600 space-y-2 relative animate-fade-in">
                       <div className="absolute left-0 top-0 w-1 h-full bg-[#EE4D2D] rounded-l-xl"></div>
                       <div className="flex justify-between">
-                        {/* 💡 พระเอกอยู่ตรงนี้: เอา Base Fare มาบวก Platform Fee หลอกตาผู้ใช้ */}
                         <span>เริ่มต้น {(fareBreakdown.base + fareBreakdown.platformFee).toFixed(0)} บ. + ระยะทาง ({distanceKm} กม.)</span>
                         <span className="font-bold text-gray-800">฿{(fareBreakdown.base + fareBreakdown.distanceFee + fareBreakdown.platformFee).toFixed(2)}</span>
                       </div>
@@ -307,20 +314,41 @@ export default function WinOnlinePage() {
           </div>
         )}
 
+        {/* 🗺️ Location Picker Modal แบบใหม่ (ดึงข้อมูล Google Places จริง) */}
         {isLocationPickerOpen && (
           <div className="fixed inset-0 z-[100] bg-white flex flex-col">
-            <div className="p-4 border-b border-gray-100 flex items-center gap-3 bg-white">
-              <button onClick={() => setIsLocationPickerOpen(false)} className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center text-gray-400">←</button>
-              <input autoFocus type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder={`ค้นหาจุด ${pickingType === 'pickup' ? 'รับ' : 'ส่ง'}...`} className="flex-1 bg-gray-100 border-none rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-[#EE4D2D] outline-none" />
+            <div className="p-4 border-b border-gray-100 flex items-center gap-3 bg-white shadow-sm">
+              <button onClick={() => setIsLocationPickerOpen(false)} className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center text-gray-400 hover:bg-gray-100">←</button>
+              <input 
+                autoFocus 
+                type="text" 
+                value={value} 
+                onChange={(e) => setValue(e.target.value)} 
+                disabled={!ready || !isLoaded}
+                placeholder={!isLoaded ? "กำลังโหลดระบบแผนที่..." : `พิมพ์ค้นหาจุด ${pickingType === 'pickup' ? 'รับ' : 'ส่ง'}...`} 
+                className="flex-1 bg-gray-100 border-none rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-[#EE4D2D] outline-none" 
+              />
             </div>
-            <div className="flex-1 overflow-y-auto p-2">
-              <div onClick={() => selectLocation('ตำแหน่งปัจจุบัน (จำลอง)')} className="p-4 border-b border-gray-50 text-[#EE4D2D] font-bold text-sm flex items-center gap-2">📍 เลือกพิกัดจากแผนที่</div>
-              {mockPlaces.filter(p => p.name.includes(searchQuery)).map((place, i) => (
-                <div key={i} onClick={() => selectLocation(place.name)} className="p-4 border-b border-gray-50 cursor-pointer active:bg-gray-50">
-                  <h4 className="text-sm font-bold text-gray-800">{place.name}</h4>
-                  <p className="text-[11px] text-gray-500">{place.detail}</p>
+            
+            <div className="flex-1 overflow-y-auto p-2 bg-gray-50">
+              {/* รายการค้นหาที่ดึงมาจาก Google Maps ของจริง */}
+              {status === "OK" && data.map(({ place_id, description, structured_formatting: { main_text, secondary_text } }) => (
+                <div 
+                  key={place_id} 
+                  onClick={() => handleSelectLocation(description)} 
+                  className="p-4 mb-2 bg-white rounded-xl shadow-sm cursor-pointer active:bg-orange-50 border border-gray-100 flex items-center gap-3"
+                >
+                  <div className="w-8 h-8 rounded-full bg-orange-100 text-orange-500 flex items-center justify-center shrink-0">📍</div>
+                  <div>
+                    <h4 className="text-sm font-bold text-gray-800">{main_text}</h4>
+                    <p className="text-[10px] text-gray-500 mt-0.5 line-clamp-1">{secondary_text}</p>
+                  </div>
                 </div>
               ))}
+
+              {status !== "OK" && value.length > 0 && (
+                <div className="p-8 text-center text-gray-400 text-sm font-medium">กำลังค้นหาสถานที่...</div>
+              )}
             </div>
           </div>
         )}
