@@ -4,11 +4,11 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import BottomNav from '@/app/components/BottomNav';
-import { useLoadScript, GoogleMap, MarkerF, DirectionsRenderer } from '@react-google-maps/api';
+import { useLoadScript, GoogleMap, MarkerF } from '@react-google-maps/api';
 import usePlacesAutocomplete, { getGeocode, getLatLng } from 'use-places-autocomplete';
 
 const libraries: ("places")[] = ["places"];
-const DEFAULT_CENTER = { lat: 12.7844, lng: 101.6500 };
+const DEFAULT_CENTER = { lat: 12.7844, lng: 101.6500 }; // พิกัดอำเภอแกลง
 
 export default function WinOnlinePage() {
   const router = useRouter();
@@ -33,7 +33,7 @@ export default function WinOnlinePage() {
   const [selectedPin, setSelectedPin] = useState<google.maps.LatLngLiteral | null>(null);
   const [isLocating, setIsLocating] = useState(false);
 
-  // 🌟 พิกัดสำหรับคำนวณระยะทางจริง
+  // พิกัดสำหรับคำนวณระยะทางจริง
   const [pickupCoords, setPickupCoords] = useState<google.maps.LatLngLiteral | null>(null);
   const [dropoffCoords, setDropoffCoords] = useState<google.maps.LatLngLiteral | null>(null);
 
@@ -58,32 +58,33 @@ export default function WinOnlinePage() {
   const [showFareDetails, setShowFareDetails] = useState(false);
   const [fareBreakdown, setFareBreakdown] = useState({ base: 0, distanceFee: 0, fuelSurge: 0, platformFee: 0, totalFare: 0 });
 
-  // 🌟 ฟังก์ชันคำนวณระยะทางขับรถจริงผ่าน Google Directions API
+  // 🌟 รายการสถานที่ยอดฮิต (กู้คืนส่วนที่ทำให้ Error)
+  const popularPlaces = [
+    { name: 'โรงพยาบาลแกลง', detail: 'ตำบลทางเกวียน อำเภอแกลง' },
+    { name: 'ตลาดสามย่าน แกลง', detail: 'ตลาดสดเทศบาล' },
+    { name: 'เซเว่นอีเลฟเว่น สาขาตลาดแกลง', detail: 'ใกล้สี่แยกไฟแดง' },
+    { name: 'โลตัส แกลง', detail: 'ถนนสุขุมวิท' }
+  ];
+
+  // ฟังก์ชันคำนวณระยะทางขับรถจริง
   const calculateRoute = useCallback(async (origin: google.maps.LatLngLiteral, destination: google.maps.LatLngLiteral) => {
     if (!isLoaded) return;
     const directionsService = new google.maps.DirectionsService();
-    
     try {
       const result = await directionsService.route({
         origin: origin,
         destination: destination,
         travelMode: google.maps.TravelMode.DRIVING,
       });
-
       if (result.routes[0].legs[0].distance) {
-        // แปลงจากเมตรเป็นกิโลเมตร
-        const dist = result.routes[0].legs[0].distance.value / 1000;
-        setDistanceKm(Number(dist.toFixed(1)));
+        setDistanceKm(Number((result.routes[0].legs[0].distance.value / 1000).toFixed(1)));
       }
-    } catch (error) {
-      console.error("Directions Request Failed:", error);
-    }
+    } catch (error) { console.error("Route error:", error); }
   }, [isLoaded]);
 
-  // 🧮 คำนวณราคาจากระยะทางจริง
+  // คำนวณราคา
   useEffect(() => {
     if (pickupCoords && (dropoffCoords || jobType === 'buy')) {
-      // ถ้ามีทั้งจุดรับและส่ง ให้คำนวณเส้นทางใหม่
       if (dropoffCoords) calculateRoute(pickupCoords, dropoffCoords);
       
       let baseFare = 0; let ratePerKm = 0;
@@ -120,66 +121,47 @@ export default function WinOnlinePage() {
     e.preventDefault();
     if (!currentUser) return router.push('/auth/login');
     setIsSubmitting(true);
-    try {
-      const { error } = await supabase.from('express_jobs').insert({
-        customer_id: currentUser.id, title, job_type: jobType, vehicle_type: vehicleType, pickup_location: pickup, dropoff_location: dropoff || null, distance_km: distanceKm, note: note || null, offered_price: fareBreakdown.totalFare, status: 'open'
-      });
-      if (error) throw error;
-      setIsModalOpen(false);
-      alert('โพสต์งานเรียบร้อยค่ะ! 🚀');
-      fetchJobs(); 
-    } catch (error: any) { alert(error.message); } finally { setIsSubmitting(false); }
+    const { error } = await supabase.from('express_jobs').insert({
+      customer_id: currentUser.id, title, job_type: jobType, vehicle_type: vehicleType, pickup_location: pickup, dropoff_location: dropoff || null, distance_km: distanceKm, note: note || null, offered_price: fareBreakdown.totalFare, status: 'open'
+    });
+    if (!error) { setIsModalOpen(false); alert('โพสต์งานเรียบร้อยค่ะ! 🚀'); fetchJobs(); }
+    setIsSubmitting(false);
   };
 
-  // 🌟 แก้ไขฟังก์ชันเลือกตำแหน่งให้เก็บพิกัด Lat/Lng ด้วย
   const handleSelectLocation = async (address: string) => {
     setValue('', false);
     clearSuggestions();
-    
     try {
       const results = await getGeocode({ address });
-      const { lat, lng } = await getLatLng(results[0]);
-      const coords = { lat, lng };
-
-      if (pickingType === 'pickup') {
-        setPickup(address);
-        setPickupCoords(coords);
-      } else {
-        setDropoff(address);
-        setDropoffCoords(coords);
-      }
-    } catch (error) {
-      console.error("Geocoding failed", error);
+      const coords = await getLatLng(results[0]);
+      if (pickingType === 'pickup') { setPickup(address); setPickupCoords(coords); } 
+      else { setDropoff(address); setDropoffCoords(coords); }
+    } catch { 
       if (pickingType === 'pickup') setPickup(address); else setDropoff(address);
     }
-
     setIsLocationPickerOpen(false);
     setIsMapMode(false);
-    setSelectedPin(null);
   };
 
   const handleGetCurrentLocation = () => {
     if (!navigator.geolocation) return alert("เบราว์เซอร์ไม่รองรับ GPS");
     setIsLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const coords = { lat: position.coords.latitude, lng: position.coords.longitude };
-        setMapCenter(coords);
-        setSelectedPin(coords);
-        try {
-          const results = await getGeocode({ location: coords });
-          const address = results[0]?.formatted_address || `พิกัดปัจจุบัน`;
-          if (confirm(`ใช้ที่อยู่นี้ไหม?\n${address}`)) {
-            if (pickingType === 'pickup') { setPickup(address); setPickupCoords(coords); }
-            else { setDropoff(address); setDropoffCoords(coords); }
-            setIsLocationPickerOpen(false);
-            setIsMapMode(false);
-          }
-        } catch { alert("ระบุที่อยู่ไม่ได้ แต่ปักหมุดสำเร็จค่ะ"); }
-        setIsLocating(false);
-      },
-      () => { alert("เข้าถึง GPS ไม่ได้"); setIsLocating(false); }
-    );
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      setMapCenter(coords);
+      setSelectedPin(coords);
+      try {
+        const res = await getGeocode({ location: coords });
+        const addr = res[0]?.formatted_address || "พิกัดปัจจุบัน";
+        if (confirm(`ใช้ตำแหน่งนี้ใช่ไหม?\n${addr}`)) {
+          if (pickingType === 'pickup') { setPickup(addr); setPickupCoords(coords); }
+          else { setDropoff(addr); setDropoffCoords(coords); }
+          setIsLocationPickerOpen(false);
+          setIsMapMode(false);
+        }
+      } catch { alert("ระบุพิกัดสำเร็จ"); }
+      setIsLocating(false);
+    }, () => setIsLocating(false));
   };
 
   const onMapClick = useCallback(async (e: google.maps.MapMouseEvent) => {
@@ -187,21 +169,22 @@ export default function WinOnlinePage() {
       const coords = { lat: e.latLng.lat(), lng: e.latLng.lng() };
       setSelectedPin(coords);
       try {
-        const results = await getGeocode({ location: coords });
-        const address = results[0]?.formatted_address || `ตำแหน่งปักหมุด`;
-        if (confirm(`ใช้ตำแหน่งนี้ใช่ไหม?\n${address}`)) {
-          if (pickingType === 'pickup') { setPickup(address); setPickupCoords(coords); }
-          else { setDropoff(address); setDropoffCoords(coords); }
+        const res = await getGeocode({ location: coords });
+        const addr = res[0]?.formatted_address || "พิกัดที่เลือก";
+        if (confirm(`ใช้ตำแหน่งนี้ใช่ไหม?\n${addr}`)) {
+          if (pickingType === 'pickup') { setPickup(addr); setPickupCoords(coords); }
+          else { setDropoff(addr); setDropoffCoords(coords); }
           setIsLocationPickerOpen(false);
           setIsMapMode(false);
         }
-      } catch { alert("ปักหมุดสำเร็จค่ะ"); }
+      } catch { alert("ปักหมุดสำเร็จ"); }
     }
   }, [pickingType]);
 
   const getVehicleIcon = (type: string) => {
     switch (type) { case 'car': return '🚗'; case 'suv': return '🚙'; case 'van': return '🚐'; case 'pickup': return '🛻'; case 'saleng': return '🛺'; default: return '🛵'; }
   };
+
   const getVehicleName = (type: string) => {
     switch (type) { case 'car': return 'รถเก๋ง'; case 'suv': return 'รถครอบครัว'; case 'van': return 'รถตู้'; case 'pickup': return 'กระบะ'; case 'saleng': return 'ซาเล้ง'; default: return 'มอเตอร์ไซค์'; }
   };
@@ -212,7 +195,7 @@ export default function WinOnlinePage() {
         
         {/* Header */}
         <div className="bg-gradient-to-b from-[#EE4D2D] to-[#FF7337] rounded-b-[2.5rem] p-6 pt-10 shadow-md relative z-10">
-          <div className="flex justify-between items-center mb-4 px-1">
+          <div className="flex justify-between items-center mb-4">
             <h1 className="text-white text-2xl font-black">🛵 งานด่วนชุมชน</h1>
             <button onClick={() => setUserRole(userRole === 'customer' ? 'provider' : 'customer')} className="bg-white/20 px-3 py-1.5 rounded-full text-[10px] text-white font-bold backdrop-blur-sm">
               โหมด: {userRole === 'customer' ? 'ลูกค้า' : 'ไรเดอร์'}
@@ -227,11 +210,10 @@ export default function WinOnlinePage() {
         {/* Feed */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-32 scrollbar-hide">
           {userRole === 'customer' ? (
-            <div className="mt-6 text-center bg-white rounded-[2.5rem] p-10 shadow-sm">
+            <div className="mt-6 text-center bg-white rounded-[2.5rem] p-10 shadow-sm border border-gray-50">
               <div className="text-6xl mb-4">🏠</div>
-              <h3 className="text-lg font-black mb-2">เรียกรถ หรือ ส่งของ?</h3>
-              <p className="text-xs text-gray-500 mb-8 px-4">สนับสนุนไรเดอร์ในบ้านเราด้วยราคาที่เป็นธรรม ❤️</p>
-              <button onClick={() => setIsModalOpen(true)} className="bg-[#EE4D2D] text-white px-8 py-4 rounded-2xl font-bold w-full shadow-md active:scale-95 transition-all">
+              <h3 className="text-lg font-black text-gray-800">เรียกวิน หรือ ส่งของ?</h3>
+              <button onClick={() => setIsModalOpen(true)} className="bg-[#EE4D2D] text-white px-8 py-4 rounded-2xl font-bold w-full mt-4 shadow-md active:scale-95 transition-all">
                 + โพสต์งานด่วนเลย
               </button>
             </div>
@@ -274,9 +256,9 @@ export default function WinOnlinePage() {
               </div>
 
               <form onSubmit={handlePostJob} className="space-y-4">
-                <div className="flex gap-2 mb-4">
+                <div className="flex gap-2">
                   {['ride', 'buy', 'deliver'].map((t) => (
-                    <button key={t} type="button" onClick={() => setJobType(t as any)} className={`flex-1 py-2.5 rounded-xl text-[11px] font-bold border ${jobType === t ? 'bg-orange-50 border-[#EE4D2D] text-[#EE4D2D]' : 'bg-white border-gray-200 text-gray-400'}`}>
+                    <button key={t} type="button" onClick={() => setJobType(t as any)} className={`flex-1 py-2.5 rounded-xl text-[11px] font-bold border transition-all ${jobType === t ? 'bg-orange-50 border-[#EE4D2D] text-[#EE4D2D]' : 'bg-white border-gray-200 text-gray-400'}`}>
                       {t === 'ride' ? '🛵 เรียกรถ' : t === 'buy' ? '🍜 ฝากซื้อ' : '📦 ส่งของ'}
                     </button>
                   ))}
@@ -286,7 +268,7 @@ export default function WinOnlinePage() {
                   <label className="text-[11px] font-bold text-gray-600 pl-1">เลือกประเภทรถ <span className="text-red-500">*</span></label>
                   <div className="grid grid-cols-3 gap-2">
                     {['motorcycle', 'saleng', 'car', 'suv', 'van', 'pickup'].map((v) => (
-                      <div key={v} onClick={() => setVehicleType(v as any)} className={`cursor-pointer border rounded-xl py-2.5 flex flex-col items-center gap-1 ${vehicleType === v ? 'border-[#EE4D2D] bg-orange-50 ring-1 ring-[#EE4D2D]' : 'border-gray-200 bg-white'}`}>
+                      <div key={v} onClick={() => setVehicleType(v as any)} className={`cursor-pointer border rounded-xl py-2.5 flex flex-col items-center gap-1 transition-all ${vehicleType === v ? 'border-[#EE4D2D] bg-orange-50 ring-1 ring-[#EE4D2D]' : 'border-gray-200 bg-white'}`}>
                         <span className="text-xl">{getVehicleIcon(v)}</span>
                         <span className={`text-[8px] font-bold ${vehicleType === v ? 'text-[#EE4D2D]' : 'text-gray-500'}`}>{getVehicleName(v)}</span>
                       </div>
@@ -379,6 +361,8 @@ export default function WinOnlinePage() {
                   <div onClick={() => setIsMapMode(true)} className="p-4 bg-white rounded-2xl border border-gray-100 flex items-center gap-3 text-gray-600 font-bold text-sm cursor-pointer">
                     <span className="text-xl">🗺️</span> เลือกตำแหน่งจากแผนที่เอง
                   </div>
+                  
+                  {/* 🌟 ส่วนที่กู้คืนแก้ไข Error */}
                   {status === "OK" ? data.map(({ place_id, description, structured_formatting: { main_text, secondary_text } }) => (
                     <div key={place_id} onClick={() => handleSelectLocation(description)} className="p-4 bg-white rounded-xl shadow-sm border border-gray-50 flex items-center gap-3 cursor-pointer">
                       <div className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center shrink-0">📍</div>
@@ -403,7 +387,7 @@ export default function WinOnlinePage() {
                       <button onClick={handleGetCurrentLocation} className="absolute top-4 right-4 w-12 h-12 bg-white rounded-2xl shadow-xl flex items-center justify-center text-2xl border border-gray-100">🎯</button>
                       <div className="absolute bottom-10 left-4 right-4">
                         <div className="bg-white/90 backdrop-blur-md p-5 rounded-[2rem] shadow-2xl border border-white text-center">
-                          <p className="text-sm font-black text-gray-800 mb-4 px-6">จิ้มลงบนแผนที่เพื่อปักหมุด 📍</p>
+                          <p className="text-sm font-black text-gray-800 mb-4 px-6 italic">จิ้มลงบนแผนที่เพื่อปักหมุด 📍</p>
                           <button onClick={() => setIsMapMode(false)} className="text-[#EE4D2D] text-[11px] font-bold py-2 px-4 rounded-full border border-orange-100">กลับไปพิมพ์ค้นหา</button>
                         </div>
                       </div>
