@@ -184,7 +184,7 @@ export default function WinOnlinePage() {
       try {
         const res = await getGeocode({ location: coords });
         const addr = res[0]?.formatted_address || "Current Location";
-        if (confirm(`Use this? ${addr}`)) {
+        if (confirm(`ใช้ตำแหน่งนี้ใช่ไหม? ${addr}`)) {
           if (pickingType === 'pickup') { setPickup(addr); setPickupCoords(coords); } else { setDropoff(addr); setDropoffCoords(coords); }
           setIsLocationPickerOpen(false); setIsMapMode(false);
         }
@@ -192,6 +192,20 @@ export default function WinOnlinePage() {
       setIsLocating(false);
     });
   };
+
+  // 🌟 ฟังก์ชันที่ขาดหายไปและทำให้เกิด Error เจมกู้คืนมาแล้วครับ
+  const onMapClick = useCallback(async (e: google.maps.MapMouseEvent) => {
+    if (e.latLng) {
+      const coords = { lat: e.latLng.lat(), lng: e.latLng.lng() }; setSelectedPin(coords);
+      try {
+        const res = await getGeocode({ location: coords }); const addr = res[0]?.formatted_address || "Pinned Location";
+        if (confirm(`ใช้ตำแหน่งนี้ใช่ไหมคะ?\n${addr}`)) {
+          if (pickingType === 'pickup') { setPickup(addr); setPickupCoords(coords); } else { setDropoff(addr); setDropoffCoords(coords); }
+          setIsLocationPickerOpen(false); setIsMapMode(false);
+        }
+      } catch { alert("ปักหมุดสำเร็จ"); }
+    }
+  }, [pickingType]);
 
   const getVehicleIcon = (type: string) => {
     switch (type) { case 'car': return '🚗'; case 'suv': return '🚙'; case 'van': return '🚐'; case 'pickup': return '🛻'; case 'saleng': return '🛺'; default: return '🛵'; }
@@ -204,7 +218,7 @@ export default function WinOnlinePage() {
     <div className="min-h-screen bg-[#F4F6F8] flex justify-center font-sans">
       <div className="w-full sm:max-w-md md:max-w-lg bg-[#F4F6F8] min-h-screen relative flex flex-col shadow-2xl overflow-hidden border-x border-gray-100">
         
-        {/* --- Header & Tabs (อัปเกรดดีไซน์ตรงตามภาพ) --- */}
+        {/* --- Header & Tabs --- */}
         <div className="bg-gradient-to-br from-[#FF5A2D] to-[#FF8A4C] rounded-b-[3rem] p-6 pt-12 shadow-[0_10px_30px_rgba(238,77,45,0.2)] relative z-10">
           
           <div className="flex justify-between items-center mb-6">
@@ -220,14 +234,14 @@ export default function WinOnlinePage() {
             </div>
           </div>
           
-          {/* แถบสลับโหมด ลูกค้า/คนขับ */}
+          {/* แถบสลับโหมด */}
           <div className="flex justify-center mb-6">
              <button onClick={() => { setUserRole(userRole === 'customer' ? 'provider' : 'customer'); setActiveTab('feed'); }} className="bg-white/20 hover:bg-white/30 backdrop-blur-md px-6 py-2 rounded-full text-xs text-white font-bold border border-white/40 transition-all shadow-sm active:scale-95">
                 โหมดปัจจุบัน: {userRole === 'customer' ? '👤 ผู้เรียกใช้บริการ' : '🛵 ไรเดอร์ชุมชน'} (คลิกเพื่อเปลี่ยน)
              </button>
           </div>
 
-          {/* แถบเมนู (Tabs) สไตล์ Glow */}
+          {/* แถบเมนู Tabs */}
           <div className="flex gap-3 px-2">
             <button onClick={() => setActiveTab('feed')} className={`flex-1 py-3.5 rounded-[1.5rem] text-sm font-black transition-all duration-300 ${activeTab === 'feed' ? 'bg-white text-[#EE4D2D] shadow-[0_0_20px_rgba(255,255,255,0.6)] scale-105' : 'bg-white/20 text-white hover:bg-white/30 backdrop-blur-sm border border-white/20'}`}>
               {userRole === 'customer' ? '🏠 เรียกวิน/ส่งของ' : '🔥 งานใหม่ (Live)'}
@@ -330,7 +344,7 @@ export default function WinOnlinePage() {
           )}
         </div>
 
-        {/* --- 📝 MODAL: POST JOB (ฟอร์มโพสต์งานสมบูรณ์) --- */}
+        {/* --- 📝 MODAL: POST JOB --- */}
         {isModalOpen && !isLocationPickerOpen && (
           <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/60 backdrop-blur-sm animate-fade-in sm:items-center">
             <div className="bg-white w-full sm:max-w-md rounded-t-[2.5rem] sm:rounded-[2.5rem] p-6 pt-8 max-h-[90vh] overflow-y-auto pb-10 scrollbar-hide shadow-2xl relative">
@@ -343,8 +357,6 @@ export default function WinOnlinePage() {
               </div>
 
               <form onSubmit={handlePostJob} className="space-y-5">
-                
-                {/* ประเภทงาน */}
                 <div className="flex gap-2 bg-gray-50 p-1 rounded-[1.2rem] border border-gray-100">
                   {['ride', 'buy', 'deliver'].map((t) => (
                     <button key={t} type="button" onClick={() => setJobType(t as any)} className={`flex-1 py-3 rounded-xl text-xs font-bold transition-all shadow-sm ${jobType === t ? 'bg-white text-[#EE4D2D] border border-orange-100' : 'text-gray-400 hover:text-gray-600'}`}>
@@ -353,7 +365,6 @@ export default function WinOnlinePage() {
                   ))}
                 </div>
 
-                {/* ประเภทรถ */}
                 <div className="space-y-2">
                   <label className="text-[11px] font-black text-gray-700 pl-1 uppercase tracking-wider">เลือกรถที่ต้องการ <span className="text-red-500">*</span></label>
                   <div className="grid grid-cols-3 gap-2">
@@ -371,7 +382,6 @@ export default function WinOnlinePage() {
                   <input type="text" required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="เช่น ไปส่งหน้าตลาดแกลง, ซื้อข้าวผัด 2 กล่อง" className="w-full bg-white border border-gray-200 rounded-[1.2rem] px-5 py-4 text-sm font-medium focus:border-[#EE4D2D] focus:ring-4 focus:ring-orange-50 outline-none transition-all shadow-sm placeholder:text-gray-300" />
                 </div>
 
-                {/* จุดรับส่ง */}
                 <div className="space-y-3 bg-[#F8FAFC] p-5 rounded-[1.5rem] border border-gray-100 shadow-inner">
                   <div onClick={() => { setPickingType('pickup'); setIsLocationPickerOpen(true); }} className={`w-full bg-white border rounded-[1.2rem] px-4 py-3.5 text-sm flex justify-between items-center cursor-pointer shadow-sm transition-all hover:border-orange-300 ${pickup ? 'border-orange-200 text-gray-800 font-bold' : 'border-gray-200 text-gray-400'}`}>
                     <div className="flex gap-3 items-center overflow-hidden"><span className="text-green-500 shrink-0">📍</span><span className="truncate">{pickup || 'ค้นหาจุดรับต้นทาง'}</span></div>
@@ -388,7 +398,6 @@ export default function WinOnlinePage() {
                   <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="เช่น รอหน้าเซเว่น, จ่ายแบงค์พัน" rows={2} className="w-full bg-white border border-gray-200 rounded-[1.2rem] px-5 py-4 text-sm font-medium focus:border-[#EE4D2D] focus:ring-4 focus:ring-orange-50 outline-none resize-none shadow-sm placeholder:text-gray-300"></textarea>
                 </div>
 
-                {/* สรุปราคา */}
                 <div className="pt-2">
                   <div className="bg-gradient-to-br from-orange-50 to-red-50 border border-orange-100 rounded-[1.5rem] p-5 flex justify-between items-center shadow-sm relative overflow-hidden">
                     <div className="absolute -right-4 -top-4 text-6xl opacity-10">💰</div>
@@ -413,7 +422,7 @@ export default function WinOnlinePage() {
                   )}
                 </div>
 
-                <button type="submit" disabled={isSubmitting || fareBreakdown.totalFare <= 0} className="w-full bg-gradient-to-r from-[#FF5A2D] to-[#EE4D2D] text-white font-black py-4.5 rounded-[1.5rem] text-base mt-2 shadow-[0_8px_20px_rgba(238,77,45,0.3)] active:scale-95 disabled:opacity-50 disabled:active:scale-100 transition-all h-14">
+                <button type="submit" disabled={isSubmitting || fareBreakdown.totalFare <= 0} className="w-full bg-gradient-to-r from-[#FF5A2D] to-[#EE4D2D] text-white font-black py-4.5 rounded-[1.5rem] text-base mt-2 shadow-[0_8px_20px_rgba(238,77,45,0.3)] active:scale-95 disabled:opacity-50 disabled:active:scale-100 transition-all h-14 flex items-center justify-center">
                   {isSubmitting ? 'กำลังส่งข้อมูล...' : 'ยืนยันการโพสต์งาน'}
                 </button>
               </form>
@@ -421,7 +430,7 @@ export default function WinOnlinePage() {
           </div>
         )}
 
-        {/* --- 🗺️ MODAL: MAP PICKER (แผนที่) --- */}
+        {/* --- 🗺️ MODAL: MAP PICKER --- */}
         {isLocationPickerOpen && (
           <div className="fixed inset-0 z-[110] bg-white flex flex-col animate-fade-in">
             <div className="p-4 border-b flex items-center gap-3 bg-white shadow-sm z-10 pt-safe">
