@@ -217,11 +217,10 @@ export default function WinOnlinePage() {
 
   return (
     <div className="min-h-screen bg-[#F4F6F8] flex justify-center font-sans">
-      {/* 🌟 แก้ไข: ขยายความกว้างเป็น max-w-3xl เพื่อให้สอดคล้องกับหน้าหลัก */}
       <div className="w-full max-w-3xl bg-[#F4F6F8] min-h-screen relative flex flex-col shadow-2xl overflow-hidden border-x border-gray-100">
         
-        {/* --- Header & Tabs --- */}
-        <div className="bg-gradient-to-br from-[#FF5A2D] to-[#EE4D2D] rounded-b-[2.5rem] p-6 pt-10 shadow-md relative z-10">
+        {/* --- Header & Tabs (แก้ไขให้ขอบมนเหมือนหน้าหลัก และใช้เฉดสีเดิม) --- */}
+        <div className="m-4 bg-gradient-to-b from-[#EE4D2D] to-[#FF7337] rounded-[2rem] p-6 shadow-md relative z-10">
           
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-white text-xl sm:text-2xl font-black tracking-tight flex items-center gap-2">
@@ -239,12 +238,12 @@ export default function WinOnlinePage() {
           {/* แถบสลับโหมด */}
           <div className="flex justify-center mb-6">
              <button onClick={() => { setUserRole(userRole === 'customer' ? 'provider' : 'customer'); setActiveTab('feed'); }} className="bg-white/20 hover:bg-white/30 backdrop-blur-md px-6 py-2 rounded-full text-[11px] sm:text-xs text-white font-bold border border-white/40 transition-all shadow-sm active:scale-95">
-                โหมด: {userRole === 'customer' ? '👤 ผู้เรียกใช้บริการ' : '🛵 ไรเดอร์ชุมชน'} (คลิกเปลี่ยน)
+                โหมดปัจจุบัน: {userRole === 'customer' ? '👤 ผู้เรียกใช้บริการ' : '🛵 ไรเดอร์ชุมชน'} (คลิกเปลี่ยน)
              </button>
           </div>
 
           {/* แถบเมนู Tabs */}
-          <div className="flex gap-2 sm:gap-3 px-1 sm:px-2">
+          <div className="flex gap-2 sm:gap-3 px-1">
             <button onClick={() => setActiveTab('feed')} className={`flex-1 py-3 rounded-[1rem] sm:rounded-[1.5rem] text-xs sm:text-sm font-black transition-all duration-300 ${activeTab === 'feed' ? 'bg-white text-[#EE4D2D] shadow-lg scale-105' : 'bg-white/20 text-white hover:bg-white/30 backdrop-blur-sm border border-white/20'}`}>
               {userRole === 'customer' ? '🏠 เรียกวิน/ส่งของ' : '🔥 งานใหม่ (Live)'}
             </button>
@@ -255,23 +254,22 @@ export default function WinOnlinePage() {
         </div>
 
         {/* --- Main Content --- */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 pb-32 scrollbar-hide -mt-4 pt-8">
+        <div className="flex-1 overflow-y-auto p-4 sm:px-6 space-y-5 pb-32 scrollbar-hide">
           
           {/* TAB: FEED */}
           {activeTab === 'feed' && userRole === 'customer' && (
-            <div className="text-center bg-white rounded-[2rem] p-8 sm:p-10 shadow-sm border border-gray-100 animate-fade-in relative overflow-hidden group max-w-2xl mx-auto">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-orange-50 rounded-full blur-3xl opacity-50 -mr-10 -mt-10"></div>
+            <div className="text-center bg-white rounded-[2rem] p-8 sm:p-10 shadow-sm border border-gray-100 animate-fade-in relative overflow-hidden group max-w-2xl mx-auto mt-2">
               <div className="text-6xl sm:text-7xl mb-6 drop-shadow-sm transition-transform group-hover:scale-110">🏠</div>
               <h3 className="text-lg sm:text-xl font-black text-gray-800 mb-3 tracking-tight">เรียกวิน หรือ ส่งของ?</h3>
               <p className="text-[11px] sm:text-xs text-gray-500 mb-8 leading-relaxed px-2 font-medium">สนับสนุนไรเดอร์ในบ้านเรา ด้วยราคาที่โปร่งใส เงินเข้ากระเป๋าคนขับเต็มๆ 100% ❤️</p>
-              <button onClick={() => setIsModalOpen(true)} className="bg-gradient-to-r from-[#FF5A2D] to-[#EE4D2D] text-white px-8 py-4 sm:py-5 rounded-[1.2rem] sm:rounded-[1.5rem] font-black w-full shadow-lg hover:shadow-xl active:scale-95 transition-all text-sm sm:text-base tracking-wide">
+              <button onClick={() => setIsModalOpen(true)} className="bg-[#EE4D2D] text-white px-8 py-4 sm:py-5 rounded-[1.2rem] sm:rounded-[1.5rem] font-black w-full shadow-lg hover:shadow-xl active:scale-95 transition-all text-sm sm:text-base tracking-wide">
                 + โพสต์งานด่วนเลย
               </button>
             </div>
           )}
 
           {activeTab === 'feed' && userRole === 'provider' && (
-            <div className="space-y-4 animate-fade-in max-w-2xl mx-auto">
+            <div className="space-y-4 animate-fade-in max-w-2xl mx-auto mt-2">
               {isLoading ? ( <div className="bg-white rounded-[2rem] p-6 h-40 animate-pulse shadow-sm"></div> ) : jobs.length === 0 ? (
                 <div className="bg-white rounded-[2.5rem] p-12 text-center shadow-sm border border-gray-100">
                   <div className="text-5xl mb-4 opacity-50">😴</div>
@@ -306,7 +304,7 @@ export default function WinOnlinePage() {
 
           {/* TAB: MY JOBS */}
           {activeTab === 'my_jobs' && (
-            <div className="space-y-4 animate-fade-in max-w-2xl mx-auto">
+            <div className="space-y-4 animate-fade-in max-w-2xl mx-auto mt-2">
               {!currentUser ? (
                 <div className="bg-white rounded-[2rem] p-10 text-center shadow-sm border border-gray-100"><p className="text-gray-400 font-bold text-sm">กรุณาเข้าสู่ระบบเพื่อดูงานของคุณค่ะ 🔒</p></div>
               ) : isLoading ? (
@@ -423,7 +421,7 @@ export default function WinOnlinePage() {
                   )}
                 </div>
 
-                <button type="submit" disabled={isSubmitting || fareBreakdown.totalFare <= 0} className="w-full bg-gradient-to-r from-[#FF5A2D] to-[#EE4D2D] text-white font-black py-4 rounded-[1.2rem] text-sm sm:text-base mt-2 shadow-lg active:scale-95 disabled:opacity-50 disabled:active:scale-100 transition-all flex items-center justify-center">
+                <button type="submit" disabled={isSubmitting || fareBreakdown.totalFare <= 0} className="w-full bg-[#EE4D2D] text-white font-black py-4 rounded-[1.2rem] text-sm sm:text-base mt-2 shadow-lg active:scale-95 disabled:opacity-50 disabled:active:scale-100 transition-all flex items-center justify-center">
                   {isSubmitting ? 'กำลังส่งข้อมูล...' : 'ยืนยันการโพสต์งาน'}
                 </button>
               </form>
@@ -508,7 +506,7 @@ export default function WinOnlinePage() {
               <div className="text-center text-[9px] sm:text-[10px] text-gray-400 font-bold my-4 bg-gray-200/50 py-1 px-3 rounded-full w-max mx-auto">แชทปลอดภัย 100%</div>
               {messages.map((msg, i) => (
                 <div key={i} className={`flex ${msg.sender_id === currentUser.id ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[75%] p-3 sm:p-3.5 rounded-[1rem] sm:rounded-[1.2rem] text-xs sm:text-sm font-medium shadow-sm ${msg.sender_id === currentUser.id ? 'bg-gradient-to-br from-[#FF5A2D] to-[#EE4D2D] text-white rounded-tr-sm' : 'bg-white border border-gray-100 text-gray-800 rounded-tl-sm'}`}>
+                  <div className={`max-w-[75%] p-3 sm:p-3.5 rounded-[1rem] sm:rounded-[1.2rem] text-xs sm:text-sm font-medium shadow-sm ${msg.sender_id === currentUser.id ? 'bg-[#EE4D2D] text-white rounded-tr-sm' : 'bg-white border border-gray-100 text-gray-800 rounded-tl-sm'}`}>
                     {msg.content}
                   </div>
                 </div>
