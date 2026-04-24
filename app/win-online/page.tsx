@@ -27,7 +27,7 @@ export default function WinOnlinePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<any>(null);
 
-  // --- 🌟 ระบบแชท (Chat States) ---
+  // --- Chat States ---
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [activeChatJob, setActiveChatJob] = useState<any>(null);
   const [messages, setMessages] = useState<any[]>([]);
@@ -68,44 +68,24 @@ export default function WinOnlinePage() {
     { name: 'เซเว่นอีเลฟเว่น ตลาดแกลง', detail: '7-Eleven Sam Yan' },
   ];
 
-  // 🌟 ฟังก์ชันดึงข้อความแชท
   const fetchMessages = useCallback(async (jobId: string) => {
-    const { data } = await supabase
-      .from('job_messages')
-      .select('*')
-      .eq('job_id', jobId)
-      .order('created_at', { ascending: true });
+    const { data } = await supabase.from('job_messages').select('*').eq('job_id', jobId).order('created_at', { ascending: true });
     if (data) setMessages(data);
   }, []);
 
-  // 🌟 ฟังก์ชันส่งข้อความ
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || !currentUser || !activeChatJob) return;
-
-    const messageObj = {
-      job_id: activeChatJob.id,
-      sender_id: currentUser.id,
-      content: newMessage.trim(),
-    };
-
-    const { error } = await supabase.from('job_messages').insert(messageObj);
-    if (!error) {
-      setNewMessage('');
-      fetchMessages(activeChatJob.id);
-    }
+    const { error } = await supabase.from('job_messages').insert({ job_id: activeChatJob.id, sender_id: currentUser.id, content: newMessage.trim() });
+    if (!error) { setNewMessage(''); fetchMessages(activeChatJob.id); }
   };
 
   const calculateRoute = useCallback(async (origin: google.maps.LatLngLiteral, destination: google.maps.LatLngLiteral) => {
     if (!isLoaded) return;
     const directionsService = new google.maps.DirectionsService();
     try {
-      const result = await directionsService.route({
-        origin, destination, travelMode: google.maps.TravelMode.DRIVING,
-      });
-      if (result.routes[0].legs[0].distance) {
-        setDistanceKm(Number((result.routes[0].legs[0].distance.value / 1000).toFixed(1)));
-      }
+      const result = await directionsService.route({ origin, destination, travelMode: google.maps.TravelMode.DRIVING });
+      if (result.routes[0].legs[0].distance) { setDistanceKm(Number((result.routes[0].legs[0].distance.value / 1000).toFixed(1))); }
     } catch (error) { console.error(error); }
   }, [isLoaded]);
 
@@ -147,22 +127,32 @@ export default function WinOnlinePage() {
       fetchJobs(session?.user?.id);
     });
 
-    // 🌟 Real-time สำหรับงานและแชท
     const jobChannel = supabase.channel('job-updates').on('postgres_changes', { event: '*', schema: 'public', table: 'express_jobs' }, () => {
       supabase.auth.getSession().then(({ data: { session } }) => fetchJobs(session?.user?.id));
     }).subscribe();
 
     const chatChannel = supabase.channel('chat-updates').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'job_messages' }, (payload) => {
-      if (activeChatJob && payload.new.job_id === activeChatJob.id) {
-        fetchMessages(activeChatJob.id);
-      }
+      if (activeChatJob && payload.new.job_id === activeChatJob.id) { fetchMessages(activeChatJob.id); }
     }).subscribe();
 
-    return () => { 
-      supabase.removeChannel(jobChannel); 
-      supabase.removeChannel(chatChannel); 
-    };
+    return () => { supabase.removeChannel(jobChannel); supabase.removeChannel(chatChannel); };
   }, [fetchJobs, activeChatJob, fetchMessages]);
+
+  const handlePostJob = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUser) return router.push('/auth/login');
+    setIsSubmitting(true);
+    const { error } = await supabase.from('express_jobs').insert({
+      customer_id: currentUser.id, title, job_type: jobType, vehicle_type: vehicleType, pickup_location: pickup, dropoff_location: dropoff || null, distance_km: distanceKm, note: note || null, offered_price: fareBreakdown.totalFare, status: 'open'
+    });
+    if (!error) { 
+      setIsModalOpen(false); alert('โพสต์งานเรียบร้อยค่ะ! 🚀'); 
+      setActiveTab('my_jobs'); fetchJobs(currentUser.id); 
+    } else {
+      alert("เกิดข้อผิดพลาด: " + error.message);
+    }
+    setIsSubmitting(false);
+  };
 
   const handleUpdateJobStatus = async (jobId: string, newStatus: 'accepted' | 'completed' | 'cancelled') => {
     if (!currentUser) return alert("Please Login");
@@ -206,80 +196,133 @@ export default function WinOnlinePage() {
   const getVehicleIcon = (type: string) => {
     switch (type) { case 'car': return '🚗'; case 'suv': return '🚙'; case 'van': return '🚐'; case 'pickup': return '🛻'; case 'saleng': return '🛺'; default: return '🛵'; }
   };
+  const getVehicleName = (type: string) => {
+    switch (type) { case 'car': return 'รถเก๋ง'; case 'suv': return 'ครอบครัว'; case 'van': return 'รถตู้'; case 'pickup': return 'กระบะ'; case 'saleng': return 'ซาเล้ง'; default: return 'มอไซค์'; }
+  };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex justify-center">
-      <div className="w-full sm:max-w-2xl bg-[#F4F6F8] min-h-screen relative flex flex-col shadow-xl overflow-hidden">
+    <div className="min-h-screen bg-[#F4F6F8] flex justify-center font-sans">
+      <div className="w-full sm:max-w-md md:max-w-lg bg-[#F4F6F8] min-h-screen relative flex flex-col shadow-2xl overflow-hidden border-x border-gray-100">
         
-        {/* Header */}
-        <div className="bg-gradient-to-b from-[#EE4D2D] to-[#FF7337] rounded-b-[2.5rem] p-6 pt-10 shadow-md relative z-10">
-          <div className="flex justify-between items-center mb-4">
-            <h1 className="text-white text-2xl font-black">🛵 งานด่วนชุมชน</h1>
-            <button onClick={() => { setUserRole(userRole === 'customer' ? 'provider' : 'customer'); setActiveTab('feed'); }} className="bg-white/20 px-4 py-2 rounded-full text-xs text-white font-bold backdrop-blur-sm border border-white/30">
-              โหมด: {userRole === 'customer' ? 'ลูกค้า' : 'ไรเดอร์'}
-            </button>
+        {/* --- Header & Tabs (อัปเกรดดีไซน์ตรงตามภาพ) --- */}
+        <div className="bg-gradient-to-br from-[#FF5A2D] to-[#FF8A4C] rounded-b-[3rem] p-6 pt-12 shadow-[0_10px_30px_rgba(238,77,45,0.2)] relative z-10">
+          
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-white text-2xl font-black tracking-tight flex items-center gap-2">
+               🛵 งานด่วนชุมชน
+            </h1>
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+              </span>
+              <span className="text-white/90 text-[10px] font-bold">เชื่อมต่อแล้ว</span>
+            </div>
           </div>
-          <div className="flex gap-2 bg-white/20 p-1 rounded-2xl backdrop-blur-md border border-white/30">
-            <button onClick={() => setActiveTab('feed')} className={`flex-1 py-2 rounded-xl text-xs font-bold ${activeTab === 'feed' ? 'bg-white text-[#EE4D2D]' : 'text-white'}`}>หน้าหลัก</button>
-            <button onClick={() => setActiveTab('my_jobs')} className={`flex-1 py-2 rounded-xl text-xs font-bold ${activeTab === 'my_jobs' ? 'bg-white text-[#EE4D2D]' : 'text-white'}`}>งานของฉัน</button>
+          
+          {/* แถบสลับโหมด ลูกค้า/คนขับ */}
+          <div className="flex justify-center mb-6">
+             <button onClick={() => { setUserRole(userRole === 'customer' ? 'provider' : 'customer'); setActiveTab('feed'); }} className="bg-white/20 hover:bg-white/30 backdrop-blur-md px-6 py-2 rounded-full text-xs text-white font-bold border border-white/40 transition-all shadow-sm active:scale-95">
+                โหมดปัจจุบัน: {userRole === 'customer' ? '👤 ผู้เรียกใช้บริการ' : '🛵 ไรเดอร์ชุมชน'} (คลิกเพื่อเปลี่ยน)
+             </button>
+          </div>
+
+          {/* แถบเมนู (Tabs) สไตล์ Glow */}
+          <div className="flex gap-3 px-2">
+            <button onClick={() => setActiveTab('feed')} className={`flex-1 py-3.5 rounded-[1.5rem] text-sm font-black transition-all duration-300 ${activeTab === 'feed' ? 'bg-white text-[#EE4D2D] shadow-[0_0_20px_rgba(255,255,255,0.6)] scale-105' : 'bg-white/20 text-white hover:bg-white/30 backdrop-blur-sm border border-white/20'}`}>
+              {userRole === 'customer' ? '🏠 เรียกวิน/ส่งของ' : '🔥 งานใหม่ (Live)'}
+            </button>
+            <button onClick={() => setActiveTab('my_jobs')} className={`flex-1 py-3.5 rounded-[1.5rem] text-sm font-black transition-all duration-300 ${activeTab === 'my_jobs' ? 'bg-white text-[#EE4D2D] shadow-[0_0_20px_rgba(255,255,255,0.6)] scale-105' : 'bg-white/20 text-white hover:bg-white/30 backdrop-blur-sm border border-white/20'}`}>
+              📋 งานของฉัน
+            </button>
           </div>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-32 scrollbar-hide">
-          {activeTab === 'feed' ? (
-            userRole === 'customer' ? (
-              <div className="mt-10 text-center bg-white rounded-[2.5rem] p-10 shadow-sm border border-gray-100 animate-fade-in">
-                <div className="text-6xl mb-4">🏠</div>
-                <h3 className="text-lg font-black text-gray-800 mb-2">เรียกวิน หรือ ส่งของ?</h3>
-                <p className="text-xs text-gray-400 mb-8 px-4 leading-relaxed">สนับสนุนไรเดอร์ในบ้านเรา ด้วยราคาที่โปร่งใส เงินเข้ากระเป๋าคนขับเต็มๆ ❤️</p>
-                <button onClick={() => setIsModalOpen(true)} className="bg-[#EE4D2D] text-white px-8 py-4 rounded-2xl font-bold w-full shadow-lg active:scale-95 transition-all">+ โพสต์งานด่วน</button>
-              </div>
-            ) : (
-              <div className="space-y-3 animate-fade-in">
-                <div className="flex items-center gap-2 px-1 mb-2">
-                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                  <h2 className="text-xs font-bold text-gray-400 uppercase">งานใหม่ล่าสุด</h2>
+        {/* --- Main Content --- */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-5 pb-32 scrollbar-hide -mt-4 pt-8">
+          
+          {/* TAB: FEED */}
+          {activeTab === 'feed' && userRole === 'customer' && (
+            <div className="text-center bg-white rounded-[2.5rem] p-10 shadow-lg border border-orange-50 animate-fade-in relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-orange-50 rounded-full blur-3xl opacity-50 -mr-10 -mt-10"></div>
+              <div className="text-7xl mb-6 drop-shadow-md transition-transform group-hover:scale-110">🏠</div>
+              <h3 className="text-xl font-black text-gray-800 mb-3 tracking-tight">เรียกวิน หรือ ส่งของ?</h3>
+              <p className="text-xs text-gray-500 mb-8 leading-relaxed px-2 font-medium">สนับสนุนไรเดอร์ในบ้านเรา ด้วยราคาที่โปร่งใส เงินเข้ากระเป๋าคนขับเต็มๆ 100% ❤️</p>
+              <button onClick={() => setIsModalOpen(true)} className="bg-gradient-to-r from-[#FF5A2D] to-[#EE4D2D] text-white px-8 py-5 rounded-[1.5rem] font-black w-full shadow-[0_8px_20px_rgba(238,77,45,0.3)] hover:shadow-[0_10px_25px_rgba(238,77,45,0.4)] active:scale-95 transition-all text-base tracking-wide">
+                + โพสต์งานด่วนเลย
+              </button>
+            </div>
+          )}
+
+          {activeTab === 'feed' && userRole === 'provider' && (
+            <div className="space-y-4 animate-fade-in">
+              {isLoading ? ( <div className="bg-white rounded-[2rem] p-6 h-40 animate-pulse shadow-sm"></div> ) : jobs.length === 0 ? (
+                <div className="bg-white rounded-[2.5rem] p-12 text-center shadow-sm border border-gray-100">
+                  <div className="text-5xl mb-4 opacity-50">😴</div>
+                  <p className="text-gray-400 font-bold text-sm">ยังไม่มีงานเข้ามาในตอนนี้ค่ะ</p>
                 </div>
-                {jobs.map((job) => (
-                  <div key={job.id} className="bg-white rounded-[1.5rem] p-4 shadow-sm border border-gray-50">
-                    <div className="flex justify-between items-start mb-3">
-                      <div className="flex gap-3">
-                        <div className="w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center text-2xl">{getVehicleIcon(job.vehicle_type)}</div>
-                        <div><h3 className="font-bold text-sm text-gray-800">{job.title}</h3><span className="text-[10px] text-gray-400">ลูกค้า: {job.profiles?.first_name} • {job.distance_km} กม.</span></div>
+              ) : jobs.map((job) => (
+                <div key={job.id} className="bg-white rounded-[2rem] p-5 shadow-[0_4px_15px_rgba(0,0,0,0.03)] border border-orange-50/50 hover:border-orange-200 transition-all">
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex gap-4">
+                      <div className="w-14 h-14 bg-gradient-to-br from-orange-50 to-red-50 rounded-[1.2rem] flex items-center justify-center text-3xl shadow-inner border border-orange-100/50">{getVehicleIcon(job.vehicle_type)}</div>
+                      <div>
+                        <h3 className="font-black text-gray-800 text-base">{job.title}</h3>
+                        <p className="text-[11px] text-gray-400 mt-0.5 font-medium">ลูกค้า: {job.profiles?.first_name || 'ไม่ระบุ'}</p>
                       </div>
-                      <div className="text-lg font-black text-[#EE4D2D]">฿{job.offered_price}</div>
                     </div>
-                    <button onClick={() => handleUpdateJobStatus(job.id, 'accepted')} className="w-full bg-[#EE4D2D] text-white py-2.5 rounded-xl text-xs font-bold">รับงานนี้ ⚡</button>
+                    <div className="text-right">
+                      <div className="text-xl font-black text-[#EE4D2D] tracking-tight">฿{job.offered_price}</div>
+                      <div className="text-[10px] text-gray-400 font-bold bg-gray-50 px-2 py-0.5 rounded-md mt-1 inline-block">{job.distance_km} กม.</div>
+                    </div>
                   </div>
-                ))}
-              </div>
-            )
-          ) : (
-            /* 🌟 หน้า "งานของฉัน" พร้อมระบบโทร + แชท */
-            <div className="space-y-3 animate-fade-in">
-              {myJobs.map((job) => (
-                <div key={job.id} className="bg-white rounded-[1.5rem] p-4 shadow-sm border border-gray-50">
-                  <div className="flex justify-between items-center mb-3 pb-2 border-b border-gray-50">
-                    <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{job.status}</span>
-                    <span className="text-[10px] text-orange-500 font-black">฿{job.offered_price}</span>
+                  <div className="bg-[#F8FAFC] p-3.5 rounded-[1.2rem] mb-4 space-y-2 text-xs text-gray-600 border border-gray-100">
+                     <div className="flex gap-2"><span className="text-green-500">📍</span><span className="line-clamp-1 font-medium">{job.pickup_location}</span></div>
+                     {job.dropoff_location && <div className="flex gap-2 border-t border-gray-200/60 pt-2"><span className="text-red-500">🚩</span><span className="line-clamp-1 font-medium">{job.dropoff_location}</span></div>}
                   </div>
-                  <div className="flex gap-3 mb-4">
-                    <div className="text-2xl">{getVehicleIcon(job.vehicle_type)}</div>
-                    <div><h4 className="font-bold text-sm text-gray-800 line-clamp-1">{job.title}</h4><p className="text-[10px] text-gray-400">เส้นทาง: {job.pickup_location.split(',')[0]} → {job.dropoff_location?.split(',')[0] || 'ปลายทาง'}</p></div>
+                  <button onClick={() => handleUpdateJobStatus(job.id, 'accepted')} className="w-full bg-gradient-to-r from-orange-50 to-red-50 text-[#EE4D2D] hover:text-white hover:from-[#EE4D2D] hover:to-[#FF5A2D] border border-orange-200 hover:border-transparent py-3.5 rounded-[1.2rem] text-sm font-black active:scale-95 transition-all shadow-sm">
+                    รับงานนี้ ⚡
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* TAB: MY JOBS */}
+          {activeTab === 'my_jobs' && (
+            <div className="space-y-4 animate-fade-in">
+              {!currentUser ? (
+                <div className="bg-white rounded-[2.5rem] p-10 text-center shadow-sm border border-gray-100"><p className="text-gray-400 font-bold text-sm">กรุณาเข้าสู่ระบบเพื่อดูงานของคุณค่ะ 🔒</p></div>
+              ) : isLoading ? (
+                <div className="bg-white rounded-[2rem] p-6 h-40 animate-pulse shadow-sm"></div>
+              ) : myJobs.length === 0 ? (
+                <div className="bg-white rounded-[2.5rem] p-12 text-center shadow-sm border border-gray-100"><div className="text-5xl mb-4 opacity-50">📭</div><p className="text-gray-400 font-bold text-sm">คุณยังไม่มีประวัติงานในระบบค่ะ</p></div>
+              ) : myJobs.map((job) => (
+                <div key={job.id} className="bg-white rounded-[2rem] p-5 shadow-[0_4px_15px_rgba(0,0,0,0.03)] border border-gray-100">
+                  <div className="flex justify-between items-center mb-4 pb-3 border-b border-gray-50">
+                    <span className="text-[10px] text-gray-400 font-bold bg-gray-50 px-2 py-1 rounded-md">{new Date(job.created_at).toLocaleString('th-TH', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short'})}</span>
+                    <span className={`text-[10px] font-black px-3 py-1 rounded-full ${job.status === 'open' ? 'bg-orange-100 text-orange-600' : job.status === 'accepted' ? 'bg-blue-100 text-blue-600' : job.status === 'completed' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
+                      {job.status === 'open' ? '⏳ รอคนรับ' : job.status === 'accepted' ? '🛵 กำลังไป' : job.status === 'completed' ? '✅ สำเร็จ' : '❌ ยกเลิก'}
+                    </span>
+                  </div>
+                  <div className="flex gap-4 mb-4">
+                    <div className="w-12 h-12 bg-gray-50 rounded-2xl flex items-center justify-center text-2xl border border-gray-100">{getVehicleIcon(job.vehicle_type)}</div>
+                    <div className="flex-1">
+                      <h4 className="font-black text-gray-800 text-sm line-clamp-1">{job.title}</h4>
+                      <p className="text-[11px] text-[#EE4D2D] font-bold mt-0.5">฿{job.offered_price} <span className="text-gray-300 mx-1">|</span> <span className="text-gray-500">{job.distance_km} กม.</span></p>
+                    </div>
                   </div>
 
-                  {/* 🌟 ส่วนการสื่อสาร (จะขึ้นมาเมื่อมีการรับงานแล้ว) */}
                   {job.status === 'accepted' && (
-                    <div className="flex gap-2 mb-2">
-                      <a href={`tel:${userRole === 'customer' ? job.provider?.phone_number : job.customer?.phone_number}`} className="flex-1 bg-blue-50 text-blue-600 py-3 rounded-xl text-[11px] font-bold flex items-center justify-center gap-2">📞 โทรหา{userRole === 'customer' ? 'คนขับ' : 'ลูกค้า'}</a>
-                      <button onClick={() => { setActiveChatJob(job); fetchMessages(job.id); setIsChatOpen(true); }} className="flex-1 bg-orange-50 text-[#EE4D2D] py-3 rounded-xl text-[11px] font-bold flex items-center justify-center gap-2">💬 แชท</button>
+                    <div className="flex gap-2 mb-3">
+                      <a href={`tel:${userRole === 'customer' ? job.provider?.phone_number : job.customer?.phone_number}`} className="flex-1 bg-gradient-to-br from-blue-50 to-blue-100 text-blue-700 py-3 rounded-[1rem] text-[11px] font-black flex items-center justify-center gap-2 shadow-sm border border-blue-200/50 active:scale-95 transition-all">📞 โทรศัพท์</a>
+                      <button onClick={() => { setActiveChatJob(job); fetchMessages(job.id); setIsChatOpen(true); }} className="flex-1 bg-gradient-to-br from-orange-50 to-orange-100 text-[#EE4D2D] py-3 rounded-[1rem] text-[11px] font-black flex items-center justify-center gap-2 shadow-sm border border-orange-200/50 active:scale-95 transition-all">💬 แชทข้อความ</button>
                     </div>
                   )}
 
-                  <div className="flex gap-2">
-                    {job.status === 'accepted' && userRole === 'provider' && <button onClick={() => handleUpdateJobStatus(job.id, 'completed')} className="w-full bg-green-500 text-white py-3 rounded-xl text-xs font-bold">ส่งงานสำเร็จ ✅</button>}
-                    {(job.status === 'open' || job.status === 'accepted') && userRole === 'customer' && <button onClick={() => handleUpdateJobStatus(job.id, 'cancelled')} className="w-full bg-gray-100 text-gray-400 py-3 rounded-xl text-xs font-bold">ยกเลิก</button>}
+                  <div className="flex gap-2 mt-2">
+                    {job.status === 'accepted' && userRole === 'provider' && <button onClick={() => handleUpdateJobStatus(job.id, 'completed')} className="w-full bg-green-500 text-white py-3.5 rounded-[1rem] text-xs font-black shadow-md active:scale-95 transition-all">จบงาน / รับเงินเรียบร้อย ✅</button>}
+                    {(job.status === 'open' || job.status === 'accepted') && userRole === 'customer' && <button onClick={() => handleUpdateJobStatus(job.id, 'cancelled')} className="w-full bg-gray-50 hover:bg-red-50 text-gray-500 hover:text-red-500 py-3 rounded-[1rem] text-xs font-bold transition-all border border-gray-200 hover:border-red-200">ยกเลิกงาน</button>}
                   </div>
                 </div>
               ))}
@@ -287,40 +330,199 @@ export default function WinOnlinePage() {
           )}
         </div>
 
-        {/* 🌟 📥 Chat Interface Modal */}
+        {/* --- 📝 MODAL: POST JOB (ฟอร์มโพสต์งานสมบูรณ์) --- */}
+        {isModalOpen && !isLocationPickerOpen && (
+          <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/60 backdrop-blur-sm animate-fade-in sm:items-center">
+            <div className="bg-white w-full sm:max-w-md rounded-t-[2.5rem] sm:rounded-[2.5rem] p-6 pt-8 max-h-[90vh] overflow-y-auto pb-10 scrollbar-hide shadow-2xl relative">
+              
+              <div className="absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-gray-200 rounded-full sm:hidden"></div>
+
+              <div className="flex justify-between items-center mb-6 mt-2">
+                <h2 className="text-xl font-black text-gray-800 tracking-tight">เรียกงานด่วน 🚀</h2>
+                <button onClick={() => setIsModalOpen(false)} className="w-8 h-8 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center text-gray-500 transition-colors">✕</button>
+              </div>
+
+              <form onSubmit={handlePostJob} className="space-y-5">
+                
+                {/* ประเภทงาน */}
+                <div className="flex gap-2 bg-gray-50 p-1 rounded-[1.2rem] border border-gray-100">
+                  {['ride', 'buy', 'deliver'].map((t) => (
+                    <button key={t} type="button" onClick={() => setJobType(t as any)} className={`flex-1 py-3 rounded-xl text-xs font-bold transition-all shadow-sm ${jobType === t ? 'bg-white text-[#EE4D2D] border border-orange-100' : 'text-gray-400 hover:text-gray-600'}`}>
+                      {t === 'ride' ? '🛵 เรียกรถ' : t === 'buy' ? '🍜 ฝากซื้อ' : '📦 ส่งของ'}
+                    </button>
+                  ))}
+                </div>
+
+                {/* ประเภทรถ */}
+                <div className="space-y-2">
+                  <label className="text-[11px] font-black text-gray-700 pl-1 uppercase tracking-wider">เลือกรถที่ต้องการ <span className="text-red-500">*</span></label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {['motorcycle', 'saleng', 'car', 'suv', 'van', 'pickup'].map((v) => (
+                      <div key={v} onClick={() => setVehicleType(v as any)} className={`cursor-pointer border rounded-2xl py-3 flex flex-col items-center gap-1.5 transition-all ${vehicleType === v ? 'border-[#EE4D2D] bg-orange-50 ring-2 ring-[#EE4D2D]/20 shadow-sm' : 'border-gray-200 bg-white hover:bg-gray-50'}`}>
+                        <span className="text-2xl drop-shadow-sm">{getVehicleIcon(v)}</span>
+                        <span className={`text-[9px] font-bold ${vehicleType === v ? 'text-[#EE4D2D]' : 'text-gray-500'}`}>{getVehicleName(v)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[11px] font-black text-gray-700 pl-1 uppercase tracking-wider">รายละเอียดงาน <span className="text-red-500">*</span></label>
+                  <input type="text" required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="เช่น ไปส่งหน้าตลาดแกลง, ซื้อข้าวผัด 2 กล่อง" className="w-full bg-white border border-gray-200 rounded-[1.2rem] px-5 py-4 text-sm font-medium focus:border-[#EE4D2D] focus:ring-4 focus:ring-orange-50 outline-none transition-all shadow-sm placeholder:text-gray-300" />
+                </div>
+
+                {/* จุดรับส่ง */}
+                <div className="space-y-3 bg-[#F8FAFC] p-5 rounded-[1.5rem] border border-gray-100 shadow-inner">
+                  <div onClick={() => { setPickingType('pickup'); setIsLocationPickerOpen(true); }} className={`w-full bg-white border rounded-[1.2rem] px-4 py-3.5 text-sm flex justify-between items-center cursor-pointer shadow-sm transition-all hover:border-orange-300 ${pickup ? 'border-orange-200 text-gray-800 font-bold' : 'border-gray-200 text-gray-400'}`}>
+                    <div className="flex gap-3 items-center overflow-hidden"><span className="text-green-500 shrink-0">📍</span><span className="truncate">{pickup || 'ค้นหาจุดรับต้นทาง'}</span></div>
+                    <span className="text-orange-300 shrink-0">›</span>
+                  </div>
+                  <div onClick={() => { setPickingType('dropoff'); setIsLocationPickerOpen(true); }} className={`w-full bg-white border rounded-[1.2rem] px-4 py-3.5 text-sm flex justify-between items-center cursor-pointer shadow-sm transition-all hover:border-orange-300 ${dropoff ? 'border-orange-200 text-gray-800 font-bold' : 'border-gray-200 text-gray-400'}`}>
+                    <div className="flex gap-3 items-center overflow-hidden"><span className="text-red-500 shrink-0">🚩</span><span className="truncate">{dropoff || 'ค้นหาจุดส่งปลายทาง'}</span></div>
+                    <span className="text-orange-300 shrink-0">›</span>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                   <label className="text-[11px] font-black text-gray-700 pl-1 uppercase tracking-wider">หมายเหตุ (ถ้ามี)</label>
+                  <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="เช่น รอหน้าเซเว่น, จ่ายแบงค์พัน" rows={2} className="w-full bg-white border border-gray-200 rounded-[1.2rem] px-5 py-4 text-sm font-medium focus:border-[#EE4D2D] focus:ring-4 focus:ring-orange-50 outline-none resize-none shadow-sm placeholder:text-gray-300"></textarea>
+                </div>
+
+                {/* สรุปราคา */}
+                <div className="pt-2">
+                  <div className="bg-gradient-to-br from-orange-50 to-red-50 border border-orange-100 rounded-[1.5rem] p-5 flex justify-between items-center shadow-sm relative overflow-hidden">
+                    <div className="absolute -right-4 -top-4 text-6xl opacity-10">💰</div>
+                    <div className="space-y-1 relative z-10">
+                      <div className="flex items-center gap-2">
+                        <p className="text-[11px] text-[#EE4D2D] font-black uppercase tracking-wider">ราคาประเมินสุทธิ</p>
+                        {distanceKm > 0 && <button type="button" onClick={() => setShowFareDetails(!showFareDetails)} className="w-5 h-5 rounded-full bg-white text-orange-400 flex items-center justify-center text-[10px] font-black shadow-sm border border-orange-100">i</button>}
+                      </div>
+                      <p className="text-[9px] text-orange-400/80 font-bold">แอปไม่หักเปอร์เซ็นต์คนขับ</p>
+                    </div>
+                    <div className="text-right relative z-10">
+                      <div className="text-3xl font-black text-[#EE4D2D] tracking-tighter">{fareBreakdown.totalFare > 0 ? `฿${fareBreakdown.totalFare}` : '-'}</div>
+                      {distanceKm > 0 && <div className="text-[9px] text-orange-500/80 font-bold mt-1 bg-white px-2 py-0.5 rounded-full inline-block">ระยะทาง {distanceKm} กม.</div>}
+                    </div>
+                  </div>
+
+                  {showFareDetails && distanceKm > 0 && (
+                    <div className="mt-3 bg-white border border-gray-100 p-4 rounded-[1.2rem] shadow-sm text-[10px] font-bold text-gray-600 space-y-2 relative animate-fade-in">
+                      <div className="flex justify-between"><span>เริ่มต้น {(fareBreakdown.base + fareBreakdown.platformFee).toFixed(0)} บ. + ระยะทาง ({distanceKm} กม.)</span><span className="text-gray-800">฿{(fareBreakdown.base + fareBreakdown.distanceFee + fareBreakdown.platformFee).toFixed(2)}</span></div>
+                      <div className="flex justify-between text-orange-500"><span>ค่าความผันผวนพลังงาน</span><span>+ ฿{fareBreakdown.fuelSurge.toFixed(2)}</span></div>
+                    </div>
+                  )}
+                </div>
+
+                <button type="submit" disabled={isSubmitting || fareBreakdown.totalFare <= 0} className="w-full bg-gradient-to-r from-[#FF5A2D] to-[#EE4D2D] text-white font-black py-4.5 rounded-[1.5rem] text-base mt-2 shadow-[0_8px_20px_rgba(238,77,45,0.3)] active:scale-95 disabled:opacity-50 disabled:active:scale-100 transition-all h-14">
+                  {isSubmitting ? 'กำลังส่งข้อมูล...' : 'ยืนยันการโพสต์งาน'}
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* --- 🗺️ MODAL: MAP PICKER (แผนที่) --- */}
+        {isLocationPickerOpen && (
+          <div className="fixed inset-0 z-[110] bg-white flex flex-col animate-fade-in">
+            <div className="p-4 border-b flex items-center gap-3 bg-white shadow-sm z-10 pt-safe">
+              <button onClick={() => { setIsLocationPickerOpen(false); setIsMapMode(false); }} className="w-10 h-10 bg-gray-50 hover:bg-gray-100 rounded-full flex items-center justify-center text-gray-600 transition-colors">←</button>
+              {!isMapMode ? (
+                <input autoFocus type="text" value={value} onChange={(e) => setValue(e.target.value)} placeholder={`ค้นหาจุด ${pickingType === 'pickup' ? 'รับ' : 'ส่ง'}...`} className="flex-1 bg-[#F4F6F8] rounded-[1rem] px-5 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-orange-200 transition-all" />
+              ) : (
+                <div className="flex-1 font-black text-sm text-gray-800 text-center pr-10">เลื่อนแผนที่เพื่อปักหมุด 📍</div>
+              )}
+            </div>
+
+            <div className="flex-1 relative flex flex-col bg-[#F4F6F8]">
+              {!isMapMode ? (
+                <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                  <div onClick={handleGetCurrentLocation} className="p-4 bg-white rounded-[1.2rem] border border-blue-100 flex items-center justify-between text-blue-600 font-bold text-sm shadow-sm cursor-pointer hover:bg-blue-50 transition-all">
+                    <div className="flex items-center gap-3"><span className="text-xl">🎯</span><span>ใช้ตำแหน่งปัจจุบัน (GPS)</span></div>
+                    {isLocating && <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>}
+                  </div>
+                  <div onClick={() => setIsMapMode(true)} className="p-4 bg-white rounded-[1.2rem] border border-gray-200 flex items-center gap-3 text-gray-700 font-bold text-sm shadow-sm cursor-pointer hover:bg-gray-50 transition-all">
+                    <span className="text-xl">🗺️</span> ปักหมุดบนแผนที่เอง
+                  </div>
+                  
+                  <div className="pt-2 px-2 text-[10px] font-black text-gray-400 uppercase tracking-widest">สถานที่แนะนำ / ประวัติ</div>
+                  {status === "OK" ? data.map(({ place_id, description, structured_formatting: { main_text, secondary_text } }) => (
+                    <div key={place_id} onClick={() => handleSelectLocation(description)} className="p-4 bg-white rounded-[1.2rem] shadow-sm border border-gray-100 flex items-center gap-4 cursor-pointer hover:border-orange-200 transition-all">
+                      <div className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center shrink-0 text-lg">📍</div>
+                      <div><h4 className="text-sm font-bold text-gray-800">{main_text}</h4><p className="text-[11px] text-gray-400 line-clamp-1 mt-0.5">{secondary_text}</p></div>
+                    </div>
+                  )) : (
+                    popularPlaces.map((p, i) => (
+                      <div key={i} onClick={() => handleSelectLocation(p.name)} className="p-4 bg-white rounded-[1.2rem] shadow-sm border border-gray-100 flex items-center gap-4 cursor-pointer hover:border-orange-200 transition-all">
+                        <div className="w-10 h-10 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center shrink-0 text-lg">⭐</div>
+                        <div><h4 className="text-sm font-bold text-gray-800">{p.name}</h4><p className="text-[11px] text-gray-400 mt-0.5">{p.detail}</p></div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              ) : (
+                <div className="flex-1 relative">
+                  {isLoaded && (
+                    <>
+                      <GoogleMap mapContainerStyle={{ width: '100%', height: '100%' }} center={mapCenter} zoom={16} onClick={onMapClick} options={{ disableDefaultUI: true, zoomControl: false }}>
+                        {selectedPin && <MarkerF position={selectedPin} />}
+                      </GoogleMap>
+                      <button onClick={handleGetCurrentLocation} className="absolute top-6 right-6 w-14 h-14 bg-white rounded-full shadow-lg flex items-center justify-center text-2xl border border-gray-100 active:scale-95 transition-all text-blue-500">🎯</button>
+                      <div className="absolute bottom-10 left-6 right-6">
+                        <div className="bg-white/95 backdrop-blur-xl p-6 rounded-[2rem] shadow-2xl border border-white/50 text-center">
+                          <p className="text-base font-black text-gray-800 mb-1">จิ้มที่แผนที่เพื่อปักหมุด 📍</p>
+                          <p className="text-[11px] text-gray-500 mb-5 font-medium">ลากและซูมแผนที่ เพื่อความแม่นยำสูงสุด</p>
+                          <button onClick={() => setIsMapMode(false)} className="bg-gray-100 text-gray-600 px-6 py-3 rounded-full text-xs font-bold hover:bg-gray-200 transition-all">กลับไปค้นหาด้วยชื่อ</button>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* --- 💬 MODAL: CHAT INTERFACE --- */}
         {isChatOpen && activeChatJob && (
-          <div className="fixed inset-0 z-[200] bg-white flex flex-col animate-fade-in">
-            <div className="p-4 border-b flex items-center justify-between bg-white shadow-sm">
-              <button onClick={() => setIsChatOpen(false)} className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center text-gray-400">✕</button>
+          <div className="fixed inset-0 z-[200] bg-[#F4F6F8] flex flex-col animate-fade-in">
+            <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-white shadow-sm pt-safe z-10">
+              <button onClick={() => setIsChatOpen(false)} className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center text-gray-600 font-bold hover:bg-gray-100">✕</button>
               <div className="text-center">
-                <h3 className="text-sm font-black text-gray-800">แชทกับ{userRole === 'customer' ? 'ไรเดอร์' : 'ลูกค้า'}</h3>
-                <p className="text-[9px] text-gray-400">งาน: {activeChatJob.title}</p>
+                <h3 className="text-sm font-black text-gray-800">แชท: {userRole === 'customer' ? 'ไรเดอร์' : 'ลูกค้า'}</h3>
+                <p className="text-[10px] text-[#EE4D2D] font-bold mt-0.5 line-clamp-1">{activeChatJob.title}</p>
               </div>
               <div className="w-10"></div>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+            
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              <div className="text-center text-[10px] text-gray-400 font-bold my-4 bg-gray-200/50 py-1 px-3 rounded-full w-max mx-auto">แชทปลอดภัย 100%</div>
               {messages.map((msg, i) => (
                 <div key={i} className={`flex ${msg.sender_id === currentUser.id ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[75%] p-3 rounded-2xl text-xs shadow-sm ${msg.sender_id === currentUser.id ? 'bg-[#EE4D2D] text-white rounded-tr-none' : 'bg-white text-gray-800 rounded-tl-none'}`}>
+                  <div className={`max-w-[75%] p-3.5 rounded-[1.2rem] text-sm font-medium shadow-sm ${msg.sender_id === currentUser.id ? 'bg-gradient-to-br from-[#FF5A2D] to-[#EE4D2D] text-white rounded-tr-sm' : 'bg-white border border-gray-100 text-gray-800 rounded-tl-sm'}`}>
                     {msg.content}
                   </div>
                 </div>
               ))}
               <div ref={chatEndRef} />
             </div>
-            <form onSubmit={handleSendMessage} className="p-4 border-t bg-white flex gap-2">
-              <input type="text" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder="พิมพ์ข้อความ..." className="flex-1 bg-gray-100 border-none rounded-xl px-4 py-3 text-sm outline-none" />
-              <button type="submit" className="bg-[#EE4D2D] text-white px-5 rounded-xl font-bold active:scale-95 transition-all">ส่ง</button>
+
+            <form onSubmit={handleSendMessage} className="p-4 border-t border-gray-200 bg-white flex gap-3 pb-safe">
+              <input type="text" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder="พิมพ์ข้อความที่นี่..." className="flex-1 bg-[#F4F6F8] border border-gray-200 rounded-full px-5 py-3.5 text-sm font-medium outline-none focus:ring-2 focus:ring-orange-200 transition-all" />
+              <button type="submit" disabled={!newMessage.trim()} className="bg-[#EE4D2D] text-white w-12 h-12 rounded-full flex items-center justify-center text-lg shadow-md active:scale-95 disabled:opacity-50 transition-all">➤</button>
             </form>
           </div>
         )}
 
-        {/* --- MODALS (Code เดิมของเจมที่ใส่ให้ครบถ้วน) --- */}
-        {/* ... (ในส่วนนี้ผมรวม Modal Post Job และ Map Picker จากโค้ดเวอร์ชันเสถียรล่าสุดให้เรียบร้อยแล้วครับ) ... */}
-
+        {/* Bottom Nav ซ่อนเมื่อเปิด Modal */}
         {!isModalOpen && !isLocationPickerOpen && !isChatOpen && <BottomNav />}
       </div>
-      <style dangerouslySetInnerHTML={{__html: `.animate-fade-in { animation: fadeIn 0.3s ease-out; } @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }`}} />
+      <style dangerouslySetInnerHTML={{__html: `
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .pt-safe { padding-top: env(safe-area-inset-top); }
+        .pb-safe { padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
+        .animate-fade-in { animation: fadeIn 0.25s cubic-bezier(0.4, 0, 0.2, 1); }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(15px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+      `}} />
     </div>
   );
 }
