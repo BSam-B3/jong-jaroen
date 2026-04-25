@@ -3,28 +3,25 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import BottomNav from '@/app/components/BottomNav';
 
 export default function ProfilePage() {
   const router = useRouter();
 
-  // State เก็บข้อมูลผู้ใช้
+  // State สำหรับจัดการข้อมูล
   const [userProfile, setUserProfile] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // ดึงข้อมูลผู้ใช้จาก Supabase
   useEffect(() => {
     const fetchUserProfile = async () => {
       try {
-        // 1. เช็ค Session ว่าล็อกอินอยู่ไหม
         const { data: { session } } = await supabase.auth.getSession();
         
         if (!session) {
-          // ถ้าไม่ได้ล็อกอิน ให้เด้งไปหน้า Login
           router.push('/auth/login');
           return;
         }
 
-        // 2. ดึงข้อมูลจากตาราง profiles
         const { data: profileData, error } = await supabase
           .from('profiles')
           .select('*')
@@ -36,10 +33,11 @@ export default function ProfilePage() {
         if (profileData) {
           setUserProfile({
             ...profileData,
-            // ดึงอักษรตัวแรกของชื่อมาทำเป็นรูปโปรไฟล์
             initial: profileData.first_name ? profileData.first_name.charAt(0).toUpperCase() : '?',
-            // จัดฟอร์แมตเบอร์โทรให้สวยงาม (ถ้ามี)
-            formattedPhone: profileData.phone ? formatPhone(profileData.phone) : 'ยังไม่ระบุเบอร์โทร',
+            // ✅ แก้ไข: ใช้ phone_number ตามฐานข้อมูลจริง
+            formattedPhone: profileData.phone_number ? formatPhone(profileData.phone_number) : 'ยังไม่ระบุเบอร์โทรศัพท์',
+            // ✅ แก้ไข: นำ first_name และ last_name มาต่อกัน
+            full_name: `${profileData.first_name || ''} ${profileData.last_name || ''}`.trim() || 'ผู้ใช้งานชุมชน',
           });
         }
       } catch (error) {
@@ -52,7 +50,6 @@ export default function ProfilePage() {
     fetchUserProfile();
   }, [router]);
 
-  // ฟังก์ชันจัดฟอร์แมตเบอร์โทร (เช่น 0812345678 -> 081-234-5678)
   const formatPhone = (phone: string) => {
     let p = phone;
     if (p.startsWith('66')) p = '0' + p.slice(2);
@@ -60,198 +57,107 @@ export default function ProfilePage() {
     return p;
   };
 
-  // ฟังก์ชันออกจากระบบ
   const handleSignOut = async () => {
-    try {
+    if (confirm('คุณต้องการออกจากระบบใช่หรือไม่?')) {
       await supabase.auth.signOut();
       router.push('/auth/login');
-    } catch (error) {
-      console.error('Error signing out:', error);
     }
   };
 
+  const handleRegisterProvider = () => {
+    alert('ฟีเจอร์ลงทะเบียนพาร์ทเนอร์ (คนขับ/ช่าง) กำลังอยู่ในช่วงพัฒนาสำหรับเฟสต่อไปค่ะ 🚀');
+  };
+
   return (
-    <div className="min-h-screen bg-gray-100 flex justify-center pb-24">
-      <div className="w-full sm:max-w-2xl md:max-w-3xl bg-[#F4F6F8] min-h-screen relative flex flex-col shadow-xl overflow-x-hidden rounded-t-[2.5rem]">
+    <div className="min-h-screen bg-[#F4F6F8] flex justify-center font-sans">
+      <div className="w-full max-w-3xl bg-[#F4F6F8] min-h-screen relative flex flex-col shadow-2xl overflow-x-hidden border-x border-gray-100">
         
-        {/* 🟠 Header */}
-        <div className="bg-gradient-to-b from-[#EE4D2D] to-[#FF7337] rounded-b-[2.5rem] p-6 pt-12 shadow-md relative z-10">
-          <div className="flex items-center gap-4 mt-2 mb-2">
-            
-            {/* รูปโปรไฟล์ */}
-            <div className="w-16 h-16 bg-white rounded-full border-2 border-white/20 shadow-md flex items-center justify-center text-2xl font-black text-[#EE4D2D] relative flex-shrink-0 overflow-hidden">
+        {/* 🟠 Premium Header (Glassmorphism Style) */}
+        <div className="m-4 bg-gradient-to-br from-[#EE4D2D] to-[#FF7337] rounded-[2.5rem] p-8 shadow-lg relative z-10 overflow-hidden pb-12">
+          {/* แสงเงาตกแต่งข้างหลัง */}
+          <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/10 rounded-full blur-3xl"></div>
+          
+          <div className="flex items-center gap-6 relative z-20">
+            {/* รูปโปรไฟล์อัปเกรด */}
+            <div className="w-20 h-20 bg-white rounded-[1.5rem] rotate-3 shadow-xl flex items-center justify-center text-3xl font-black text-[#EE4D2D] relative border-4 border-white/30 transition-transform hover:rotate-0 cursor-pointer shrink-0">
               {isLoading ? (
-                <div className="w-full h-full bg-orange-100 animate-pulse"></div>
+                <div className="w-full h-full bg-orange-50 animate-pulse rounded-2xl"></div>
               ) : (
-                userProfile?.initial
+                <span className="-rotate-3">{userProfile?.initial}</span>
               )}
-              <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-1 shadow-sm">
-                <span className="text-[8px] text-gray-600 block leading-none">✏️</span>
+              <div className="absolute -bottom-2 -right-2 bg-white rounded-full p-2 shadow-lg border border-gray-100">
+                <span className="text-[10px] block leading-none">✏️</span>
               </div>
             </div>
             
-            {/* ชื่อและเบอร์โทร */}
-            <div className="text-white flex-1">
+            <div className="text-white overflow-hidden">
               {isLoading ? (
-                <div className="space-y-2">
-                  <div className="h-5 w-3/4 bg-white/30 rounded animate-pulse"></div>
-                  <div className="h-3 w-1/2 bg-white/20 rounded animate-pulse"></div>
+                <div className="space-y-3">
+                  <div className="h-6 w-40 bg-white/30 rounded-lg animate-pulse"></div>
+                  <div className="h-4 w-24 bg-white/20 rounded-lg animate-pulse"></div>
                 </div>
               ) : (
                 <>
-                  <h1 className="text-xl font-black tracking-tight leading-tight">
-                    {userProfile?.full_name || 'ผู้ใช้งาน'}
-                  </h1>
-                  <p className="text-white/80 text-xs mt-0.5">{userProfile?.formattedPhone}</p>
+                  <div className="flex items-center gap-2">
+                    <h1 className="text-xl sm:text-2xl font-black tracking-tight truncate">{userProfile?.full_name}</h1>
+                  </div>
+                  <p className="text-white/90 text-[11px] sm:text-xs font-bold mt-1.5 opacity-90 truncate">{userProfile?.formattedPhone}</p>
                 </>
               )}
             </div>
           </div>
         </div>
 
-        {/* 📋 ส่วนเนื้อหาหลัก */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-5 relative z-20 scrollbar-hide pb-24">
+        {/* 📋 ส่วนเนื้อหาหลัก (✅ ต่อโค้ดให้สมบูรณ์แล้ว) */}
+        <div className="flex-1 overflow-y-auto px-4 sm:px-6 space-y-4 pb-32 -mt-8 relative z-20 scrollbar-hide">
           
-          <div className="bg-orange-50 border border-[#EE4D2D]/20 rounded-2xl p-4 flex items-start gap-3 shadow-sm">
-             <span className="text-xl">💡</span>
-             <p className="text-[10px] text-gray-700 leading-relaxed font-medium">
-               หน้าต่างนี้สำหรับจัดการข้อมูลส่วนตัว ตั้งค่าช่องทางรับเงิน และเรียกดูประวัติผลงานของคุณค่ะ
-             </p>
-          </div>
-
-          {/* 👤 หมวด: แก้ไขข้อมูลส่วนตัว */}
-          <div className="bg-white rounded-[1.5rem] shadow-sm border border-gray-100 overflow-hidden">
-            <div className="px-5 py-3 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
-              <span className="text-[#EE4D2D] text-sm">👤</span>
-              <h3 className="font-bold text-gray-800 text-xs">ข้อมูลส่วนตัว</h3>
-            </div>
-            <div className="p-4 text-center">
-               <button 
-                 onClick={() => router.push('/auth/signup')} 
-                 className="w-full text-xs font-bold text-[#EE4D2D] bg-orange-50 px-6 py-3 rounded-full border border-orange-100 active:scale-95 transition-transform shadow-sm"
-               >
-                 อัปเดต / แก้ไขโปรไฟล์
-               </button>
+          {/* 🌟 แบนเนอร์สมัครไรเดอร์ (รับสมัครพาร์ทเนอร์) */}
+          <div className="bg-gradient-to-r from-gray-900 to-gray-800 rounded-[2rem] p-6 shadow-xl text-white relative overflow-hidden group">
+            <div className="absolute right-0 bottom-0 text-8xl opacity-10 transform translate-x-4 translate-y-4 group-hover:scale-110 transition-transform duration-500">🛵</div>
+            <div className="relative z-10">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="bg-orange-500 text-white text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">เปิดรับสมัคร</span>
+              </div>
+              <h3 className="text-lg font-black mb-1">ร่วมเป็นพาร์ทเนอร์</h3>
+              <p className="text-[11px] text-gray-300 mb-5 leading-relaxed max-w-[75%] font-medium">
+                สมัครเป็นไรเดอร์ หรือช่างชุมชน รับรายได้ 100% ไม่มีหักเปอร์เซ็นต์
+              </p>
+              <button onClick={handleRegisterProvider} className="bg-gradient-to-r from-[#FF5A2D] to-[#EE4D2D] text-white px-6 py-3 rounded-full text-xs font-black shadow-lg active:scale-95 transition-all">
+                ยืนยันตัวตนเลย 🚀
+              </button>
             </div>
           </div>
 
-          {/* 🛡️ หมวด: ยืนยันตัวตน แฟ้มเอกสาร และประวัติ */}
-          <div className="bg-white rounded-[1.5rem] shadow-sm border border-gray-100 overflow-hidden">
-            <div className="px-5 py-3 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
-              <span className="text-[#EE4D2D] text-sm">🛡️</span>
-              <h3 className="font-bold text-gray-800 text-xs">ยืนยันตัวตนและประวัติการใช้งาน</h3>
+          {/* ⚙️ เมนูการตั้งค่า */}
+          <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 overflow-hidden">
+            <div className="p-5 border-b border-gray-50 flex items-center justify-between cursor-pointer hover:bg-orange-50/50 transition-colors">
+              <div className="flex items-center gap-4"><div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-500 text-lg">💳</div><span className="text-sm font-bold text-gray-700">ช่องทางการชำระเงิน</span></div>
+              <span className="text-gray-300 font-bold">›</span>
             </div>
-            
-            <MenuRow 
-              icon="🔍" 
-              title="ยืนยันตัวตน (KYC)" 
-              subtitle="ยืนยันเบอร์โทรศัพท์และประวัติ"
-              status={userProfile?.national_id ? '✅ มีข้อมูลแล้ว' : '⏳ รอข้อมูล'}
-              onClick={() => {}} 
-            />
-            <MenuRow 
-              icon="🪪" 
-              title="แฟ้มเอกสารส่วนตัว" 
-              subtitle="วุฒิการศึกษา, ใบขับขี่, ใบอนุญาต"
-              onClick={() => {}} 
-            />
-            <MenuRow 
-              icon="🏦" 
-              title="บัญชีรับเงิน (Bank Account)" 
-              subtitle="ตั้งค่าช่องทางรับเงินสำหรับผู้รับงาน"
-              onClick={() => {}} 
-            />
-            <MenuRow 
-              icon="📜" 
-              title="ประวัติรายการ (History)" 
-              subtitle="บันทึกกิจกรรมและประวัติการจ้างงาน"
-              onClick={() => {}} 
-            />
-          </div>
-
-          {/* 🏆 หมวด: ผลงานและใบรับรอง */}
-          <div className="bg-white rounded-[1.5rem] shadow-sm border border-gray-100 overflow-hidden">
-            <div className="px-5 py-3 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
-              <span className="text-[#EE4D2D] text-sm">🏆</span>
-              <h3 className="font-bold text-gray-800 text-xs">ผลงานและใบรับรอง</h3>
+            <div className="p-5 border-b border-gray-50 flex items-center justify-between cursor-pointer hover:bg-orange-50/50 transition-colors">
+              <div className="flex items-center gap-4"><div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center text-green-500 text-lg">📍</div><span className="text-sm font-bold text-gray-700">ที่อยู่ที่บันทึกไว้</span></div>
+              <span className="text-gray-300 font-bold">›</span>
             </div>
-            
-            <MenuRow 
-              icon="🖼️" 
-              title="คลังใบประกาศ (Certificates)" 
-              subtitle="อัปโหลดใบประกาศ / ใบผ่านงาน"
-              onClick={() => {}} 
-            />
-            <MenuRow 
-              icon="📋" 
-              title="เรซูเม่และประวัติงาน (Portfolio)" 
-              subtitle="ดาวน์โหลดประวัติการทำงาน (PDF)"
-              onClick={() => {}} 
-            />
+            <div className="p-5 flex items-center justify-between cursor-pointer hover:bg-orange-50/50 transition-colors">
+              <div className="flex items-center gap-4"><div className="w-10 h-10 rounded-full bg-purple-50 flex items-center justify-center text-purple-500 text-lg">🎧</div><span className="text-sm font-bold text-gray-700">ศูนย์ช่วยเหลือ (Support)</span></div>
+              <span className="text-gray-300 font-bold">›</span>
+            </div>
           </div>
 
-          {/* 🛑 ปุ่มออกจากระบบ */}
-          <div className="pb-8">
-            <button 
-              onClick={handleSignOut}
-              className="w-full bg-gray-100 text-gray-700 py-4 rounded-xl font-bold text-sm shadow-inner hover:bg-gray-200 active:scale-[0.98] transition-all"
-            >
-              ออกจากระบบ
-            </button>
-          </div>
+          {/* 🔴 ปุ่มออกจากระบบ */}
+          <button onClick={handleSignOut} className="w-full bg-white hover:bg-red-50 text-red-500 py-4.5 rounded-[2rem] text-sm font-black transition-all border border-gray-100 hover:border-red-100 shadow-sm mt-2 active:scale-95">
+            ออกจากระบบ
+          </button>
 
+          <div className="text-center pt-4 pb-6">
+            <p className="text-[10px] text-gray-400 font-bold tracking-wider uppercase">Jong Jaroen App v1.0.0</p>
+          </div>
         </div>
 
-        {/* ✅ Bottom Navigation */}
-        <div className="fixed bottom-0 w-full sm:max-w-2xl md:max-w-3xl bg-white/95 backdrop-blur-md border-t border-gray-100 px-1 py-4 flex justify-between items-center shadow-[0_-4px_25px_rgba(0,0,0,0.06)] rounded-t-[2.5rem] z-50">
-          <NavItem icon="🏠" label="หน้าแรก" active={false} onClick={() => router.push('/')} />
-          <NavItem icon="🛠️" label="บริการ" active={false} onClick={() => router.push('/services')} />
-          <NavItem icon="📋" label="งานด่วน" active={false} onClick={() => router.push('/win-online')} />
-          <NavItem icon="📰" label="ข่าวสาร" active={false} onClick={() => router.push('/news')} />
-          <NavItem icon="🎟️" label="ปองเจริญ" active={false} onClick={() => router.push('/coupons')} />
-          <NavItem icon="👤" label="ฉัน" active={true} onClick={() => {}} />
-        </div>
-
+        {/* แถบเมนูด้านล่าง */}
+        <BottomNav />
       </div>
-
-      <style dangerouslySetInnerHTML={{__html: `
-        .scrollbar-hide::-webkit-scrollbar { display: none; }
-        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
-      `}} />
-    </div>
-  );
-}
-
-// คอมโพเนนต์ย่อยสำหรับแถวเมนู
-function MenuRow({ icon, title, subtitle, onClick, status }: any) {
-  return (
-    <div 
-      onClick={onClick}
-      className="flex items-center justify-between p-4 border-b border-gray-50 last:border-0 cursor-pointer hover:bg-gray-50 active:bg-gray-100 transition-colors"
-    >
-      <div className="flex items-center gap-4">
-        <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center text-xl shadow-inner border border-gray-100 shrink-0">
-          {icon}
-        </div>
-        <div>
-          <h4 className="text-sm font-bold text-gray-800 leading-tight">{title}</h4>
-          {subtitle && <p className="text-[10px] text-gray-500 mt-0.5 leading-tight">{subtitle}</p>}
-        </div>
-      </div>
-      <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-        {status && <span className="text-[9px] font-bold bg-gray-100 px-2 py-1 rounded-md text-gray-600 shadow-inner">{status}</span>}
-        <span className="text-gray-300 text-xl leading-none">›</span>
-      </div>
-    </div>
-  );
-}
-
-function NavItem({ icon, label, active, onClick }: any) {
-  return (
-    <div onClick={onClick} className={`flex flex-col items-center gap-1.5 cursor-pointer transition-all ${active ? 'scale-110' : 'opacity-40 hover:opacity-100'} flex-1`}>
-      <span className="text-[22px]">{icon}</span>
-      <span className={`text-[9px] font-bold ${active ? 'text-[#EE4D2D]' : 'text-gray-500'} whitespace-nowrap`}>{label}</span>
-      {active && <div className="w-1.5 h-1.5 bg-[#EE4D2D] rounded-full shadow-sm mt-0.5"></div>}
+      <style dangerouslySetInnerHTML={{__html: `.scrollbar-hide::-webkit-scrollbar { display: none; }`}} />
     </div>
   );
 }
