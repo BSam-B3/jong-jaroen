@@ -1,0 +1,155 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { supabase } from '@/lib/supabase';
+import { useRouter, useParams } from 'next/navigation';
+
+export default function KYCDetailPage() {
+  const router = useRouter();
+  const params = useParams();
+  const [userProfile, setUserProfile] = useState<any>(null);
+  const [idCardImage, setIdCardImage] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [processing, setProcessing] = useState(false);
+
+  useEffect(() => {
+    if (params.id) {
+      fetchUserDetails(params.id as string);
+    }
+  }, [params.id]);
+
+  async function fetchUserDetails(userId: string) {
+    // 1. ดึงข้อมูล Profile
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+
+    if (profile) {
+      setUserProfile(profile);
+      // 2. ขอ URL แบบชั่วคราวสำหรับดูรูป (เพราะเราล็อกถังเป็น Private ไว้)
+      if (profile.id_card_url) {
+        const { data } = await supabase.storage
+          .from('kyc_documents')
+          .createSignedUrl(profile.id_card_url, 3600); // ดูได้ 1 ชั่วโมง
+        if (data) setIdCardImage(data.signedUrl);
+      }
+    }
+    setLoading(false);
+  }
+
+  // --- ฟังก์ชันอนุมัติ ---
+  async function handleApprove() {
+    if (!confirm('ยืนยันว่าข้อมูลถูกต้องและต้องการ อนุมัติ ใช่หรือไม่?')) return;
+    setProcessing(true);
+
+    try {
+      // เปลี่ยนสถานะเป็น approved
+      await supabase.from('profiles').update({ kyc_status: 'approved' }).eq('id', userProfile.id);
+      
+      // ลบรูปภาพทิ้งตามหลัก PDPA
+      if (userProfile.id_card_url) {
+        await supabase.storage.from('kyc_documents').remove([userProfile.id_card_url]);
+        await supabase.from('profiles').update({ id_card_url: null }).eq('id', userProfile.id);
+      }
+      
+      alert('✅ อนุมัติสำเร็จ! ระบบได้ทำการลบรูปภาพบัตรเพื่อความปลอดภัยแล้วค่ะ');
+      router.push('/admin/kyc');
+    } catch (error) {
+      console.error(error);
+      alert('เกิดข้อผิดพลาดในการอนุมัติ');
+      setProcessing(false);
+    }
+  }
+
+  // --- ฟังก์ชันปฏิเสธ ---
+  async function handleReject() {
+    if (!confirm('ต้องการ ปฏิเสธ และให้ลูกค้าถ่ายเอกสารใหม่ ใช่หรือไม่?')) return;
+    setProcessing(true);
+
+    try {
+      // เปลี่ยนสถานะกลับเป็น none ให้ส่งใหม่
+      await supabase.from('profiles').update({ kyc_status: 'none' }).eq('id', userProfile.id);
+      
+      // ลบรูปภาพทิ้ง
+      if (userProfile.id_card_url) {
+        await supabase.storage.from('kyc_documents').remove([userProfile.id_card_url]);
+        await supabase.from('profiles').update({ id_card_url: null }).eq('id', userProfile.id);
+      }
+      
+      alert('❌ ปฏิเสธสำเร็จ! ระบบส่งเรื่องให้ลูกค้าถ่ายเอกสารใหม่แล้วค่ะ');
+      router.push('/admin/kyc');
+    } catch (error) {
+      console.error(error);
+      alert('เกิดข้อผิดพลาดในการปฏิเสธ');
+      setProcessing(false);
+    }
+  }
+
+  if (loading) return <div className="p-10 font-bold text-center">กำลังโหลดข้อมูลลูกค้า...</div>;
+  if (!userProfile) return <div className="p-10 font-bold text-center text-red-500">ไม่พบข้อมูลลูกค้ารายนี้ค่ะ</div>;
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-6">
+      <div className="flex items-center gap-4">
+        <button onClick={() => router.back()} className="text-gray-500 hover:text-black font-bold">← กลับไปหน้ารวม</button>
+        <h1 className="text-2xl font-black">ตรวจสอบเอกสารลูกค้ารายบุคคล</h1>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-6">
+        {/* คอลัมน์ซ้าย: แสดงรูปบัตร */}
+        <div className="bg-white p-6 rounded-3xl shadow-sm border">
+          <h2 className="text-sm font-black text-gray-400 uppercase mb-4">รูปถ่ายหน้าบัตร</h2>
+          {idCardImage ? (
+            <img src={idCardImage} alt="ID Card" className="w-full rounded-xl border-2 border-gray-100" />
+          ) : (
+            <div className="h-48 bg-gray-50 rounded-xl flex items-center justify-center text-gray-400 font-bold">
+              ไม่พบไฟล์รูปภาพ (อาจถูกลบไปแล้ว)
+            </div>
+          )}
+        </div>
+
+        {/* คอลัมน์ขวา: แสดงข้อมูลตัวอักษร */}
+        <div className="bg-white p-6 rounded-3xl shadow-sm border space-y-6">
+          <h2 className="text-sm font-black text-gray-400 uppercase border-b pb-4">ข้อมูลที่ AI สแกนได้</h2>
+          
+          <div>
+            <p className="text-[10px] font-black text-gray-400 uppercase">ชื่อ-นามสกุล</p>
+            <p className="font-bold text-lg">{userProfile.full_name || '-'}</p>
+          </div>
+          <div>
+            <p className="text-[10px] font-black text-gray-400 uppercase">เลขบัตร 13 หลัก</p>
+            <p className="font-mono text-lg tracking-widest">{userProfile.national_id || '-'}</p>
+          </div>
+          <div>
+            <p className="text-[10px] font-black text-gray-400 uppercase">วันเกิด</p>
+            <p className="font-bold">{userProfile.date_of_birth || '-'}</p>
+          </div>
+          <div>
+            <p className="text-[10px] font-black text-gray-400 uppercase">ที่อยู่ตามบัตร</p>
+            <p className="font-bold">{userProfile.address || '-'}</p>
+          </div>
+
+          {/* ส่วนปุ่มตัดสินใจ */}
+          <div className="pt-6 border-t flex gap-4">
+            <button 
+              onClick={handleReject} 
+              disabled={processing}
+              className="flex-1 bg-red-50 text-red-600 border border-red-200 py-4 rounded-xl font-black hover:bg-red-100 transition disabled:opacity-50"
+            >
+              ❌ ปฏิเสธ (ให้ถ่ายใหม่)
+            </button>
+            <button 
+              onClick={handleApprove} 
+              disabled={processing}
+              className="flex-1 bg-green-500 text-white py-4 rounded-xl font-black shadow-lg hover:bg-green-600 transition disabled:opacity-50"
+            >
+              ✅ อนุมัติผ่าน
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
