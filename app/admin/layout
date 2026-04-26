@@ -11,20 +11,32 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [loading, setLoading] = useState(true);
   const [adminData, setAdminData] = useState<any>(null);
 
+  // ✅ รายการเมนู (ย้ายมาไว้ตรงนี้เพื่อให้ Sidebar มองเห็นและใช้งานได้ค่ะ)
+  const menus = [
+    { name: 'ภาพรวม (Dashboard)', path: '/admin', icon: '📊', key: 'all' },
+    { name: 'ยืนยันตัวตน (KYC)', path: '/admin/kyc', icon: '🪪', key: 'can_view_kyc' },
+    { name: 'จัดการสมาชิก (Users)', path: '/admin/users', icon: '👥', key: 'all' },
+    { name: 'จัดการงาน (Jobs)', path: '/admin/jobs', icon: '💼', key: 'can_view_jobs' },
+    { name: 'การเงิน (Finance)', path: '/admin/finance', icon: '💰', key: 'can_view_finance' },
+  ];
+
   useEffect(() => {
     checkAdminAccess();
   }, []);
 
   async function checkAdminAccess() {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { router.push('/login'); return; }
+    if (!user) {
+      router.push('/auth/login');
+      return;
+    }
 
     const { data: profile } = await supabase.from('profiles')
       .select('full_name, role, admin_permissions')
       .eq('id', user.id)
       .single();
 
-    // 🔒 ระบบความปลอดภัย: เช็คว่าเป็น Super Admin หรือมีสิทธิ์พนักงานหรือไม่
+    // 🔒 ด่านตรวจความปลอดภัย
     if (profile?.role !== 'super_admin' && profile?.role !== 'admin') {
       alert('คุณไม่มีสิทธิ์เข้าถึงพื้นที่ของ Admin ค่ะ');
       router.push('/');
@@ -35,56 +47,68 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     setLoading(false);
   }
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center font-black text-gray-400">กำลังตรวจสอบสิทธิ์หลังบ้าน...</div>;
-
-  // 📝 รายการเมนูทั้งหมด (จะถูกซ่อน/แสดง ตามสิทธิ์ที่ตั้งไว้ในฐานข้อมูล)
-  const menus = [
-    { name: 'ภาพรวม (Dashboard)', path: '/admin', icon: '📊', key: 'all' },
-    { name: 'ยืนยันตัวตน (KYC)', path: '/admin/kyc', icon: '🪪', key: 'can_view_kyc' },
-    { name: 'จัดการงาน (Jobs)', path: '/admin/jobs', icon: '💼', key: 'can_view_jobs' },
-    { name: 'การเงิน (Finance)', path: '/admin/finance', icon: '💰', key: 'can_view_finance' },
-  ];
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="text-center">
+        <div className="w-12 h-12 border-4 border-[#EE4D2D] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+        <p className="font-black text-gray-400 italic tracking-widest">กำลังตรวจสอบสิทธิ์ ADMIN...</p>
+      </div>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      {/* --- Sidebar Navigation --- */}
-      <aside className="w-64 bg-white border-r shadow-sm flex flex-col z-10 relative">
-        <div className="p-6 border-b">
-          <h1 className="text-2xl font-black text-[#EE4D2D] tracking-tighter">JONG-JAROEN</h1>
-          <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Admin Workspace</span>
+    <div className="min-h-screen bg-[#F8F9FA] flex overflow-hidden">
+      {/* --- Sidebar --- */}
+      <aside className="w-72 bg-white border-r border-gray-200 shadow-xl flex flex-col z-30 relative">
+        <div className="p-8 border-b border-gray-100">
+          <h1 className="text-2xl font-black text-[#EE4D2D] tracking-tighter leading-none">JONG-JAROEN</h1>
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mt-2">Central Control Panel</p>
         </div>
         
-        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+        <nav className="flex-1 p-6 space-y-2 overflow-y-auto">
           {menus.map(menu => {
-            // โลจิกซ่อนเมนู: ถ้าเป็น super_admin เห็นหมด, ถ้าไม่ใช่ ต้องไปเช็คใน admin_permissions (JSONB)
             const isSuperAdmin = adminData.role === 'super_admin';
             const hasPermission = adminData.admin_permissions?.[menu.key];
 
+            // กรองสิทธิ์: ถ้าไม่ใช่ Super Admin และไม่มีสิทธิ์เฉพาะทาง จะมองไม่เห็นเมนูนั้นค่ะ
             if (menu.key !== 'all' && !isSuperAdmin && !hasPermission) return null;
 
             const isActive = pathname === menu.path || pathname.startsWith(`${menu.path}/`);
             return (
-              <Link key={menu.path} href={menu.path} className={`flex items-center gap-3 px-4 py-3 rounded-2xl font-bold transition-all ${isActive ? 'bg-[#EE4D2D] text-white shadow-lg shadow-orange-500/30' : 'text-gray-500 hover:bg-orange-50 hover:text-[#EE4D2D]'}`}>
-                <span className="text-xl">{menu.icon}</span>
-                <span className="text-sm">{menu.name}</span>
+              <Link key={menu.path} href={menu.path} 
+                className={`flex items-center gap-4 px-5 py-4 rounded-[1.5rem] font-bold transition-all duration-300 ${
+                  isActive 
+                  ? 'bg-[#EE4D2D] text-white shadow-lg shadow-orange-500/30 translate-x-2' 
+                  : 'text-gray-500 hover:bg-orange-50 hover:text-[#EE4D2D] hover:translate-x-1'
+                }`}>
+                <span className="text-2xl">{menu.icon}</span>
+                <span className="text-sm tracking-tight">{menu.name}</span>
               </Link>
             );
           })}
         </nav>
 
-        {/* Profile Card ด้านล่าง */}
-        <div className="p-4 border-t bg-gray-50/50 m-4 rounded-2xl border border-gray-100">
-          <p className="text-[10px] font-black text-gray-400 uppercase mb-1">เข้าสู่ระบบโดย</p>
-          <p className="text-sm font-black text-gray-800 truncate">{adminData.full_name || 'Administrator'}</p>
-          <span className="inline-block mt-2 bg-green-100 text-green-700 text-[9px] px-2 py-1 rounded-full font-black uppercase tracking-widest border border-green-200">
-            {adminData.role?.replace('_', ' ')}
-          </span>
+        {/* User Badge ด้านล่าง */}
+        <div className="p-6 bg-gray-50 m-6 rounded-[2rem] border border-gray-100 shadow-inner">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-white rounded-2xl shadow-sm flex items-center justify-center text-lg font-black text-[#EE4D2D]">
+              {adminData.full_name?.charAt(0)}
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <p className="text-xs font-black text-gray-800 truncate">{adminData.full_name}</p>
+              <span className="inline-block mt-1 bg-[#EE4D2D]/10 text-[#EE4D2D] text-[8px] px-2 py-0.5 rounded-full font-black uppercase tracking-widest border border-[#EE4D2D]/20">
+                {adminData.role?.replace('_', ' ')}
+              </span>
+            </div>
+          </div>
         </div>
       </aside>
 
-      {/* --- Main Content Area --- */}
-      <main className="flex-1 p-8 overflow-y-auto">
-        {children}
+      {/* --- Main Content --- */}
+      <main className="flex-1 h-screen overflow-y-auto p-10 relative bg-[#F8F9FA] text-black">
+        <div className="max-w-6xl mx-auto">
+          {children}
+        </div>
       </main>
     </div>
   );
