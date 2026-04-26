@@ -3,8 +3,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-// เราจะเก็บ Tesseract ไว้เป็นตัวสำรอง (Fallback) จนกว่า Google จะพร้อมนะค๊ะ
-import Tesseract from 'tesseract.js';
 
 export default function KYCPage() {
   const router = useRouter();
@@ -12,13 +10,17 @@ export default function KYCPage() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [kycStatus, setKycStatus] = useState<string | null>(null);
   const [error, setError] = useState('');
-  const [step, setStep] = useState<number>(1);
-
+  
+  // -- Form States --
   const [fullName, setFullName] = useState('');
   const [idNumber, setIdNumber] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState(''); // ช่องใหม่
+  const [address, setAddress] = useState('');         // ช่องใหม่
+  
   const [pdpaConsent, setPdpaConsent] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // -- Camera & AI States --
   const [idImageFile, setIdImageFile] = useState<File | null>(null);
   const [idPreview, setIdPreview] = useState<string | null>(null);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
@@ -50,13 +52,15 @@ export default function KYCPage() {
       if (!user) { router.push('/login'); return; }
       setCurrentUser(user);
       const { data: profile } = await supabase.from('profiles')
-        .select('kyc_status, phone_verified, full_name, national_id')
+        .select('kyc_status, full_name, national_id, date_of_birth, address')
         .eq('id', user.id).single();
+        
       if (profile) {
         setKycStatus(profile.kyc_status || 'none');
         if (profile.full_name) setFullName(profile.full_name);
         if (profile.national_id) setIdNumber(profile.national_id);
-        if (profile.phone_verified) setStep(2);
+        if (profile.date_of_birth) setDateOfBirth(profile.date_of_birth);
+        if (profile.address) setAddress(profile.address);
       }
     } catch (_e) {}
     setLoading(false);
@@ -95,29 +99,70 @@ export default function KYCPage() {
     canvas.width = width;
     canvas.height = height;
     ctx.drawImage(video, 0, 0, width, height);
+    
     const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
     setIdPreview(dataUrl);
     stopCamera();
 
     setIsScanning(true);
     setError('');
-    setStatusMessage('กำลังตรวจสอบความชัดเจนของเอกสาร...');
+    setStatusMessage('Google AI กำลังวิเคราะห์ข้อมูลบนบัตร...');
     
     try {
-      const result = await Tesseract.recognize(dataUrl, 'tha+eng');
-      const text = result.data.text;
-      const isValid = text.includes('บัตรประจำตัวประชาชน') || text.includes('Identification') || text.includes('Thai National');
+      // ดึง Base64 เพื่อส่งให้ Google Vision API
+      const base64Image = dataUrl.split(',')[1];
+      const apiKey = process.env.NEXT_PUBLIC_GOOGLE_VISION_API_KEY;
+      
+      if (!apiKey) throw new Error("API Key ไม่พร้อมใช้งาน");
+
+      const response = await fetch(`https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requests: [{
+            image: { content: base64Image },
+            features: [{ type: 'TEXT_DETECTION' }]
+          }]
+        })
+      });
+
+      const result = await response.json();
+      const rawText = result.responses?.[0]?.fullTextAnnotation?.text || '';
+
+      // เช็คว่าเป็นบัตรประชาชนจริงๆ ไหม
+      const isValid = rawText.includes('บัตรประจำตัวประชาชน') || rawText.includes('Identification') || rawText.includes('Thai National');
       
       if (!isValid) {
-        setError('❌ ตรวจไม่พบข้อมูลบนหน้าบัตร กรุณาถ่ายใหม่ในที่สว่างและอยู่ในกรอบค่ะ');
+        setError('❌ ตรวจไม่พบข้อมูลบนหน้าบัตร กรุณาถ่ายใหม่ให้ชัดเจนและเห็นเต็มใบค่ะ');
         setIdPreview(null);
       } else {
-        setStatusMessage('✅ ตรวจสอบเอกสารเบื้องต้นเรียบร้อย');
+        setStatusMessage('✅ ดึงข้อมูลสำเร็จ กรุณาตรวจสอบความถูกต้องอีกครั้ง');
+        
+        // --- 🤖 AI Data Parsing (พยายามควานหาข้อมูลจากข้อความดิบ) ---
+        
+        // หาเลขบัตร 13 หลัก
+        const idMatch = rawText.match(/\b\d\s?\d{4}\s?\d{5}\s?\d{2}\s?\d\b/);
+        if (idMatch) setIdNumber(idMatch[0].replace(/\s/g, ''));
+
+        // หาชื่อ (แบบง่ายๆ)
+        const nameMatch = rawText.match(/(นาย|นาง|นางสาว)\s*([ก-๙]+)\s+([ก-๙]+)/);
+        if (nameMatch) setFullName(`${nameMatch[1]}${nameMatch[2]} ${nameMatch[3]}`);
+
+        // หาวันเกิด
+        const dobMatch = rawText.match(/เกิดวันที่\s*(.*?)\n/);
+        if (dobMatch) setDateOfBirth(dobMatch[1].trim());
+
+        // หาที่อยู่ (ควานหาคำว่า "ที่อยู่" จนจบประโยคหรือขึ้นบรรทัดใหม่)
+        const addressMatch = rawText.match(/ที่อยู่\s*(.*?)(?=\n|$)/);
+        if (addressMatch) setAddress(addressMatch[1].trim());
+
+        // แปลงภาพเป็นไฟล์เตรียมอัปโหลด
         const blob = await (await fetch(dataUrl)).blob();
         setIdImageFile(new File([blob], `verified_id_${Date.now()}.jpg`, { type: 'image/jpeg' }));
       }
     } catch (err) {
-      setStatusMessage('ระบบขัดข้องชั่วคราว คุณสามารถส่งรูปเพื่อตรวจสอบภายหลังได้ค่ะ');
+      console.error(err);
+      setStatusMessage('⚠️ ไม่สามารถดึงข้อมูลอัตโนมัติได้ กรุณากรอกด้วยตนเองค่ะ');
       const blob = await (await fetch(dataUrl)).blob();
       setIdImageFile(new File([blob], `id_card_${Date.now()}.jpg`, { type: 'image/jpeg' }));
     } finally {
@@ -133,9 +178,17 @@ export default function KYCPage() {
       const fileName = `${currentUser.id}/${idImageFile.name}`;
       const { data: uploadData, error: uploadErr } = await supabase.storage.from('kyc_documents').upload(fileName, idImageFile);
       if (uploadErr) throw uploadErr;
+      
       await supabase.from('profiles').update({
-        kyc_status: 'pending', full_name: fullName, national_id: idNumber, id_card_url: uploadData.path, pdpa_consented_at: new Date().toISOString()
+        kyc_status: 'pending', 
+        full_name: fullName, 
+        national_id: idNumber, 
+        date_of_birth: dateOfBirth, // บันทึกวันเกิด
+        address: address,           // บันทึกที่อยู่
+        id_card_url: uploadData.path, 
+        pdpa_consented_at: new Date().toISOString()
       }).eq('id', currentUser.id);
+      
       setKycStatus('pending');
     } catch (err: any) { setError(err.message); }
     setIsSubmitting(false);
@@ -180,46 +233,64 @@ export default function KYCPage() {
         )}
 
         <div className="p-6 border-b sticky top-0 bg-white z-50 flex items-center gap-4">
-          <button onClick={() => router.back()} className="text-2xl font-bold">←</button>
+          <button type="button" onClick={() => router.back()} className="text-2xl font-bold">←</button>
           <h1 className="font-black text-xl">ยืนยันตัวตน</h1>
         </div>
 
         <div className="p-8 space-y-8">
           {error && <div className="bg-red-50 text-red-600 p-4 rounded-2xl text-xs font-black border border-red-100">{error}</div>}
+          
+          {/* ส่วนกล้องย้ายมาไว้ด้านบนเพื่อดึงดูดให้ถ่ายรูปก่อน */}
+          <div className="space-y-3">
+            <label className="block text-[11px] font-black text-gray-400 uppercase">1. ถ่ายรูปหน้าบัตรประชาชน</label>
+            <div onClick={() => !isScanning && startCamera()} className={`border-4 border-dashed rounded-[2rem] p-8 text-center cursor-pointer transition-all ${idPreview ? 'border-green-100 bg-green-50' : 'border-gray-100 bg-gray-50 hover:bg-gray-100'}`}>
+               {isScanning ? (
+                 <div className="py-6 space-y-4">
+                    <div className="w-10 h-10 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                    <p className="text-sm font-black text-orange-600 animate-pulse">{statusMessage}</p>
+                 </div>
+               ) : idPreview ? (
+                 <div className="space-y-4">
+                   <img src={idPreview} className="max-h-48 mx-auto rounded-xl shadow-md border-2 border-white" alt="ID Preview" />
+                   <p className="text-xs font-black text-green-600">✅ รูปพร้อมใช้งาน (แตะเพื่อถ่ายใหม่)</p>
+                 </div>
+               ) : (
+                 <div className="py-10 space-y-3">
+                    <div className="text-5xl">🪪</div>
+                    <p className="text-sm font-black text-gray-700">แตะเพื่อถ่ายรูปบัตร</p>
+                    <p className="text-[10px] text-gray-400">ระบบ AI จะช่วยกรอกข้อมูลให้อัตโนมัติ</p>
+                 </div>
+               )}
+            </div>
+          </div>
+
           <form onSubmit={handleSubmitData} className="space-y-6">
+            <label className="block text-[11px] font-black text-gray-400 uppercase pt-4 border-t">2. ตรวจสอบข้อมูล (แก้ไขได้หาก AI อ่านผิด)</label>
+            
             <div>
               <label className="block text-[11px] font-black text-gray-400 mb-2 uppercase">ชื่อ-นามสกุลจริง</label>
-              <input type="text" value={fullName} onChange={e => setFullName(e.target.value)} className="w-full p-4 bg-gray-50 border-none rounded-2xl font-bold" placeholder="กรอกชื่อตามบัตร" required />
+              <input type="text" value={fullName} onChange={e => setFullName(e.target.value)} className="w-full p-4 bg-gray-50 border-none rounded-2xl font-bold focus:ring-2 focus:ring-orange-500" placeholder="กรอกชื่อตามบัตร" required />
             </div>
             <div>
               <label className="block text-[11px] font-black text-gray-400 mb-2 uppercase">เลขบัตรประชาชน 13 หลัก</label>
-              <input type="text" value={idNumber} onChange={e => setIdNumber(e.target.value.replace(/\D/g,'').slice(0,13))} className="w-full p-4 bg-gray-50 border-none rounded-2xl font-black tracking-widest text-lg" placeholder="0000000000000" required />
+              <input type="text" value={idNumber} onChange={e => setIdNumber(e.target.value.replace(/\D/g,'').slice(0,13))} className="w-full p-4 bg-gray-50 border-none rounded-2xl font-black tracking-widest text-lg focus:ring-2 focus:ring-orange-500" placeholder="0000000000000" required />
             </div>
-            <div className="space-y-3">
-              <label className="block text-[11px] font-black text-gray-400 uppercase">ถ่ายรูปบัตรประชาชน</label>
-              <div onClick={() => !isScanning && startCamera()} className={`border-4 border-dashed rounded-[2rem] p-8 text-center cursor-pointer transition-all ${idPreview ? 'border-green-100 bg-green-50' : 'border-gray-100 bg-gray-50 hover:bg-gray-100'}`}>
-                 {isScanning ? (
-                   <div className="py-6 space-y-4">
-                      <div className="w-10 h-10 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-                      <p className="text-sm font-black text-orange-600 animate-pulse">{statusMessage}</p>
-                   </div>
-                 ) : idPreview ? (
-                   <div className="space-y-4">
-                     <img src={idPreview} className="max-h-48 mx-auto rounded-xl shadow-md border-2 border-white" alt="ID Preview" />
-                     <p className="text-xs font-black text-green-600">✅ รูปพร้อมใช้งาน (แตะเพื่อถ่ายใหม่)</p>
-                   </div>
-                 ) : (
-                   <div className="py-10 space-y-3">
-                      <div className="text-5xl">🪪</div>
-                      <p className="text-sm font-black text-gray-700">แตะเพื่อถ่ายรูปบัตร</p>
-                   </div>
-                 )}
-              </div>
+            
+            {/* --- ช่องใหม่: วันเกิด และ ที่อยู่ --- */}
+            <div>
+              <label className="block text-[11px] font-black text-gray-400 mb-2 uppercase">วัน/เดือน/ปีเกิด (ตามบัตร)</label>
+              <input type="text" value={dateOfBirth} onChange={e => setDateOfBirth(e.target.value)} className="w-full p-4 bg-gray-50 border-none rounded-2xl font-bold focus:ring-2 focus:ring-orange-500" placeholder="เช่น 1 ม.ค. 2540" />
             </div>
+            <div>
+              <label className="block text-[11px] font-black text-gray-400 mb-2 uppercase">ที่อยู่ตามหน้าบัตร</label>
+              <textarea value={address} onChange={e => setAddress(e.target.value)} rows={3} className="w-full p-4 bg-gray-50 border-none rounded-2xl font-bold focus:ring-2 focus:ring-orange-500 resize-none" placeholder="บ้านเลขที่, หมู่, ตำบล, อำเภอ, จังหวัด" />
+            </div>
+
             <div className="flex items-start gap-3 bg-blue-50 p-4 rounded-2xl">
               <input type="checkbox" checked={pdpaConsent} onChange={e => setPdpaConsent(e.target.checked)} className="mt-1 h-5 w-5 rounded" required />
-              <p className="text-[10px] text-blue-800 leading-relaxed font-medium">ข้าพเจ้ายินยอมให้ประมวลผลข้อมูลเพื่อใช้ในการยืนยันตัวตนตามนโยบายของระบบ</p>
+              <p className="text-[10px] text-blue-800 leading-relaxed font-medium">ข้าพเจ้ายินยอมให้แพลตฟอร์มจงเจริญประมวลผลข้อมูลส่วนบุคคลและรูปถ่ายหน้าบัตรประชาชน เพื่อวัตถุประสงค์ในการยืนยันตัวตน (KYC) และรักษาความปลอดภัยของบัญชีตามนโยบาย PDPA</p>
             </div>
+            
             <button type="submit" disabled={isSubmitting || !idImageFile || isScanning} className="w-full bg-[#EE4D2D] text-white py-5 rounded-full font-black text-sm shadow-xl active:scale-95 disabled:opacity-50 transition-all">
               {isSubmitting ? 'กำลังส่งข้อมูล...' : 'ส่งข้อมูลเพื่อรับการตรวจสอบ'}
             </button>
