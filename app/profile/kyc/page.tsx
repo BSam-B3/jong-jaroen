@@ -35,7 +35,6 @@ export default function KYCPage() {
     return () => stopCamera();
   }, []);
 
-  // ติดตั้งวิดีโอเข้ากับ Stream เมื่อกล้องเปิด
   useEffect(() => {
     if (isCameraOpen && videoRef.current && streamRef.current) {
       videoRef.current.srcObject = streamRef.current;
@@ -94,7 +93,6 @@ export default function KYCPage() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // ตั้งค่าความละเอียดภาพที่เหมาะสมสำหรับการทำ OCR
     const width = 1280;
     const height = Math.round((video.videoHeight * width) / video.videoWidth);
     canvas.width = width;
@@ -129,10 +127,8 @@ export default function KYCPage() {
       const result = await response.json();
       const rawText = result.responses?.[0]?.fullTextAnnotation?.text || '';
       
-      // ล้างข้อความเพื่อให้อ่านง่ายขึ้น
       const cleanText = rawText.replace(/\n/g, ' ');
 
-      // เช็คว่าเป็นบัตรประชาชนจริงหรือไม่
       const isValid = rawText.includes('บัตรประจำตัวประชาชน') || rawText.includes('Identification') || rawText.includes('Thai National');
       
       if (!isValid) {
@@ -141,7 +137,7 @@ export default function KYCPage() {
       } else {
         setStatusMessage('✅ วิเคราะห์สำเร็จ กรุณาตรวจสอบข้อมูลอีกครั้ง');
         
-        // --- 🤖 ขุมพลัง AI Data Parsing (ดึงข้อมูลลงช่องให้อัตโนมัติ) ---
+        // --- 🤖 ขุมพลัง AI Data Parsing (เวอร์ชันคุณบีสาม: ประกอบร่างเลโก้) ---
         
         // 1. เลขบัตร 13 หลัก
         const idMatch = rawText.replace(/\D/g, '').match(/(\d{13})/);
@@ -155,12 +151,28 @@ export default function KYCPage() {
         const dobMatch = cleanText.match(/(\d{1,2}\s*[ก-๙\.]+\s*\d{4})/);
         if (dobMatch) setDateOfBirth(dobMatch[1]);
 
-        // 4. ที่อยู่ (ปรับแก้: สั่งหยุดเมื่อเจอคำว่า เจ้าพนักงาน/ผู้ออกบัตร)
-        const addressMatch = cleanText.match(/(?:ที่อยู่|Address)\s*(.*?)(?=\s*(?:เจ้าพนักงาน|ผู้ออก|พนักงาน|วันออก|Date|ศาสนา|$))/i);
-        if (addressMatch) {
-            // ล้างคำขยะท้ายบรรทัดอีกรอบ
-            const finalAddr = addressMatch[1].split(/เจ้าพนักงาน|ผู้ออก|พนักงาน|วันออก/)[0].trim();
-            setAddress(finalAddr);
+        // 4. ที่อยู่ (แยกส่วนหาทีละคำ แล้วจับมาต่อกัน)
+        let extractedAddress = "";
+        
+        // 4.1 หาบ้านเลขที่ และ หมู่ (ดักจับตัวเลขและหมู่ที่อยู่หลังคำว่าที่อยู่)
+        const houseMatch = cleanText.match(/(?:ที่อยู่|Address)\s*([0-9/]+(?:\s*(?:หมู่ที่|หมู่|ม\.)\s*\d+)?)/);
+        if (houseMatch) extractedAddress += houseMatch[1] + " ";
+
+        // 4.2 หาตำบล หรือ แขวง
+        const subDistrictMatch = cleanText.match(/(?:ตำบล|ต\.|แขวง)\s*([ก-๙]+)/);
+        if (subDistrictMatch) extractedAddress += `ต.${subDistrictMatch[1]} `;
+
+        // 4.3 หาอำเภอ หรือ เขต
+        const districtMatch = cleanText.match(/(?:อำเภอ|อ\.|เขต)\s*([ก-๙]+)/);
+        if (districtMatch) extractedAddress += `อ.${districtMatch[1]} `;
+
+        // 4.4 หาจังหวัด
+        const provinceMatch = cleanText.match(/(?:จังหวัด|จ\.)\s*([ก-๙]+)/);
+        if (provinceMatch) extractedAddress += `จ.${provinceMatch[1]}`;
+
+        // นำข้อมูลที่ประกอบร่างแล้วไปใส่ในช่องฟอร์ม
+        if (extractedAddress.trim()) {
+          setAddress(extractedAddress.trim());
         }
 
         const blob = await (await fetch(dataUrl)).blob();
@@ -220,23 +232,19 @@ export default function KYCPage() {
         {/* --- 📸 Dedicated Full-Screen Camera Interface --- */}
         {isCameraOpen && (
           <div className="fixed inset-0 z-[999] bg-black flex flex-col overflow-hidden">
-            {/* Top Bar */}
             <div className="p-6 flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent">
                <button type="button" onClick={stopCamera} className="text-white text-sm font-bold bg-white/20 px-4 py-2 rounded-full backdrop-blur-md">ยกเลิก</button>
                <span className="text-white font-black text-sm tracking-widest uppercase">Scan ID Card</span>
                <div className="w-12"></div>
             </div>
 
-            {/* Camera Viewport */}
             <div className="relative flex-1 flex items-center justify-center px-6">
               <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover opacity-80" />
               
-              {/* ID Card Frame */}
               <div className="relative z-10 w-full aspect-[86/54] border-2 border-dashed border-orange-500 rounded-2xl shadow-[0_0_0_9999px_rgba(0,0,0,0.6)] flex items-center justify-center">
                  <div className="absolute inset-0 border-2 border-white/20 rounded-2xl"></div>
                  <p className="text-white/40 font-black text-xs tracking-tighter uppercase">วางหน้าบัตรให้พอดีกรอบ</p>
                  
-                 {/* Corner Accents */}
                  <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-orange-500 rounded-tl-2xl"></div>
                  <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-orange-500 rounded-tr-2xl"></div>
                  <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-orange-500 rounded-bl-2xl"></div>
@@ -244,7 +252,6 @@ export default function KYCPage() {
               </div>
             </div>
 
-            {/* Bottom Shutter Area (ปรับให้กดง่ายบนมือถือ) */}
             <div className="bg-black p-10 pb-16 flex flex-col items-center gap-4">
               <p className="text-white/60 text-[10px] font-bold uppercase tracking-widest">แตะปุ่มด้านล่างเพื่อถ่ายรูป</p>
               <button 
