@@ -14,9 +14,8 @@ export default function KYCPage() {
   // -- Form States --
   const [fullName, setFullName] = useState('');
   const [idNumber, setIdNumber] = useState('');
-  const [dateOfBirth, setDateOfBirth] = useState(''); // ช่องใหม่
-  const [address, setAddress] = useState('');         // ช่องใหม่
-  
+  const [dateOfBirth, setDateOfBirth] = useState('');
+  const [address, setAddress] = useState('');         
   const [pdpaConsent, setPdpaConsent] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -106,10 +105,9 @@ export default function KYCPage() {
 
     setIsScanning(true);
     setError('');
-    setStatusMessage('Google AI กำลังวิเคราะห์ข้อมูลบนบัตร...');
+    setStatusMessage('กำลังวิเคราะห์ข้อมูลด้วย AI...');
     
     try {
-      // ดึง Base64 เพื่อส่งให้ Google Vision API
       const base64Image = dataUrl.split(',')[1];
       const apiKey = process.env.NEXT_PUBLIC_GOOGLE_VISION_API_KEY;
       
@@ -128,41 +126,43 @@ export default function KYCPage() {
 
       const result = await response.json();
       const rawText = result.responses?.[0]?.fullTextAnnotation?.text || '';
+      
+      // ลบเว้นวรรคและการขึ้นบรรทัดใหม่บางส่วนเพื่อให้อ่านง่ายขึ้น
+      const cleanText = rawText.replace(/\n/g, ' ');
 
-      // เช็คว่าเป็นบัตรประชาชนจริงๆ ไหม
-      const isValid = rawText.includes('บัตรประจำตัวประชาชน') || rawText.includes('Identification') || rawText.includes('Thai National');
+      const isValid = rawText.includes('บัตรประจำตัวประชาชน') || rawText.includes('Identification') || rawText.includes('Thai National') || rawText.includes('ประเทศไทย');
       
       if (!isValid) {
-        setError('❌ ตรวจไม่พบข้อมูลบนหน้าบัตร กรุณาถ่ายใหม่ให้ชัดเจนและเห็นเต็มใบค่ะ');
+        setError('❌ ตรวจไม่พบข้อมูลหน้าบัตร กรุณาถ่ายใหม่ให้ชัดเจนและเห็นเต็มใบค่ะ');
         setIdPreview(null);
       } else {
-        setStatusMessage('✅ ดึงข้อมูลสำเร็จ กรุณาตรวจสอบความถูกต้องอีกครั้ง');
+        setStatusMessage('✅ ดึงข้อมูลสำเร็จ กรุณาตรวจสอบความถูกต้องด้านล่าง');
         
-        // --- 🤖 AI Data Parsing (พยายามควานหาข้อมูลจากข้อความดิบ) ---
+        // --- 🤖 อัปเกรด AI Data Parsing (หาข้อมูลเก่งขึ้น) ---
         
-        // หาเลขบัตร 13 หลัก
-        const idMatch = rawText.match(/\b\d\s?\d{4}\s?\d{5}\s?\d{2}\s?\d\b/);
-        if (idMatch) setIdNumber(idMatch[0].replace(/\s/g, ''));
+        // 1. หาเลข 13 หลัก (จับเฉพาะตัวเลข เอาให้ชัวร์ว่าครบ 13 ตัว)
+        const idMatch = rawText.replace(/\D/g, '').match(/(\d{13})/);
+        if (idMatch) setIdNumber(idMatch[1]);
 
-        // หาชื่อ (แบบง่ายๆ)
-        const nameMatch = rawText.match(/(นาย|นาง|นางสาว)\s*([ก-๙]+)\s+([ก-๙]+)/);
+        // 2. หาชื่อ (ดักจับคำนำหน้า แล้วตามด้วยอักษรไทย 2 ก้อน)
+        const nameMatch = cleanText.match(/(นาย|นาง|นางสาว)\s*([ก-๙]+)\s+([ก-๙]+)/);
         if (nameMatch) setFullName(`${nameMatch[1]}${nameMatch[2]} ${nameMatch[3]}`);
 
-        // หาวันเกิด
-        const dobMatch = rawText.match(/เกิดวันที่\s*(.*?)\n/);
-        if (dobMatch) setDateOfBirth(dobMatch[1].trim());
+        // 3. หาวันเกิด (ดักจับรูปแบบ [ตัวเลข] [ชื่อเดือนไทย] [พ.ศ.])
+        const dobMatch = cleanText.match(/(\d{1,2}\s*[ก-๙\.]+\s*\d{4})/);
+        if (dobMatch) setDateOfBirth(dobMatch[1]);
 
-        // หาที่อยู่ (ควานหาคำว่า "ที่อยู่" จนจบประโยคหรือขึ้นบรรทัดใหม่)
-        const addressMatch = rawText.match(/ที่อยู่\s*(.*?)(?=\n|$)/);
+        // 4. หาที่อยู่ (ดักคำว่าที่อยู่ แล้วกวาดไปจนถึงรหัสไปรษณีย์ หรือคำว่า จังหวัด)
+        const addressMatch = cleanText.match(/(?:ที่อยู่|Address)\s*([0-9/]+\s*(?:หมู่|ม\.)?.*?(?:ตำบล|ต\.|อำเภอ|อ\.|จังหวัด|จ\.).*?(?=\s\d{5}|\n|$))/i);
         if (addressMatch) setAddress(addressMatch[1].trim());
 
-        // แปลงภาพเป็นไฟล์เตรียมอัปโหลด
+        // เตรียมไฟล์อัปโหลด
         const blob = await (await fetch(dataUrl)).blob();
         setIdImageFile(new File([blob], `verified_id_${Date.now()}.jpg`, { type: 'image/jpeg' }));
       }
     } catch (err) {
       console.error(err);
-      setStatusMessage('⚠️ ไม่สามารถดึงข้อมูลอัตโนมัติได้ กรุณากรอกด้วยตนเองค่ะ');
+      setStatusMessage('⚠️ ระบบดึงข้อมูลขัดข้อง กรุณากรอกด้วยตนเองค่ะ');
       const blob = await (await fetch(dataUrl)).blob();
       setIdImageFile(new File([blob], `id_card_${Date.now()}.jpg`, { type: 'image/jpeg' }));
     } finally {
@@ -183,8 +183,8 @@ export default function KYCPage() {
         kyc_status: 'pending', 
         full_name: fullName, 
         national_id: idNumber, 
-        date_of_birth: dateOfBirth, // บันทึกวันเกิด
-        address: address,           // บันทึกที่อยู่
+        date_of_birth: dateOfBirth,
+        address: address,
         id_card_url: uploadData.path, 
         pdpa_consented_at: new Date().toISOString()
       }).eq('id', currentUser.id);
@@ -210,24 +210,41 @@ export default function KYCPage() {
   return (
     <div className="min-h-screen bg-gray-100 flex justify-center pb-24 relative overflow-hidden">
       <div className="w-full sm:max-w-2xl bg-white min-h-screen flex flex-col shadow-2xl relative">
+        
+        {/* --- 📸 Dedicated Camera Overlay (จอถ่ายรูปเต็มจอ) --- */}
         {isCameraOpen && (
-          <div className="absolute inset-0 bg-black z-[100] flex flex-col">
-            <div className="relative flex-1 overflow-hidden">
+          <div className="fixed inset-0 z-[999] bg-black flex flex-col">
+            {/* Header / ปิดกล้อง */}
+            <div className="absolute top-0 left-0 right-0 p-6 z-50 flex justify-between items-center bg-gradient-to-b from-black/60 to-transparent">
+               <button type="button" onClick={stopCamera} className="text-white bg-black/40 px-4 py-2 rounded-full font-bold text-sm backdrop-blur-md">ยกเลิก</button>
+               <span className="text-white font-black text-sm tracking-wider">ถ่ายรูปหน้าบัตร</span>
+               <div className="w-16"></div>
+            </div>
+
+            {/* Viewport กล้อง & กรอบบัตร */}
+            <div className="relative flex-1 overflow-hidden flex items-center justify-center">
               <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover" />
-              <div className="absolute inset-0 pointer-events-none flex items-center justify-center p-6">
-                <div className="w-full max-w-sm aspect-[86/54] border-4 border-dashed border-orange-500 rounded-xl shadow-[0_0_0_9999px_rgba(0,0,0,0.7)]">
-                  <div className="absolute -top-12 left-0 right-0 text-center text-white font-black text-sm uppercase tracking-widest">
-                    วางบัตรประชาชนในกรอบ
-                  </div>
-                </div>
+              
+              {/* กรอบสี่เหลี่ยมสัดส่วนบัตรประชาชน */}
+              <div className="relative z-10 w-[90%] max-w-sm aspect-[86/54] border-[3px] border-orange-500 rounded-xl shadow-[0_0_0_9999px_rgba(0,0,0,0.6)] flex items-center justify-center">
+                 {/* เส้นนำสายตา */}
+                 <div className="absolute w-8 h-8 border-t-2 border-l-2 border-white top-2 left-2"></div>
+                 <div className="absolute w-8 h-8 border-t-2 border-r-2 border-white top-2 right-2"></div>
+                 <div className="absolute w-8 h-8 border-b-2 border-l-2 border-white bottom-2 left-2"></div>
+                 <div className="absolute w-8 h-8 border-b-2 border-r-2 border-white bottom-2 right-2"></div>
+                 <p className="text-white/70 font-black text-xl uppercase tracking-widest opacity-50">วางบัตรในกรอบ</p>
               </div>
             </div>
-            <div className="bg-black p-10 flex justify-between items-center pb-16">
-              <button type="button" onClick={stopCamera} className="text-white font-bold px-4">ยกเลิก</button>
-              <button type="button" onClick={captureAndProcess} className="w-20 h-20 bg-white rounded-full border-4 border-gray-300 flex items-center justify-center active:scale-90 transition-transform">
+
+            {/* พื้นที่ปุ่มกดถ่ายรูป (ย้ายมาล่างสุด กดง่าย) */}
+            <div className="bg-black pb-12 pt-6 flex justify-center items-center">
+              <button 
+                type="button" 
+                onClick={captureAndProcess} 
+                className="w-20 h-20 bg-white rounded-full border-4 border-gray-400 flex items-center justify-center active:scale-90 transition-transform shadow-[0_0_20px_rgba(255,255,255,0.3)]"
+              >
                  <div className="w-16 h-16 bg-white rounded-full border-2 border-black/10"></div>
               </button>
-              <div className="w-16"></div>
             </div>
           </div>
         )}
@@ -240,7 +257,6 @@ export default function KYCPage() {
         <div className="p-8 space-y-8">
           {error && <div className="bg-red-50 text-red-600 p-4 rounded-2xl text-xs font-black border border-red-100">{error}</div>}
           
-          {/* ส่วนกล้องย้ายมาไว้ด้านบนเพื่อดึงดูดให้ถ่ายรูปก่อน */}
           <div className="space-y-3">
             <label className="block text-[11px] font-black text-gray-400 uppercase">1. ถ่ายรูปหน้าบัตรประชาชน</label>
             <div onClick={() => !isScanning && startCamera()} className={`border-4 border-dashed rounded-[2rem] p-8 text-center cursor-pointer transition-all ${idPreview ? 'border-green-100 bg-green-50' : 'border-gray-100 bg-gray-50 hover:bg-gray-100'}`}>
@@ -256,16 +272,16 @@ export default function KYCPage() {
                  </div>
                ) : (
                  <div className="py-10 space-y-3">
-                    <div className="text-5xl">🪪</div>
-                    <p className="text-sm font-black text-gray-700">แตะเพื่อถ่ายรูปบัตร</p>
-                    <p className="text-[10px] text-gray-400">ระบบ AI จะช่วยกรอกข้อมูลให้อัตโนมัติ</p>
+                    <div className="text-5xl">📸</div>
+                    <p className="text-sm font-black text-[#EE4D2D]">แตะเพื่อเปิดกล้อง</p>
+                    <p className="text-[10px] text-gray-400">ระบบ AI จะช่วยดึงข้อมูลจากรูปภาพ</p>
                  </div>
                )}
             </div>
           </div>
 
           <form onSubmit={handleSubmitData} className="space-y-6">
-            <label className="block text-[11px] font-black text-gray-400 uppercase pt-4 border-t">2. ตรวจสอบข้อมูล (แก้ไขได้หาก AI อ่านผิด)</label>
+            <label className="block text-[11px] font-black text-gray-400 uppercase pt-4 border-t">2. ตรวจสอบความถูกต้อง</label>
             
             <div>
               <label className="block text-[11px] font-black text-gray-400 mb-2 uppercase">ชื่อ-นามสกุลจริง</label>
@@ -275,8 +291,6 @@ export default function KYCPage() {
               <label className="block text-[11px] font-black text-gray-400 mb-2 uppercase">เลขบัตรประชาชน 13 หลัก</label>
               <input type="text" value={idNumber} onChange={e => setIdNumber(e.target.value.replace(/\D/g,'').slice(0,13))} className="w-full p-4 bg-gray-50 border-none rounded-2xl font-black tracking-widest text-lg focus:ring-2 focus:ring-orange-500" placeholder="0000000000000" required />
             </div>
-            
-            {/* --- ช่องใหม่: วันเกิด และ ที่อยู่ --- */}
             <div>
               <label className="block text-[11px] font-black text-gray-400 mb-2 uppercase">วัน/เดือน/ปีเกิด (ตามบัตร)</label>
               <input type="text" value={dateOfBirth} onChange={e => setDateOfBirth(e.target.value)} className="w-full p-4 bg-gray-50 border-none rounded-2xl font-bold focus:ring-2 focus:ring-orange-500" placeholder="เช่น 1 ม.ค. 2540" />
@@ -288,7 +302,7 @@ export default function KYCPage() {
 
             <div className="flex items-start gap-3 bg-blue-50 p-4 rounded-2xl">
               <input type="checkbox" checked={pdpaConsent} onChange={e => setPdpaConsent(e.target.checked)} className="mt-1 h-5 w-5 rounded" required />
-              <p className="text-[10px] text-blue-800 leading-relaxed font-medium">ข้าพเจ้ายินยอมให้แพลตฟอร์มจงเจริญประมวลผลข้อมูลส่วนบุคคลและรูปถ่ายหน้าบัตรประชาชน เพื่อวัตถุประสงค์ในการยืนยันตัวตน (KYC) และรักษาความปลอดภัยของบัญชีตามนโยบาย PDPA</p>
+              <p className="text-[10px] text-blue-800 leading-relaxed font-medium">ข้าพเจ้ายินยอมให้ประมวลผลข้อมูลส่วนบุคคลและรูปถ่ายตามนโยบายรักษาความปลอดภัย</p>
             </div>
             
             <button type="submit" disabled={isSubmitting || !idImageFile || isScanning} className="w-full bg-[#EE4D2D] text-white py-5 rounded-full font-black text-sm shadow-xl active:scale-95 disabled:opacity-50 transition-all">
