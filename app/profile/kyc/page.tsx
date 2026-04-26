@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import Tesseract from 'tesseract.js'; // ต้องเพิ่มบรรทัดนี้หลังจากแก้ package.json นะค๊ะ
+import Tesseract from 'tesseract.js';
 
 export default function KYCWithAI() {
   const router = useRouter();
@@ -23,8 +23,8 @@ export default function KYCWithAI() {
   const [idImageFile, setIdImageFile] = useState<File | null>(null);
   const [idPreview, setIdPreview] = useState<string | null>(null);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
-  const [isScanning, setIsScanning] = useState(false); // สถานะ AI กำลังอ่านบัตร
-  const [ocrStatus, setOcrStatus] = useState(''); // ข้อความบอกความคืบหน้าของ AI
+  const [isScanning, setIsScanning] = useState(false);
+  const [ocrStatus, setOcrStatus] = useState('');
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -61,12 +61,15 @@ export default function KYCWithAI() {
   const startCamera = async () => {
     setError('');
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      // ✅ แก้ไข: อนุญาตให้ใช้กล้องหน้าได้ถ้าคอมพิวเตอร์/มือถือไม่มีกล้องหลัง
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: { ideal: 'environment' } } 
+      });
       streamRef.current = stream;
       if (videoRef.current) videoRef.current.srcObject = stream;
       setIsCameraOpen(true);
     } catch (err) {
-      setError('ไม่สามารถเปิดกล้องได้ กรุณาอนุญาตการเข้าถึงกล้องค่ะ');
+      setError('ไม่สามารถเปิดกล้องได้ กรุณาตรวจสอบการอนุญาตใช้งานกล้องบนเบราว์เซอร์ค่ะ');
     }
   };
 
@@ -96,7 +99,7 @@ export default function KYCWithAI() {
     // 2. AI OCR Verification (สแกนหาคำในบัตร)
     setIsScanning(true);
     setError('');
-    setOcrStatus('AI กำลังสแกนบัตร...');
+    setOcrStatus('AI กำลังสแกนเอกสาร...');
 
     try {
       const result = await Tesseract.recognize(dataUrl, 'tha+eng', {
@@ -108,7 +111,6 @@ export default function KYCWithAI() {
       });
 
       const detectedText = result.data.text;
-      // เช็ค Keyword สำคัญบนบัตรประชาชนไทย
       const isValidCard = detectedText.includes('บัตรประจำตัวประชาชน') || 
                           detectedText.includes('Identification Card') ||
                           detectedText.includes('Thai National');
@@ -118,14 +120,12 @@ export default function KYCWithAI() {
         setIdPreview(null);
       } else {
         setOcrStatus('✅ ตรวจสอบบัตรเบื้องต้นสำเร็จ!');
-        // แปลงเป็นไฟล์เพื่อเตรียมอัปโหลด
         const blob = await (await fetch(dataUrl)).blob();
         setIdImageFile(new File([blob], `verified_id_${Date.now()}.jpg`, { type: 'image/jpeg' }));
       }
     } catch (err) {
       console.error(err);
       setError('AI ไม่สามารถประมวลผลได้ชั่วคราว แต่คุณยังสามารถส่งรูปเพื่อรอแอดมินตรวจด้วยมือได้ค่ะ');
-      // ยอมให้ไปต่อได้เผื่อระบบ OCR ติดขัด
       const blob = await (await fetch(dataUrl)).blob();
       setIdImageFile(new File([blob], `id_card_${Date.now()}.jpg`, { type: 'image/jpeg' }));
     } finally {
@@ -177,7 +177,9 @@ export default function KYCWithAI() {
         {isCameraOpen && (
           <div className="absolute inset-0 bg-black z-[100] flex flex-col">
             <div className="relative flex-1 overflow-hidden">
-              <video ref={videoRef} autoPlay playsInline className="absolute inset-0 w-full h-full object-cover" />
+              {/* ✅ แก้ไข: เพิ่มคำสั่ง muted เพื่อป้องกันเบราว์เซอร์บล็อกการเปิดกล้อง */}
+              <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover" />
+              
               <div className="absolute inset-0 pointer-events-none flex items-center justify-center p-6">
                 <div className="w-full max-w-sm aspect-[86/54] border-4 border-dashed border-orange-500 rounded-xl shadow-[0_0_0_9999px_rgba(0,0,0,0.7)]">
                   <div className="absolute -top-12 left-0 right-0 text-center text-white font-black text-sm uppercase tracking-widest">
@@ -187,8 +189,8 @@ export default function KYCWithAI() {
               </div>
             </div>
             <div className="bg-black p-10 flex justify-between items-center pb-16">
-              <button onClick={stopCamera} className="text-white font-bold px-4">ยกเลิก</button>
-              <button onClick={captureAndProcess} className="w-20 h-20 bg-white rounded-full border-4 border-gray-300 flex items-center justify-center active:scale-90 transition-transform">
+              <button type="button" onClick={stopCamera} className="text-white font-bold px-4">ยกเลิก</button>
+              <button type="button" onClick={captureAndProcess} className="w-20 h-20 bg-white rounded-full border-4 border-gray-300 flex items-center justify-center active:scale-90 transition-transform">
                  <div className="w-16 h-16 bg-white rounded-full border-2 border-black/10"></div>
               </button>
               <div className="w-16"></div>
@@ -227,7 +229,7 @@ export default function KYCWithAI() {
                    </div>
                  ) : idPreview ? (
                    <div className="space-y-4">
-                     <img src={idPreview} className="max-h-48 mx-auto rounded-xl shadow-md border-2 border-white" />
+                     <img src={idPreview} className="max-h-48 mx-auto rounded-xl shadow-md border-2 border-white" alt="ID Preview" />
                      <p className="text-xs font-black text-green-600">✅ รูปภาพพร้อมใช้งาน (แตะเพื่อถ่ายใหม่)</p>
                    </div>
                  ) : (
