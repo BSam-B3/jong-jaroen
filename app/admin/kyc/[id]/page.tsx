@@ -14,39 +14,62 @@ export default function KycApprovalPage() {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // เพิ่มตัวแปรสำหรับโหมดนักสืบ
+  const [debugLog, setDebugLog] = useState<string>('กำลังเริ่มค้นหา...');
 
   useEffect(() => {
     async function fetchData() {
       try {
-        // 1. ดึงข้อมูล Profile ตามปกติ
-        const { data: profileData } = await supabase
+        const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', userId)
           .single();
 
+        if (profileError) throw profileError;
         setProfile(profileData);
 
-        // 2. 🎯 ไม่ง้อฐานข้อมูล! สั่งให้วิ่งไปเปิดโฟลเดอร์ของคุณสุรพงษ์โดยตรงเลยค่ะ
-        const { data: files } = await supabase.storage
-          .from('kyc_documents')
-          .list(userId);
+        // 1. ลองดึงจาก id_card_url ในฐานข้อมูลก่อน (ถ้ามี)
+        if (profileData && profileData.id_card_url) {
+          setDebugLog(`พบ path ใน DB: ${profileData.id_card_url}`);
+          const { data } = supabase.storage
+            .from('kyc_documents')
+            .getPublicUrl(profileData.id_card_url);
+          
+          setImageUrl(data.publicUrl);
+          setDebugLog(prev => prev + ` => สร้างลิงก์สำเร็จ`);
+        } else {
+          setDebugLog(`ไม่พบ Path ในตาราง Profiles (ว่างเปล่า) กำลังค้นหาในโฟลเดอร์...`);
+          
+          // 2. ถ้าไม่มีใน DB ให้ไปรื้อในโฟลเดอร์
+          const { data: files, error: listError } = await supabase.storage
+            .from('kyc_documents')
+            .list(userId);
 
-        if (files && files.length > 0) {
-          // 3. กรองหาไฟล์ที่มีนามสกุลรูปภาพ
-          const imageFile = files.find(f => f.name.includes('.jpg') || f.name.includes('.png') || f.name.includes('.jpeg'));
+          if (listError) {
+            setDebugLog(`ติดปัญหาการเข้าถึงโฟลเดอร์: ${listError.message}`);
+            return;
+          }
 
-          if (imageFile) {
-            // 4. เอาชื่อไฟล์มาสร้าง Public URL (ใช้ได้ทันทีเพราะเราเปิด Public Bucket แล้ว)
-            const { data } = supabase.storage
-              .from('kyc_documents')
-              .getPublicUrl(`${userId}/${imageFile.name}`);
+          if (files && files.length > 0) {
+            const imageFile = files.find(f => f.name.includes('.jpg') || f.name.includes('.png') || f.name.includes('.jpeg'));
 
-            setImageUrl(data.publicUrl);
+            if (imageFile) {
+              const { data } = supabase.storage
+                .from('kyc_documents')
+                .getPublicUrl(`${userId}/${imageFile.name}`);
+              
+              setImageUrl(data.publicUrl);
+              setDebugLog(`ค้นเจอไฟล์ในโฟลเดอร์ชื่อ: ${imageFile.name}`);
+            } else {
+              setDebugLog(`เจอไฟล์แต่ไม่ใช่นามสกุลรูป: ${JSON.stringify(files.map(f => f.name))}`);
+            }
+          } else {
+            setDebugLog(`ค้นหาแล้ว แต่ในโฟลเดอร์ว่างเปล่า ไม่มีไฟล์เลยค่ะ`);
           }
         }
-      } catch (err) {
-        console.error('Error fetching data:', err);
+      } catch (err: any) {
+        setDebugLog(`ระบบผิดพลาด: ${err.message}`);
       } finally {
         setLoading(false);
       }
@@ -99,17 +122,25 @@ export default function KycApprovalPage() {
         {/* ส่วนแสดงรูปบัตรประชาชน */}
         <div className="mb-8">
           <div className="text-sm font-black text-gray-500 mb-3 uppercase tracking-wider text-center">หลักฐานรูปถ่ายบัตรประชาชน</div>
-          <div className="bg-gray-100 rounded-3xl border-2 border-dashed border-gray-300 overflow-hidden flex items-center justify-center relative aspect-video shadow-inner">
+          
+          <div className="bg-gray-100 rounded-3xl border-2 border-dashed border-gray-300 overflow-hidden flex flex-col items-center justify-center relative aspect-video shadow-inner p-4">
             {imageUrl ? (
-              <img src={imageUrl} alt="ID Card" className="object-contain w-full h-full" />
+              <img src={imageUrl} alt="ID Card" className="object-contain w-full h-full z-10 relative" />
             ) : (
-              <div className="text-center p-10">
+              <div className="text-center p-10 z-10 relative">
                 <div className="text-4xl mb-2">📸</div>
-                <div className="text-gray-400 font-bold text-sm">ไม่พบไฟล์รูปภาพในระบบ</div>
+                <div className="text-gray-400 font-bold text-sm mb-4">ไม่พบไฟล์รูปภาพในระบบ</div>
               </div>
             )}
+            
+            {/* 🔴 กล่องบอกสาเหตุ (Debug) จะได้รู้ว่าติดตรงไหน! 🔴 */}
+            <div className="absolute bottom-2 left-2 right-2 bg-black/90 text-green-400 font-mono text-[11px] p-3 rounded-lg z-20 break-words border border-green-500">
+              <span className="text-white font-bold mb-1 block">📌 สถานะการดึงรูปภาพ (โหมดนักสืบ):</span>
+              {debugLog}
+            </div>
+
             {/* Watermark ลายน้ำความปลอดภัย */}
-            <div className="absolute inset-0 pointer-events-none flex items-center justify-center opacity-10">
+            <div className="absolute inset-0 pointer-events-none flex items-center justify-center opacity-10 z-0">
               <span className="text-5xl font-black text-black rotate-[-30deg]">JONG JAROEN ADMIN</span>
             </div>
           </div>
@@ -134,7 +165,7 @@ export default function KycApprovalPage() {
         </div>
 
         {/* ปุ่มอนุมัติและปฏิเสธ */}
-        <div className="flex gap-4 sticky bottom-6 bg-white/80 backdrop-blur-md p-4 rounded-2xl border shadow-sm">
+        <div className="flex gap-4 sticky bottom-6 bg-white/80 backdrop-blur-md p-4 rounded-2xl border shadow-sm z-30">
           <button 
             onClick={() => handleDecision('approved')} 
             disabled={isSubmitting} 
