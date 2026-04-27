@@ -17,17 +17,25 @@ export default function KycApprovalPage() {
 
   useEffect(() => {
     async function fetchData() {
-      // 1. ดึงข้อมูลจากตาราง profiles
+      // 1. ดึงข้อมูลโปรไฟล์
       const { data: profileData } = await supabase.from('profiles').select('*').eq('id', userId).single();
       setProfile(profileData);
 
-      // 2. ดึงรูปบัตรจาก Storage (Signed URL)
+      // 2. 🔍 วิธีแก้ใหม่: ไปลิสต์ไฟล์ในโฟลเดอร์ออกมา แล้วเอาไฟล์แรกมาโชว์เลย
       if (profileData) {
-        const { data: fileData } = await supabase.storage
-          .from('kyc_documents') 
-          .createSignedUrl(`${userId}/id_card.jpg`, 3600);
-        
-        if (fileData) setImageUrl(fileData.signedUrl);
+        const { data: files, error: listError } = await supabase.storage
+          .from('kyc_documents')
+          .list(userId);
+
+        if (files && files.length > 0) {
+          // หยิบไฟล์แรกที่เจอ (เช่น verified_id_xxx.jpg) มาสร้างลิงก์
+          const fileName = files[0].name;
+          const { data: fileLink } = await supabase.storage
+            .from('kyc_documents') 
+            .createSignedUrl(`${userId}/${fileName}`, 3600);
+          
+          if (fileLink) setImageUrl(fileLink.signedUrl);
+        }
       }
       
       setLoading(false);
@@ -77,7 +85,6 @@ export default function KycApprovalPage() {
 
         <h1 className="text-2xl font-black text-gray-800 mb-6 border-b pb-4">พิจารณาเอกสารยืนยันตัวตน</h1>
         
-        {/* ส่วนแสดงรูปบัตร (The Evidence) */}
         <div className="mb-8">
           <div className="text-sm font-black text-gray-500 mb-3 uppercase tracking-wider">หลักฐานรูปถ่ายบัตรประชาชน</div>
           <div className="bg-gray-100 rounded-3xl border-2 border-dashed border-gray-300 overflow-hidden flex items-center justify-center relative aspect-video shadow-inner">
@@ -95,8 +102,7 @@ export default function KycApprovalPage() {
           </div>
         </div>
 
-        {/* ข้อมูลเปรียบเทียบ (The Data) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10 text-left">
           <div className="space-y-6">
             <DataField label="ชื่อ-นามสกุล" value={profile.full_name} />
             <DataField label="เลขบัตรประชาชน" value={profile.national_id} isMono />
@@ -113,7 +119,6 @@ export default function KycApprovalPage() {
           </div>
         </div>
 
-        {/* Action Buttons */}
         <div className="flex gap-4 sticky bottom-6">
           <button onClick={() => handleDecision('approved')} disabled={isSubmitting} className="flex-1 bg-[#22C55E] hover:bg-green-600 text-white py-5 rounded-2xl font-black text-lg transition-all shadow-lg active:scale-95 disabled:opacity-50">
             อนุมัติข้อมูลถูกต้อง
@@ -128,7 +133,6 @@ export default function KycApprovalPage() {
   );
 }
 
-// Component ย่อยสำหรับแสดงข้อมูลให้ดูง่าย
 function DataField({ label, value, isMono = false, isAddress = false }: any) {
   return (
     <div>
