@@ -17,22 +17,34 @@ export default function KycApprovalPage() {
 
   useEffect(() => {
     async function fetchData() {
-      // 1. ดึงข้อมูลโปรไฟล์ (ซึ่งมีคอลัมน์ id_card_url อยู่แล้ว)
-      const { data: profileData } = await supabase.from('profiles').select('*').eq('id', userId).single();
-      setProfile(profileData);
+      try {
+        // 1. ดึงข้อมูลโปรไฟล์ (ใช้คอลัมน์ address และ id_card_url)
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .single();
 
-      if (profileData && profileData.id_card_url) {
-        // 2. 🎯 วิธีที่ชัวร์ที่สุด: หยิบ Path จากฐานข้อมูลมาสร้างลิงก์โดยตรงเลยค่ะ
-        const { data: fileLink } = await supabase.storage
-          .from('kyc_documents') 
-          .createSignedUrl(profileData.id_card_url, 3600);
-        
-        if (fileLink) {
-          setImageUrl(fileLink.signedUrl);
+        if (profileError) throw profileError;
+        setProfile(profileData);
+
+        // 2. ดึงรูปบัตรประชาชน (ดึงตรงจาก id_card_url ในฐานข้อมูล)
+        if (profileData && profileData.id_card_url) {
+          const { data: fileData, error: storageError } = await supabase.storage
+            .from('kyc_documents')
+            .createSignedUrl(profileData.id_card_url, 3600); // ลิงก์มีอายุ 1 ชม.
+
+          if (storageError) {
+            console.error('Storage Error:', storageError.message);
+          } else if (fileData) {
+            setImageUrl(fileData.signedUrl);
+          }
         }
+      } catch (err) {
+        console.error('Error fetching data:', err);
+      } finally {
+        setLoading(false);
       }
-      
-      setLoading(false);
     }
     if (userId) fetchData();
   }, [userId]);
@@ -77,9 +89,9 @@ export default function KycApprovalPage() {
           <span>←</span> กลับหน้าแอดมิน
         </button>
 
-        <h1 className="text-2xl font-black text-gray-800 mb-6 border-b pb-4 text-center">พิจารณาเอกสารยืนยันตัวตน</h1>
+        <h1 className="text-2xl font-black text-gray-800 mb-2 border-b pb-4 text-center">พิจารณาเอกสารยืนยันตัวตน</h1>
         
-        {/* ส่วนแสดงรูปบัตร */}
+        {/* ส่วนแสดงรูปบัตรประชาชน */}
         <div className="mb-8">
           <div className="text-sm font-black text-gray-500 mb-3 uppercase tracking-wider text-center">หลักฐานรูปถ่ายบัตรประชาชน</div>
           <div className="bg-gray-100 rounded-3xl border-2 border-dashed border-gray-300 overflow-hidden flex items-center justify-center relative aspect-video shadow-inner">
@@ -88,24 +100,26 @@ export default function KycApprovalPage() {
             ) : (
               <div className="text-center p-10">
                 <div className="text-4xl mb-2">📸</div>
-                <div className="text-gray-400 font-bold text-sm">ไม่พบไฟล์รูปภาพในระบบ</div>
+                <div className="text-gray-400 font-bold text-sm">ไม่พบไฟล์รูปภาพในระบบ (โปรดเช็ค Policy หรือ Path)</div>
               </div>
             )}
+            {/* Watermark ลายน้ำความปลอดภัย */}
             <div className="absolute inset-0 pointer-events-none flex items-center justify-center opacity-10">
               <span className="text-5xl font-black text-black rotate-[-30deg]">JONG JAROEN ADMIN</span>
             </div>
           </div>
         </div>
 
-        {/* ข้อมูลเปรียบเทียบ */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10 p-4 bg-gray-50 rounded-2xl">
+        {/* ข้อมูลเปรียบเทียบจากตาราง profiles */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10 p-6 bg-gray-50 rounded-3xl border border-gray-100">
           <div className="space-y-6">
             <DataField label="ชื่อ-นามสกุล" value={profile.full_name} />
             <DataField label="เลขบัตรประชาชน" value={profile.national_id} isMono />
             <DataField label="วันเกิด" value={profile.date_of_birth} />
           </div>
           <div className="space-y-6">
-            <DataField label="ที่อยู่ตามที่กรอกมา" value={profile.location || 'ไม่ได้ระบุที่อยู่'} isAddress />
+            {/* เปลี่ยนจาก location เป็น address ตามที่คุณบีสามต้องการค่ะ */}
+            <DataField label="ที่อยู่ตามที่กรอกมา" value={profile.address || 'ไม่ได้ระบุที่อยู่'} isAddress />
             <div>
               <div className="text-[10px] font-black text-gray-400 uppercase mb-1">สถานะปัจจุบัน</div>
               <span className="bg-orange-100 text-orange-700 px-3 py-1 rounded-lg text-xs font-black uppercase tracking-wider">
@@ -115,13 +129,21 @@ export default function KycApprovalPage() {
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex gap-4 sticky bottom-6 bg-white p-2">
-          <button onClick={() => handleDecision('approved')} disabled={isSubmitting} className="flex-1 bg-[#22C55E] hover:bg-green-600 text-white py-5 rounded-2xl font-black text-lg transition-all shadow-lg active:scale-95 disabled:opacity-50">
-            อนุมัติข้อมูลถูกต้อง
+        {/* ปุ่มอนุมัติและปฏิเสธ */}
+        <div className="flex gap-4 sticky bottom-6 bg-white/80 backdrop-blur-md p-4 rounded-2xl border shadow-sm">
+          <button 
+            onClick={() => handleDecision('approved')} 
+            disabled={isSubmitting} 
+            className="flex-1 bg-[#22C55E] hover:bg-green-600 text-white py-5 rounded-2xl font-black text-lg transition-all shadow-lg active:scale-95 disabled:opacity-50"
+          >
+            ✅ ข้อมูลถูกต้อง อนุมัติ
           </button>
-          <button onClick={() => handleDecision('rejected')} disabled={isSubmitting} className="flex-1 bg-[#EF4444] hover:bg-red-600 text-white py-5 rounded-2xl font-black text-lg transition-all shadow-lg active:scale-95 disabled:opacity-50">
-            ข้อมูลไม่ตรง / ปฏิเสธ
+          <button 
+            onClick={() => handleDecision('rejected')} 
+            disabled={isSubmitting} 
+            className="flex-1 bg-[#EF4444] hover:bg-red-600 text-white py-5 rounded-2xl font-black text-lg transition-all shadow-lg active:scale-95 disabled:opacity-50"
+          >
+            ❌ ปฏิเสธข้อมูล
           </button>
         </div>
       </div>
@@ -130,9 +152,10 @@ export default function KycApprovalPage() {
   );
 }
 
+// ส่วนประกอบย่อยสำหรับโชว์ข้อมูล
 function DataField({ label, value, isMono = false, isAddress = false }: any) {
   return (
-    <div>
+    <div className="text-left">
       <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{label}</div>
       <div className={`font-bold text-gray-800 ${isMono ? 'font-mono text-xl text-[#EE4D2D]' : 'text-lg'} ${isAddress ? 'leading-relaxed text-base' : ''}`}>
         {value || '-'}
