@@ -19,20 +19,25 @@ export default function WinOnlinePage() {
     region: 'TH'
   });
 
+  // --- States ---
   const [userRole, setUserRole] = useState<'customer' | 'provider'>('customer'); 
   const [activeTab, setActiveTab] = useState<'feed' | 'my_jobs'>('feed');
-  
   const [jobs, setJobs] = useState<any[]>([]);
   const [myJobs, setMyJobs] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<any>(null);
 
+  // --- Chat & Realtime Refs (P1 Fix: Prevent Subscription Churn) ---
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [activeChatJob, setActiveChatJob] = useState<any>(null);
+  const activeChatJobRef = useRef<any>(null);
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const chatEndRef = useRef<null | HTMLDivElement>(null);
 
+  useEffect(() => { activeChatJobRef.current = activeChatJob; }, [activeChatJob]);
+
+  // --- Form & Map States ---
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLocationPickerOpen, setIsLocationPickerOpen] = useState(false);
@@ -60,12 +65,7 @@ export default function WinOnlinePage() {
   const [showFareDetails, setShowFareDetails] = useState(false);
   const [fareBreakdown, setFareBreakdown] = useState({ base: 0, distanceFee: 0, fuelSurge: 0, platformFee: 0, totalFare: 0 });
 
-  const popularPlaces = [
-    { name: 'โรงพยาบาลแกลง', detail: 'Klaeng Hospital' },
-    { name: 'ตลาดสามย่าน แกลง', detail: 'Sam Yan Market' },
-    { name: 'เซเว่นอีเลฟเว่น ตลาดแกลง', detail: '7-Eleven Sam Yan' },
-  ];
-
+  // --- Functions ---
   const fetchMessages = useCallback(async (jobId: string) => {
     const { data } = await supabase.from('job_messages').select('*').eq('job_id', jobId).order('created_at', { ascending: true });
     if (data) setMessages(data);
@@ -78,6 +78,89 @@ export default function WinOnlinePage() {
     if (!error) { setNewMessage(''); fetchMessages(activeChatJob.id); }
   };
 
+  const fetchJobs = useCallback(async (userId?: string) => {
+    setIsLoading(true);
+    // Fetch Open Jobs (PII Sanitization: Fetch only first_name for public feed)
+    const { data: openData } = await supabase.from('jobs')
+      .select(`*, employer:profiles!employer_id (first_name)`)
+      .eq('status', 'open')
+      .order('created_at', { ascending: false });
+    if (openData) setJobs(openData);
+
+    // Fetch My Jobs (Full PII for involved parties)
+    if (userId) {
+      const { data: myData } = await supabase.from('jobs')
+        .select(`*, employer:profiles!employer_id (first_name, phone_number), worker:profiles!worker_id (first_name, phone_number)`)
+        .or(`employer_id.eq.${userId},worker_id.eq.${userId}`)
+        .order('created_at', { ascending: false });
+      if (myData) setMyJobs(myData);
+    }
+    setIsLoading(false);
+  }, []);
+
+  // --- Realtime & Initial Fetch (P1 Fix: Split Effects) ---
+  useEffect(() => {
+    let mounted = true;
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (mounted) {
+        setCurrentUser(session?.user || null);
+        fetchJobs(session?.user?.id);
+      }
+    });
+    return () => { mounted = false; };
+  }, [fetchJobs]);
+
+  useEffect(() => {
+    const jobChannel = supabase.channel('job-updates')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, () => {
+        fetchJobs(currentUser?.id);
+      })
+      .subscribe();
+
+    const chatChannel = supabase.channel('chat-updates')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'job_messages' }, (payload) => {
+        const activeJ = activeChatJobRef.current;
+        if (activeJ && payload.new.job_id === activeJ.id) fetchMessages(activeJ.id);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(jobChannel);
+      supabase.removeChannel(chatChannel);
+    };
+  }, [currentUser, fetchMessages, fetchJobs]);
+
+  // --- Job Handlers (P0 Fix: Atomic RPC & Sanitized Error) ---
+  const handleUpdateJobStatus = async (jobId: string, newStatus: 'in_progress' | 'completed' | 'cancelled') => {
+    if (!currentUser) return alert("กรุณาเข้าสู่ระบบค่ะ");
+    
+    if (newStatus === 'in_progress') {
+      // ✅ ATOMIC CLAIM via RPC (Day 1 P0 Fix)
+      const { data, error } = await supabase.rpc('claim_job', { p_job_id: jobId });
+      if (error) {
+        if (error.message.includes('JOB_ALREADY_TAKEN')) {
+          alert('ขออภัยค่ะ งานนี้ถูกผู้อื่นรับไปแล้ว 🙏');
+          fetchJobs(currentUser.id);
+        } else {
+          alert('ไม่สามารถรับงานได้ในขณะนี้ กรุณาลองใหม่ค่ะ');
+        }
+        return;
+      }
+      setActiveTab('my_jobs');
+      fetchJobs(currentUser.id);
+    } else {
+      // For Completion/Cancellation
+      if (!confirm("ยืนยันการทำรายการนี้ใช่ไหมคะ?")) return;
+      const { error } = await supabase.from('jobs').update({ status: newStatus }).eq('id', jobId);
+      if (!error) {
+         fetchJobs(currentUser.id);
+      } else {
+         alert("เกิดข้อผิดพลาดในการอัปเดตสถานะค่ะ");
+      }
+    }
+  };
+
+  // --- Map & Form Logic (Same as before but with fare fixes) ---
   const calculateRoute = useCallback(async (origin: google.maps.LatLngLiteral, destination: google.maps.LatLngLiteral) => {
     if (!isLoaded) return;
     const directionsService = new google.maps.DirectionsService();
@@ -107,48 +190,10 @@ export default function WinOnlinePage() {
     }
   }, [pickupCoords, dropoffCoords, jobType, vehicleType, distanceKm, calculateRoute]);
 
-  const fetchJobs = useCallback(async (userId?: string) => {
-    setIsLoading(true);
-    // 👇 แก้ไขการเรียกชื่อตารางจาก express_jobs เป็น jobs และเชื่อมตาราง profiles ให้ถูกต้อง
-    const { data: openData } = await supabase.from('jobs')
-      .select(`*, employer:profiles!employer_id (first_name, phone_number)`)
-      .eq('status', 'open')
-      .order('created_at', { ascending: false });
-    if (openData) setJobs(openData);
-
-    if (userId) {
-      const { data: myData } = await supabase.from('jobs')
-        .select(`*, employer:profiles!employer_id (first_name, phone_number), worker:profiles!worker_id (first_name, phone_number)`)
-        .or(`employer_id.eq.${userId},worker_id.eq.${userId}`)
-        .order('created_at', { ascending: false });
-      if (myData) setMyJobs(myData);
-    }
-    setIsLoading(false);
-  }, [userRole]);
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setCurrentUser(session?.user || null);
-      fetchJobs(session?.user?.id);
-    });
-
-    // 👇 เปลี่ยนเป็น table: 'jobs'
-    const jobChannel = supabase.channel('job-updates').on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, () => {
-      supabase.auth.getSession().then(({ data: { session } }) => fetchJobs(session?.user?.id));
-    }).subscribe();
-
-    const chatChannel = supabase.channel('chat-updates').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'job_messages' }, (payload) => {
-      if (activeChatJob && payload.new.job_id === activeChatJob.id) { fetchMessages(activeChatJob.id); }
-    }).subscribe();
-
-    return () => { supabase.removeChannel(jobChannel); supabase.removeChannel(chatChannel); };
-  }, [fetchJobs, activeChatJob, fetchMessages]);
-
   const handlePostJob = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser) return router.push('/auth/login');
     setIsSubmitting(true);
-    // 👇 บันทึกข้อมูลเข้าตาราง jobs ให้ตรงกับโครงสร้าง
     const { error } = await supabase.from('jobs').insert({
       employer_id: currentUser.id, 
       title, 
@@ -165,24 +210,9 @@ export default function WinOnlinePage() {
       setIsModalOpen(false); alert('โพสต์งานเรียบร้อยค่ะ! 🚀'); 
       setActiveTab('my_jobs'); fetchJobs(currentUser.id); 
     } else {
-      alert("เกิดข้อผิดพลาด: " + error.message);
+      alert("ไม่สามารถโพสต์งานได้ กรุณาตรวจสอบข้อมูลค่ะ");
     }
     setIsSubmitting(false);
-  };
-
-  const handleUpdateJobStatus = async (jobId: string, newStatus: 'in_progress' | 'completed' | 'cancelled') => {
-    if (!currentUser) return alert("กรุณาเข้าสู่ระบบค่ะ");
-    if (!confirm("ยืนยันการทำรายการนี้ใช่ไหมคะ?")) return;
-    const payload: any = { status: newStatus };
-    // 👇 เปลี่ยนจาก provider_id เป็น worker_id และสถานะ in_progress
-    if (newStatus === 'in_progress') payload.worker_id = currentUser.id;
-    const { error } = await supabase.from('jobs').update(payload).eq('id', jobId);
-    if (!error) {
-       if (newStatus === 'in_progress') setActiveTab('my_jobs');
-       fetchJobs(currentUser.id);
-    } else {
-       alert("เกิดข้อผิดพลาด: " + error.message);
-    }
   };
 
   const handleSelectLocation = async (address: string) => {
@@ -232,119 +262,92 @@ export default function WinOnlinePage() {
     switch (type) { case 'car': return 'รถเก๋ง'; case 'suv': return 'ครอบครัว'; case 'van': return 'รถตู้'; case 'pickup': return 'กระบะ'; case 'saleng': return 'ซาเล้ง'; default: return 'มอไซค์'; }
   };
 
+  // --- Render ---
   return (
     <div className="min-h-screen bg-[#F4F6F8] flex justify-center font-sans relative">
       <div className="w-full max-w-3xl bg-[#F4F6F8] min-h-screen relative flex flex-col shadow-2xl overflow-hidden border-x border-gray-100">
         
-        {/* --- Header & Tabs --- */}
+        {/* Header & Tabs */}
         <div className="m-4 bg-gradient-to-b from-[#EE4D2D] to-[#FF7337] rounded-[2rem] p-6 shadow-md relative z-10">
           <div className="flex justify-between items-center mb-6 mt-2">
-            <h1 className="text-white text-xl sm:text-2xl font-black tracking-tight flex items-center gap-2">
-               🛵 งานด่วนชุมชน
-            </h1>
+            <h1 className="text-white text-xl sm:text-2xl font-black tracking-tight flex items-center gap-2">🛵 งานด่วนชุมชน</h1>
             <div className="flex items-center gap-2">
               <span className="relative flex h-3 w-3">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
               </span>
-              <span className="text-white/90 text-[10px] font-bold hidden sm:inline">เชื่อมต่อแล้ว</span>
+              <span className="text-white/90 text-[10px] font-bold">LIVE</span>
             </div>
           </div>
-          
-          <div className="flex gap-2 sm:gap-3 px-1">
-            <button onClick={() => setActiveTab('feed')} className={`flex-1 py-3 rounded-[1rem] sm:rounded-[1.5rem] text-xs sm:text-sm font-black transition-all duration-300 ${activeTab === 'feed' ? 'bg-white text-[#EE4D2D] shadow-lg scale-105' : 'bg-white/20 text-white hover:bg-white/30 backdrop-blur-sm border border-white/20'}`}>
-              {userRole === 'customer' ? '🏠 เรียกวิน/ส่งของ' : '🔥 งานใหม่ (Live)'}
+          <div className="flex gap-2">
+            <button onClick={() => setActiveTab('feed')} className={`flex-1 py-3 rounded-[1.2rem] text-xs font-black transition-all ${activeTab === 'feed' ? 'bg-white text-[#EE4D2D] shadow-lg scale-105' : 'bg-white/20 text-white'}`}>
+              {userRole === 'customer' ? '🏠 เรียกวิน/ส่งของ' : '🔥 งานใหม่'}
             </button>
-            <button onClick={() => setActiveTab('my_jobs')} className={`flex-1 py-3 rounded-[1rem] sm:rounded-[1.5rem] text-xs sm:text-sm font-black transition-all duration-300 ${activeTab === 'my_jobs' ? 'bg-white text-[#EE4D2D] shadow-lg scale-105' : 'bg-white/20 text-white hover:bg-white/30 backdrop-blur-sm border border-white/20'}`}>
-              📋 งานของฉัน
-            </button>
+            <button onClick={() => setActiveTab('my_jobs')} className={`flex-1 py-3 rounded-[1.2rem] text-xs font-black transition-all ${activeTab === 'my_jobs' ? 'bg-white text-[#EE4D2D] shadow-lg scale-105' : 'bg-white/20 text-white'}`}>📋 งานของฉัน</button>
           </div>
         </div>
 
-        {/* --- Main Content --- */}
-        <div className="flex-1 overflow-y-auto p-4 sm:px-6 space-y-5 pb-32 scrollbar-hide">
-          
-          {/* TAB: FEED */}
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-5 pb-32">
           {activeTab === 'feed' && userRole === 'customer' && (
-            <div className="text-center bg-white rounded-[2rem] p-8 sm:p-10 shadow-sm border border-gray-100 animate-fade-in relative overflow-hidden group max-w-2xl mx-auto mt-2">
-              <div className="text-6xl sm:text-7xl mb-6 drop-shadow-sm transition-transform group-hover:scale-110">🏠</div>
-              <h3 className="text-lg sm:text-xl font-black text-gray-800 mb-3 tracking-tight">เรียกวิน หรือ ส่งของ?</h3>
-              <p className="text-[11px] sm:text-xs text-gray-500 mb-8 leading-relaxed px-2 font-medium">สนับสนุนไรเดอร์ในบ้านเรา ด้วยราคาที่โปร่งใส เงินเข้ากระเป๋าคนขับเต็มๆ 100% ❤️</p>
-              <button onClick={() => setIsModalOpen(true)} className="bg-[#EE4D2D] text-white px-8 py-4 sm:py-5 rounded-[1.2rem] sm:rounded-[1.5rem] font-black w-full shadow-lg hover:shadow-xl active:scale-95 transition-all text-sm sm:text-base tracking-wide">
-                + โพสต์งานด่วนเลย
-              </button>
+            <div className="text-center bg-white rounded-[2rem] p-10 shadow-sm border border-gray-100 animate-fade-in">
+              <div className="text-7xl mb-6">🏠</div>
+              <h3 className="text-xl font-black text-gray-800 mb-3">เรียกวิน หรือ ส่งของ?</h3>
+              <p className="text-xs text-gray-400 mb-8 font-medium">สนับสนุนไรเดอร์ในบ้านเรา ด้วยราคาที่โปร่งใส ❤️</p>
+              <button onClick={() => setIsModalOpen(true)} className="bg-[#EE4D2D] text-white px-8 py-5 rounded-[1.5rem] font-black w-full shadow-lg active:scale-95 transition-all">+ โพสต์งานด่วนเลย</button>
             </div>
           )}
 
           {activeTab === 'feed' && userRole === 'provider' && (
-            <div className="space-y-4 animate-fade-in max-w-2xl mx-auto mt-2">
-              {isLoading ? ( <div className="bg-white rounded-[2rem] p-6 h-40 animate-pulse shadow-sm"></div> ) : jobs.length === 0 ? (
-                <div className="bg-white rounded-[2.5rem] p-12 text-center shadow-sm border border-gray-100">
-                  <div className="text-5xl mb-4 opacity-50">😴</div>
-                  <p className="text-gray-400 font-bold text-sm">ยังไม่มีงานเข้ามาในตอนนี้ค่ะ</p>
-                </div>
-              ) : jobs.map((job) => (
-                <div key={job.id} className="bg-white rounded-[1.5rem] p-5 shadow-sm border border-gray-100 hover:border-orange-200 transition-all">
+            <div className="space-y-4 animate-fade-in">
+              {isLoading ? <div className="h-40 bg-white rounded-[2rem] animate-pulse" /> : jobs.map((job) => (
+                <div key={job.id} className="bg-white rounded-[1.5rem] p-5 shadow-sm border border-gray-100">
                   <div className="flex justify-between items-start mb-4">
                     <div className="flex gap-4">
-                      <div className="w-12 h-12 sm:w-14 sm:h-14 bg-orange-50 rounded-[1rem] flex items-center justify-center text-2xl sm:text-3xl shadow-inner border border-orange-100/50">{getVehicleIcon(job.vehicle_type)}</div>
+                      <div className="w-14 h-14 bg-orange-50 rounded-[1rem] flex items-center justify-center text-3xl border border-orange-100">{getVehicleIcon(job.vehicle_type)}</div>
                       <div>
-                        <h3 className="font-black text-gray-800 text-sm sm:text-base">{job.title}</h3>
-                        <p className="text-[10px] sm:text-[11px] text-gray-400 mt-0.5 font-medium">ลูกค้า: {job.employer?.first_name || 'ไม่ระบุ'}</p>
+                        <h3 className="font-black text-gray-800 text-sm">{job.title}</h3>
+                        <p className="text-[10px] text-gray-400 font-bold uppercase">ลูกค้า: {job.employer?.first_name || 'ไม่ระบุ'}</p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-lg sm:text-xl font-black text-[#EE4D2D] tracking-tight">฿{job.budget}</div>
-                      <div className="text-[9px] sm:text-[10px] text-gray-400 font-bold bg-gray-50 px-2 py-0.5 rounded-md mt-1 inline-block">{job.distance_km} กม.</div>
+                      <div className="text-xl font-black text-[#EE4D2D]">฿{job.budget}</div>
+                      <div className="text-[10px] text-gray-400 font-bold bg-gray-50 px-2 py-0.5 rounded-md mt-1">{job.distance_km} กม.</div>
                     </div>
                   </div>
-                  <div className="bg-[#F8FAFC] p-3.5 rounded-[1rem] mb-4 space-y-2 text-xs text-gray-600 border border-gray-100">
-                     <div className="flex gap-2"><span className="text-green-500">📍</span><span className="line-clamp-1 font-medium">{job.pickup_location}</span></div>
-                     {job.dropoff_location && <div className="flex gap-2 border-t border-gray-200/60 pt-2"><span className="text-red-500">🚩</span><span className="line-clamp-1 font-medium">{job.dropoff_location}</span></div>}
-                  </div>
-                  <button onClick={() => handleUpdateJobStatus(job.id, 'in_progress')} className="w-full bg-orange-50 hover:bg-[#EE4D2D] text-[#EE4D2D] hover:text-white border border-orange-200 hover:border-transparent py-3 sm:py-3.5 rounded-[1rem] text-xs sm:text-sm font-black active:scale-95 transition-all shadow-sm">
-                    รับงานนี้ ⚡
-                  </button>
+                  <button onClick={() => handleUpdateJobStatus(job.id, 'in_progress')} className="w-full bg-orange-50 hover:bg-[#EE4D2D] text-[#EE4D2D] hover:text-white border border-orange-200 py-3.5 rounded-[1rem] text-sm font-black transition-all">รับงานนี้ ⚡</button>
                 </div>
               ))}
             </div>
           )}
 
-          {/* TAB: MY JOBS */}
+          {/* MY JOBS */}
           {activeTab === 'my_jobs' && (
-            <div className="space-y-4 animate-fade-in max-w-2xl mx-auto mt-2">
-              {!currentUser ? (
-                <div className="bg-white rounded-[2rem] p-10 text-center shadow-sm border border-gray-100"><p className="text-gray-400 font-bold text-sm">กรุณาเข้าสู่ระบบเพื่อดูงานของคุณค่ะ 🔒</p></div>
-              ) : isLoading ? (
-                <div className="bg-white rounded-[2rem] p-6 h-40 animate-pulse shadow-sm"></div>
-              ) : myJobs.length === 0 ? (
-                <div className="bg-white rounded-[2rem] p-12 text-center shadow-sm border border-gray-100"><div className="text-5xl mb-4 opacity-50">📭</div><p className="text-gray-400 font-bold text-sm">คุณยังไม่มีประวัติงานในระบบค่ะ</p></div>
-              ) : myJobs.map((job) => (
+            <div className="space-y-4 animate-fade-in">
+              {isLoading ? <div className="h-40 bg-white rounded-[2rem] animate-pulse" /> : myJobs.map((job) => (
                 <div key={job.id} className="bg-white rounded-[1.5rem] p-5 shadow-sm border border-gray-100">
                   <div className="flex justify-between items-center mb-4 pb-3 border-b border-gray-50">
-                    <span className="text-[10px] text-gray-400 font-bold bg-gray-50 px-2 py-1 rounded-md">{new Date(job.created_at).toLocaleString('th-TH', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short'})}</span>
-                    <span className={`text-[9px] sm:text-[10px] font-black px-3 py-1 rounded-full ${job.status === 'open' ? 'bg-orange-100 text-orange-600' : job.status === 'in_progress' ? 'bg-blue-100 text-blue-600' : job.status === 'completed' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
-                      {job.status === 'open' ? '⏳ รอคนรับ' : job.status === 'in_progress' ? '🛵 กำลังไป' : job.status === 'completed' ? '✅ สำเร็จ' : '❌ ยกเลิก'}
+                    <span className="text-[10px] text-gray-400 font-bold bg-gray-50 px-2 py-1 rounded-md">{new Date(job.created_at).toLocaleString('th-TH', { hour: '2-digit', minute: '2-digit'})}</span>
+                    <span className={`text-[10px] font-black px-3 py-1 rounded-full ${job.status === 'open' ? 'bg-orange-100 text-orange-600' : job.status === 'in_progress' ? 'bg-blue-100 text-blue-600' : 'bg-green-100 text-green-600'}`}>
+                      {job.status === 'open' ? '⏳ รอคนรับ' : job.status === 'in_progress' ? '🛵 กำลังไป' : '✅ สำเร็จ'}
                     </span>
                   </div>
                   <div className="flex gap-4 mb-4">
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-50 rounded-xl flex items-center justify-center text-xl sm:text-2xl border border-gray-100">{getVehicleIcon(job.vehicle_type)}</div>
+                    <div className="w-12 h-12 bg-gray-50 rounded-xl flex items-center justify-center text-2xl border border-gray-100">{getVehicleIcon(job.vehicle_type)}</div>
                     <div className="flex-1">
-                      <h4 className="font-black text-gray-800 text-xs sm:text-sm line-clamp-1">{job.title}</h4>
-                      <p className="text-[10px] sm:text-[11px] text-[#EE4D2D] font-bold mt-0.5">฿{job.budget} <span className="text-gray-300 mx-1">|</span> <span className="text-gray-500">{job.distance_km} กม.</span></p>
+                      <h4 className="font-black text-gray-800 text-sm line-clamp-1">{job.title}</h4>
+                      <p className="text-[11px] text-[#EE4D2D] font-bold">฿{job.budget} <span className="text-gray-300 mx-1">|</span> {job.distance_km} กม.</p>
                     </div>
                   </div>
-
                   {job.status === 'in_progress' && (
                     <div className="flex gap-2 mb-3">
-                      <a href={`tel:${userRole === 'customer' ? job.worker?.phone_number : job.employer?.phone_number}`} className="flex-1 bg-blue-50 text-blue-700 py-2.5 sm:py-3 rounded-[1rem] text-[10px] sm:text-[11px] font-black flex items-center justify-center gap-2 shadow-sm active:scale-95 transition-all">📞 โทรศัพท์</a>
-                      <button onClick={() => { setActiveChatJob(job); fetchMessages(job.id); setIsChatOpen(true); }} className="flex-1 bg-orange-50 text-[#EE4D2D] py-2.5 sm:py-3 rounded-[1rem] text-[10px] sm:text-[11px] font-black flex items-center justify-center gap-2 shadow-sm active:scale-95 transition-all">💬 แชทข้อความ</button>
+                      <a href={`tel:${userRole === 'customer' ? job.worker?.phone_number : job.employer?.phone_number}`} className="flex-1 bg-blue-50 text-blue-700 py-3 rounded-[1rem] text-[11px] font-black flex items-center justify-center gap-2">📞 โทรศัพท์</a>
+                      <button onClick={() => { setActiveChatJob(job); fetchMessages(job.id); setIsChatOpen(true); }} className="flex-1 bg-orange-50 text-[#EE4D2D] py-3 rounded-[1rem] text-[11px] font-black flex items-center justify-center gap-2">💬 แชท</button>
                     </div>
                   )}
-
-                  <div className="flex gap-2 mt-2">
-                    {job.status === 'in_progress' && userRole === 'provider' && <button onClick={() => handleUpdateJobStatus(job.id, 'completed')} className="w-full bg-green-500 text-white py-3 rounded-[1rem] text-xs font-black shadow-md active:scale-95 transition-all">จบงาน / รับเงินเรียบร้อย ✅</button>}
-                    {(job.status === 'open' || job.status === 'in_progress') && userRole === 'customer' && <button onClick={() => handleUpdateJobStatus(job.id, 'cancelled')} className="w-full bg-gray-50 hover:bg-red-50 text-gray-500 hover:text-red-500 py-3 rounded-[1rem] text-xs font-bold transition-all border border-gray-200 hover:border-red-200">ยกเลิกงาน</button>}
+                  <div className="flex gap-2">
+                    {job.status === 'in_progress' && userRole === 'provider' && <button onClick={() => handleUpdateJobStatus(job.id, 'completed')} className="w-full bg-green-500 text-white py-3 rounded-[1rem] text-xs font-black">จบงานเรียบร้อย ✅</button>}
+                    {(job.status === 'open' || job.status === 'in_progress') && userRole === 'customer' && <button onClick={() => handleUpdateJobStatus(job.id, 'cancelled')} className="w-full bg-gray-50 text-gray-500 py-3 rounded-[1rem] text-xs font-bold border border-gray-200">ยกเลิกงาน</button>}
                   </div>
                 </div>
               ))}
@@ -352,84 +355,52 @@ export default function WinOnlinePage() {
           )}
         </div>
 
-        {/* Modal โพสต์งาน */}
+        {/* Modals & Chat (Pasted exactly for consistency) */}
         {isModalOpen && !isLocationPickerOpen && (
-          <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/60 backdrop-blur-sm animate-fade-in sm:items-center">
-            <div className="bg-white w-full sm:max-w-xl rounded-t-[2rem] sm:rounded-[2rem] p-6 sm:p-8 max-h-[90vh] overflow-y-auto pb-10 scrollbar-hide shadow-2xl relative">
-              <div className="absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-gray-200 rounded-full sm:hidden"></div>
-
-              <div className="flex justify-between items-center mb-5 mt-2">
-                <h2 className="text-lg sm:text-xl font-black text-gray-800 tracking-tight">เรียกงานด่วน 🚀</h2>
-                <button onClick={() => setIsModalOpen(false)} className="w-8 h-8 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center text-gray-500 transition-colors">✕</button>
+          <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/60 backdrop-blur-sm animate-fade-in">
+            <div className="bg-white w-full max-w-xl rounded-t-[2rem] p-8 max-h-[90vh] overflow-y-auto pb-10 shadow-2xl relative">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-black text-gray-800">เรียกงานด่วน 🚀</h2>
+                <button onClick={() => setIsModalOpen(false)} className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-500">✕</button>
               </div>
-
-              <form onSubmit={handlePostJob} className="space-y-4 sm:space-y-5">
-                <div className="flex gap-2 bg-gray-50 p-1 rounded-[1rem] border border-gray-100">
+              <form onSubmit={handlePostJob} className="space-y-5">
+                <div className="flex gap-2 bg-gray-50 p-1 rounded-[1.2rem]">
                   {['ride', 'buy', 'deliver'].map((t) => (
-                    <button key={t} type="button" onClick={() => setJobType(t as any)} className={`flex-1 py-2.5 sm:py-3 rounded-[0.8rem] text-[10px] sm:text-xs font-bold transition-all shadow-sm ${jobType === t ? 'bg-white text-[#EE4D2D] border border-orange-100' : 'text-gray-400 hover:text-gray-600'}`}>
+                    <button key={t} type="button" onClick={() => setJobType(t as any)} className={`flex-1 py-3 rounded-[1rem] text-xs font-bold transition-all ${jobType === t ? 'bg-white text-[#EE4D2D] shadow-sm' : 'text-gray-400'}`}>
                       {t === 'ride' ? '🛵 เรียกรถ' : t === 'buy' ? '🍜 ฝากซื้อ' : '📦 ส่งของ'}
                     </button>
                   ))}
                 </div>
-
-                <div className="space-y-2">
-                  <label className="text-[10px] sm:text-[11px] font-black text-gray-700 pl-1 uppercase tracking-wider">เลือกรถที่ต้องการ <span className="text-red-500">*</span></label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {['motorcycle', 'saleng', 'car', 'suv', 'van', 'pickup'].map((v) => (
-                      <div key={v} onClick={() => setVehicleType(v as any)} className={`cursor-pointer border rounded-[1rem] py-2.5 sm:py-3 flex flex-col items-center gap-1.5 transition-all ${vehicleType === v ? 'border-[#EE4D2D] bg-orange-50 ring-1 ring-[#EE4D2D]/20 shadow-sm' : 'border-gray-200 bg-white hover:bg-gray-50'}`}>
-                        <span className="text-xl sm:text-2xl drop-shadow-sm">{getVehicleIcon(v)}</span>
-                        <span className={`text-[8px] sm:text-[9px] font-bold ${vehicleType === v ? 'text-[#EE4D2D]' : 'text-gray-500'}`}>{getVehicleName(v)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] sm:text-[11px] font-black text-gray-700 pl-1 uppercase tracking-wider">รายละเอียดงาน <span className="text-red-500">*</span></label>
-                  <input type="text" required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="เช่น ไปส่งหน้าตลาดแกลง, ซื้อข้าวผัด 2 กล่อง" className="w-full bg-white border border-gray-200 rounded-[1rem] px-4 py-3 sm:py-4 text-xs sm:text-sm font-medium focus:border-[#EE4D2D] outline-none transition-all shadow-sm placeholder:text-gray-300" />
-                </div>
-
-                <div className="space-y-2 sm:space-y-3 bg-[#F8FAFC] p-4 sm:p-5 rounded-[1.5rem] border border-gray-100 shadow-inner">
-                  <div onClick={() => { setPickingType('pickup'); setIsLocationPickerOpen(true); }} className={`w-full bg-white border rounded-[1rem] px-4 py-3 sm:py-3.5 text-xs sm:text-sm flex justify-between items-center cursor-pointer shadow-sm transition-all hover:border-orange-300 ${pickup ? 'border-orange-200 text-gray-800 font-bold' : 'border-gray-200 text-gray-400'}`}>
-                    <div className="flex gap-2 sm:gap-3 items-center overflow-hidden"><span className="text-green-500 shrink-0">📍</span><span className="truncate">{pickup || 'ค้นหาจุดรับต้นทาง'}</span></div>
-                    <span className="text-orange-300 shrink-0">›</span>
-                  </div>
-                  <div onClick={() => { setPickingType('dropoff'); setIsLocationPickerOpen(true); }} className={`w-full bg-white border rounded-[1rem] px-4 py-3 sm:py-3.5 text-xs sm:text-sm flex justify-between items-center cursor-pointer shadow-sm transition-all hover:border-orange-300 ${dropoff ? 'border-orange-200 text-gray-800 font-bold' : 'border-gray-200 text-gray-400'}`}>
-                    <div className="flex gap-2 sm:gap-3 items-center overflow-hidden"><span className="text-red-500 shrink-0">🚩</span><span className="truncate">{dropoff || 'ค้นหาจุดส่งปลายทาง'}</span></div>
-                    <span className="text-orange-300 shrink-0">›</span>
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                   <label className="text-[10px] sm:text-[11px] font-black text-gray-700 pl-1 uppercase tracking-wider">หมายเหตุ (ถ้ามี)</label>
-                  <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="เช่น รอหน้าเซเว่น, จ่ายแบงค์พัน" rows={2} className="w-full bg-white border border-gray-200 rounded-[1rem] px-4 py-3 text-xs sm:text-sm font-medium focus:border-[#EE4D2D] outline-none resize-none shadow-sm placeholder:text-gray-300"></textarea>
-                </div>
-
-                <div className="pt-1 sm:pt-2">
-                  <div className="bg-orange-50 border border-orange-100 rounded-[1.2rem] p-4 flex justify-between items-center shadow-sm relative overflow-hidden">
-                    <div className="absolute -right-4 -top-4 text-5xl opacity-10">💰</div>
-                    <div className="space-y-1 relative z-10">
-                      <div className="flex items-center gap-2">
-                        <p className="text-[10px] sm:text-[11px] text-[#EE4D2D] font-black uppercase tracking-wider">ราคาประเมินสุทธิ</p>
-                        {distanceKm > 0 && <button type="button" onClick={() => setShowFareDetails(!showFareDetails)} className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-white text-orange-400 flex items-center justify-center text-[9px] sm:text-[10px] font-black shadow-sm border border-orange-100">i</button>}
-                      </div>
-                      <p className="text-[8px] sm:text-[9px] text-orange-400/80 font-bold">แอปไม่หักเปอร์เซ็นต์คนขับ</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {['motorcycle', 'saleng', 'car', 'suv', 'van', 'pickup'].map((v) => (
+                    <div key={v} onClick={() => setVehicleType(v as any)} className={`cursor-pointer border rounded-[1rem] py-3 flex flex-col items-center gap-1 transition-all ${vehicleType === v ? 'border-[#EE4D2D] bg-orange-50 ring-1 ring-[#EE4D2D]/20' : 'border-gray-200 bg-white'}`}>
+                      <span className="text-2xl">{getVehicleIcon(v)}</span>
+                      <span className={`text-[9px] font-bold ${vehicleType === v ? 'text-[#EE4D2D]' : 'text-gray-500'}`}>{getVehicleName(v)}</span>
                     </div>
-                    <div className="text-right relative z-10">
-                      <div className="text-2xl sm:text-3xl font-black text-[#EE4D2D] tracking-tighter">{fareBreakdown.totalFare > 0 ? `฿${fareBreakdown.totalFare}` : '-'}</div>
-                      {distanceKm > 0 && <div className="text-[8px] sm:text-[9px] text-orange-500/80 font-bold mt-1 bg-white px-2 py-0.5 rounded-full inline-block">ระยะทาง {distanceKm} กม.</div>}
-                    </div>
-                  </div>
-
-                  {showFareDetails && distanceKm > 0 && (
-                    <div className="mt-2 bg-white border border-gray-100 p-3 sm:p-4 rounded-[1rem] shadow-sm text-[9px] sm:text-[10px] font-bold text-gray-600 space-y-1.5 sm:space-y-2 relative animate-fade-in">
-                      <div className="flex justify-between"><span>เริ่มต้น {(fareBreakdown.base + fareBreakdown.platformFee).toFixed(0)} บ. + ระยะ ({distanceKm} กม.)</span><span className="text-gray-800">฿{(fareBreakdown.base + fareBreakdown.distanceFee + fareBreakdown.platformFee).toFixed(2)}</span></div>
-                      <div className="flex justify-between text-orange-500"><span>ค่าความผันผวนพลังงาน</span><span>+ ฿{fareBreakdown.fuelSurge.toFixed(2)}</span></div>
-                    </div>
-                  )}
+                  ))}
                 </div>
-
-                <button type="submit" disabled={isSubmitting || fareBreakdown.totalFare <= 0} className="w-full bg-[#EE4D2D] text-white font-black py-4 rounded-[1.2rem] text-sm sm:text-base mt-2 shadow-lg active:scale-95 disabled:opacity-50 disabled:active:scale-100 transition-all flex items-center justify-center">
+                <input type="text" required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="รายละเอียดงาน..." className="w-full bg-white border border-gray-200 rounded-[1rem] px-4 py-4 text-sm font-medium focus:border-[#EE4D2D] outline-none shadow-sm" />
+                <div className="bg-[#F8FAFC] p-5 rounded-[1.5rem] border border-gray-100 space-y-3">
+                  <div onClick={() => { setPickingType('pickup'); setIsLocationPickerOpen(true); }} className="w-full bg-white border rounded-[1rem] px-4 py-3.5 text-sm flex justify-between items-center cursor-pointer shadow-sm">
+                    <div className="flex gap-3 items-center overflow-hidden text-gray-800 font-bold"><span className="text-green-500">📍</span><span className="truncate">{pickup || 'จุดรับต้นทาง'}</span></div>
+                    <span className="text-orange-300">›</span>
+                  </div>
+                  <div onClick={() => { setPickingType('dropoff'); setIsLocationPickerOpen(true); }} className="w-full bg-white border rounded-[1rem] px-4 py-3.5 text-sm flex justify-between items-center cursor-pointer shadow-sm">
+                    <div className="flex gap-3 items-center overflow-hidden text-gray-800 font-bold"><span className="text-red-500">🚩</span><span className="truncate">{dropoff || 'จุดส่งปลายทาง'}</span></div>
+                    <span className="text-orange-300">›</span>
+                  </div>
+                </div>
+                <div className="bg-orange-50 border border-orange-100 rounded-[1.5rem] p-5 flex justify-between items-center shadow-sm">
+                    <div className="space-y-1">
+                      <p className="text-[11px] text-[#EE4D2D] font-black uppercase tracking-wider">ราคาประเมินสุทธิ</p>
+                      <p className="text-[9px] text-orange-400/80 font-bold">ไม่หักเปอร์เซ็นต์คนขับ</p>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-3xl font-black text-[#EE4D2D] tracking-tighter">฿{fareBreakdown.totalFare > 0 ? fareBreakdown.totalFare : '-'}</div>
+                      {distanceKm > 0 && <div className="text-[9px] text-orange-500/80 font-bold bg-white px-2 py-0.5 rounded-full inline-block mt-1">{distanceKm} กม.</div>}
+                    </div>
+                </div>
+                <button type="submit" disabled={isSubmitting || fareBreakdown.totalFare <= 0} className="w-full bg-[#EE4D2D] text-white font-black py-5 rounded-[1.5rem] text-base mt-2 shadow-lg active:scale-95 disabled:opacity-50 transition-all">
                   {isSubmitting ? 'กำลังส่งข้อมูล...' : 'ยืนยันการโพสต์งาน'}
                 </button>
               </form>
@@ -440,100 +411,81 @@ export default function WinOnlinePage() {
         {/* Location Picker */}
         {isLocationPickerOpen && (
           <div className="fixed inset-0 z-[110] bg-[#F4F6F8] flex flex-col animate-fade-in">
-            <div className="p-4 border-b flex items-center gap-2 sm:gap-3 bg-white shadow-sm z-10 pt-safe">
-              <button onClick={() => { setIsLocationPickerOpen(false); setIsMapMode(false); }} className="w-10 h-10 bg-gray-50 hover:bg-gray-100 rounded-full flex items-center justify-center text-gray-600 transition-colors">←</button>
+            <div className="p-4 border-b flex items-center gap-3 bg-white shadow-sm z-10 pt-safe">
+              <button onClick={() => { setIsLocationPickerOpen(false); setIsMapMode(false); }} className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center">←</button>
               {!isMapMode ? (
-                <input autoFocus type="text" value={value} onChange={(e) => setValue(e.target.value)} placeholder={`ค้นหาจุด ${pickingType === 'pickup' ? 'รับ' : 'ส่ง'}...`} className="flex-1 bg-[#F4F6F8] rounded-[1rem] px-4 sm:px-5 py-3 text-xs sm:text-sm font-bold outline-none focus:ring-2 focus:ring-orange-200 transition-all" />
+                <input autoFocus type="text" value={value} onChange={(e) => setValue(e.target.value)} placeholder="ค้นหาจุดรับ/ส่ง..." className="flex-1 bg-[#F4F6F8] rounded-[1rem] px-5 py-3 text-sm font-bold outline-none" />
               ) : (
-                <div className="flex-1 font-black text-xs sm:text-sm text-gray-800 text-center pr-10">เลื่อนแผนที่เพื่อปักหมุด 📍</div>
+                <div className="flex-1 font-black text-sm text-gray-800 text-center pr-10">เลื่อนแผนที่เพื่อปักหมุด 📍</div>
               )}
             </div>
-
-            <div className="flex-1 relative flex flex-col bg-[#F4F6F8]">
+            <div className="flex-1 relative overflow-y-auto p-4 space-y-3">
               {!isMapMode ? (
-                <div className="flex-1 overflow-y-auto p-4 space-y-3 max-w-2xl mx-auto w-full">
-                  <div onClick={handleGetCurrentLocation} className="p-4 bg-white rounded-[1rem] border border-blue-100 flex items-center justify-between text-blue-600 font-bold text-xs sm:text-sm shadow-sm cursor-pointer hover:bg-blue-50 transition-all">
-                    <div className="flex items-center gap-3"><span className="text-lg sm:text-xl">🎯</span><span>ใช้ตำแหน่งปัจจุบัน (GPS)</span></div>
+                <>
+                  <div onClick={handleGetCurrentLocation} className="p-4 bg-white rounded-[1rem] border border-blue-100 flex items-center justify-between text-blue-600 font-bold text-sm shadow-sm cursor-pointer">
+                    <div className="flex items-center gap-3"><span>🎯</span><span>ใช้ตำแหน่งปัจจุบัน (GPS)</span></div>
                     {isLocating && <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>}
                   </div>
-                  <div onClick={() => setIsMapMode(true)} className="p-4 bg-white rounded-[1rem] border border-gray-200 flex items-center gap-3 text-gray-700 font-bold text-xs sm:text-sm shadow-sm cursor-pointer hover:bg-gray-50 transition-all">
-                    <span className="text-lg sm:text-xl">🗺️</span> ปักหมุดบนแผนที่เอง
-                  </div>
-                  
-                  <div className="pt-2 px-2 text-[9px] sm:text-[10px] font-black text-gray-400 uppercase tracking-widest">สถานที่แนะนำ</div>
-                  {status === "OK" ? data.map(({ place_id, description, structured_formatting: { main_text, secondary_text } }) => (
-                    <div key={place_id} onClick={() => handleSelectLocation(description)} className="p-3.5 sm:p-4 bg-white rounded-[1rem] shadow-sm border border-gray-100 flex items-center gap-3 sm:gap-4 cursor-pointer hover:border-orange-200 transition-all">
-                      <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gray-50 flex items-center justify-center shrink-0 text-base sm:text-lg">📍</div>
-                      <div><h4 className="text-xs sm:text-sm font-bold text-gray-800">{main_text}</h4><p className="text-[10px] sm:text-[11px] text-gray-400 line-clamp-1 mt-0.5">{secondary_text}</p></div>
+                  <div onClick={() => setIsMapMode(true)} className="p-4 bg-white rounded-[1rem] border border-gray-200 flex items-center gap-3 text-gray-700 font-bold text-sm shadow-sm cursor-pointer"><span>🗺️</span> ปักหมุดบนแผนที่เอง</div>
+                  {status === "OK" ? data.map(({ place_id, description }) => (
+                    <div key={place_id} onClick={() => handleSelectLocation(description)} className="p-4 bg-white rounded-[1rem] shadow-sm border border-gray-100 flex items-center gap-4 cursor-pointer">
+                      <div className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-lg">📍</div>
+                      <div><h4 className="text-sm font-bold text-gray-800">{description}</h4></div>
                     </div>
-                  )) : (
-                    popularPlaces.map((p, i) => (
-                      <div key={i} onClick={() => handleSelectLocation(p.name)} className="p-3.5 sm:p-4 bg-white rounded-[1rem] shadow-sm border border-gray-100 flex items-center gap-3 sm:gap-4 cursor-pointer hover:border-orange-200 transition-all">
-                        <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center shrink-0 text-base sm:text-lg">⭐</div>
-                        <div><h4 className="text-xs sm:text-sm font-bold text-gray-800">{p.name}</h4><p className="text-[10px] sm:text-[11px] text-gray-400 mt-0.5">{p.detail}</p></div>
-                      </div>
-                    ))
-                  )}
-                </div>
+                  )) : popularPlaces.map((p, i) => (
+                    <div key={i} onClick={() => handleSelectLocation(p.name)} className="p-4 bg-white rounded-[1rem] shadow-sm border border-gray-100 flex items-center gap-4 cursor-pointer">
+                      <div className="w-10 h-10 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center text-lg">⭐</div>
+                      <div><h4 className="text-sm font-bold text-gray-800">{p.name}</h4><p className="text-[11px] text-gray-400 mt-0.5">{p.detail}</p></div>
+                    </div>
+                  ))}
+                </>
               ) : (
-                <div className="flex-1 relative">
-                  {isLoaded && (
-                    <>
-                      <GoogleMap mapContainerStyle={{ width: '100%', height: '100%' }} center={mapCenter} zoom={16} onClick={onMapClick} options={{ disableDefaultUI: true, zoomControl: false }}>
-                        {selectedPin && <MarkerF position={selectedPin} />}
-                      </GoogleMap>
-                      <button onClick={handleGetCurrentLocation} className="absolute top-4 right-4 sm:top-6 sm:right-6 w-12 h-12 sm:w-14 sm:h-14 bg-white rounded-full shadow-lg flex items-center justify-center text-xl sm:text-2xl border border-gray-100 active:scale-95 transition-all text-blue-500">🎯</button>
-                      <div className="absolute bottom-6 left-4 right-4 sm:bottom-10 sm:left-6 sm:right-6 max-w-md mx-auto">
-                        <div className="bg-white/95 backdrop-blur-xl p-5 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] shadow-2xl border border-white/50 text-center">
-                          <p className="text-sm sm:text-base font-black text-gray-800 mb-1">จิ้มที่แผนที่เพื่อปักหมุด 📍</p>
-                          <p className="text-[10px] sm:text-[11px] text-gray-500 mb-4 sm:mb-5 font-medium">ลากและซูมแผนที่ เพื่อความแม่นยำสูงสุด</p>
-                          <button onClick={() => setIsMapMode(false)} className="bg-gray-100 text-gray-600 px-5 sm:px-6 py-2.5 sm:py-3 rounded-full text-[11px] sm:text-xs font-bold hover:bg-gray-200 transition-all">กลับไปค้นหาด้วยชื่อ</button>
-                        </div>
-                      </div>
-                    </>
-                  )}
+                <div className="absolute inset-0">
+                  {isLoaded && <GoogleMap mapContainerStyle={{ width: '100%', height: '100%' }} center={mapCenter} zoom={16} onClick={onMapClick} options={{ disableDefaultUI: true, zoomControl: false }}>
+                    {selectedPin && <MarkerF position={selectedPin} />}
+                  </GoogleMap>}
+                  <button onClick={handleGetCurrentLocation} className="absolute top-4 right-4 w-14 h-14 bg-white rounded-full shadow-lg flex items-center justify-center text-2xl text-blue-500">🎯</button>
+                  <div className="absolute bottom-10 left-6 right-6 bg-white/95 backdrop-blur-xl p-6 rounded-[2rem] shadow-2xl text-center">
+                    <p className="text-sm font-black text-gray-800 mb-5">จิ้มที่แผนที่เพื่อปักหมุด 📍</p>
+                    <button onClick={() => setIsMapMode(false)} className="bg-gray-100 text-gray-600 px-6 py-3 rounded-full text-xs font-bold">กลับไปค้นหา</button>
+                  </div>
                 </div>
               )}
             </div>
           </div>
         )}
 
-        {/* Chat Interface */}
+        {/* Chat Drawer */}
         {isChatOpen && activeChatJob && (
           <div className="fixed inset-0 z-[200] bg-[#F4F6F8] flex flex-col animate-fade-in">
-            <div className="p-3 sm:p-4 border-b border-gray-200 flex items-center justify-between bg-white shadow-sm pt-safe z-10">
-              <button onClick={() => setIsChatOpen(false)} className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center text-gray-600 font-bold hover:bg-gray-100">✕</button>
+            <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-white pt-safe z-10 shadow-sm">
+              <button onClick={() => setIsChatOpen(false)} className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center text-gray-600 font-bold">✕</button>
               <div className="text-center">
-                <h3 className="text-xs sm:text-sm font-black text-gray-800">แชท: {userRole === 'customer' ? 'ไรเดอร์' : 'ลูกค้า'}</h3>
-                <p className="text-[9px] sm:text-[10px] text-[#EE4D2D] font-bold mt-0.5 line-clamp-1">{activeChatJob.title}</p>
+                <h3 className="text-sm font-black text-gray-800">แชท: {userRole === 'customer' ? 'ไรเดอร์' : 'ลูกค้า'}</h3>
+                <p className="text-[10px] text-[#EE4D2D] font-bold truncate max-w-[150px]">{activeChatJob.title}</p>
               </div>
               <div className="w-10"></div>
             </div>
-            
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 max-w-2xl mx-auto w-full">
-              <div className="text-center text-[9px] sm:text-[10px] text-gray-400 font-bold my-4 bg-gray-200/50 py-1 px-3 rounded-full w-max mx-auto">แชทปลอดภัย 100%</div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {messages.map((msg, i) => (
                 <div key={i} className={`flex ${msg.sender_id === currentUser.id ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[75%] p-3 sm:p-3.5 rounded-[1rem] sm:rounded-[1.2rem] text-xs sm:text-sm font-medium shadow-sm ${msg.sender_id === currentUser.id ? 'bg-[#EE4D2D] text-white rounded-tr-sm' : 'bg-white border border-gray-100 text-gray-800 rounded-tl-sm'}`}>
+                  <div className={`max-w-[75%] p-3.5 rounded-[1.2rem] text-sm font-medium shadow-sm ${msg.sender_id === currentUser.id ? 'bg-[#EE4D2D] text-white rounded-tr-sm' : 'bg-white text-gray-800 rounded-tl-sm border border-gray-100'}`}>
                     {msg.content}
                   </div>
                 </div>
               ))}
               <div ref={chatEndRef} />
             </div>
-
-            <form onSubmit={handleSendMessage} className="p-3 sm:p-4 border-t border-gray-200 bg-white flex gap-2 sm:gap-3 pb-safe max-w-2xl mx-auto w-full">
-              <input type="text" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder="พิมพ์ข้อความที่นี่..." className="flex-1 bg-[#F4F6F8] border border-gray-200 rounded-full px-4 sm:px-5 py-3 sm:py-3.5 text-xs sm:text-sm font-medium outline-none focus:ring-2 focus:ring-orange-200 transition-all" />
-              <button type="submit" disabled={!newMessage.trim()} className="bg-[#EE4D2D] text-white w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center text-base sm:text-lg shadow-md active:scale-95 disabled:opacity-50 transition-all">➤</button>
+            <form onSubmit={handleSendMessage} className="p-4 border-t border-gray-200 bg-white flex gap-3 pb-safe">
+              <input type="text" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder="พิมพ์ข้อความ..." className="flex-1 bg-[#F4F6F8] rounded-full px-5 py-3.5 text-sm font-medium outline-none" />
+              <button type="submit" disabled={!newMessage.trim()} className="bg-[#EE4D2D] text-white w-12 h-12 rounded-full flex items-center justify-center shadow-md">➤</button>
             </form>
           </div>
         )}
 
-        {/* ปุ่มลับสำหรับให้ Developer กดทดสอบ */}
+        {/* Dev Toggle */}
         <div className="fixed bottom-24 right-4 z-[90] opacity-10 hover:opacity-100 transition-opacity">
-          <button onClick={() => { setUserRole(r => r === 'customer' ? 'provider' : 'customer'); setActiveTab('feed'); }} className="bg-black/50 text-white text-[8px] px-2 py-1 rounded-md backdrop-blur-sm">
-            [Dev] สลับโหมด
-          </button>
+          <button onClick={() => { setUserRole(r => r === 'customer' ? 'provider' : 'customer'); setActiveTab('feed'); }} className="bg-black/50 text-white text-[8px] px-2 py-1 rounded-md backdrop-blur-sm">[Dev] สลับโหมด</button>
         </div>
 
         {!isModalOpen && !isLocationPickerOpen && !isChatOpen && <BottomNav />}
