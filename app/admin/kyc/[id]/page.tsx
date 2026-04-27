@@ -17,31 +17,18 @@ export default function KycApprovalPage() {
 
   useEffect(() => {
     async function fetchData() {
+      // 1. ดึงข้อมูลโปรไฟล์ (ซึ่งมีคอลัมน์ id_card_url อยู่แล้ว)
       const { data: profileData } = await supabase.from('profiles').select('*').eq('id', userId).single();
       setProfile(profileData);
 
-      if (profileData) {
-        // 1. ดึงรายชื่อไฟล์ทั้งหมดออกมา
-        const { data: files } = await supabase.storage
-          .from('kyc_documents')
-          .list(userId);
-
-        if (files && files.length > 0) {
-          // 2. 🔍 กรองหา "ไฟล์รูปภาพจริงๆ" (ข้ามไฟล์ผีของระบบ)
-          const realImageFile = files.find(f => 
-            f.name.toLowerCase().endsWith('.jpg') || 
-            f.name.toLowerCase().endsWith('.jpeg') || 
-            f.name.toLowerCase().endsWith('.png')
-          );
-
-          if (realImageFile) {
-            // 3. เอาไฟล์รูปของจริงมาสร้างลิงก์
-            const { data: fileLink } = await supabase.storage
-              .from('kyc_documents') 
-              .createSignedUrl(`${userId}/${realImageFile.name}`, 3600);
-            
-            if (fileLink) setImageUrl(fileLink.signedUrl);
-          }
+      if (profileData && profileData.id_card_url) {
+        // 2. 🎯 วิธีที่ชัวร์ที่สุด: หยิบ Path จากฐานข้อมูลมาสร้างลิงก์โดยตรงเลยค่ะ
+        const { data: fileLink } = await supabase.storage
+          .from('kyc_documents') 
+          .createSignedUrl(profileData.id_card_url, 3600);
+        
+        if (fileLink) {
+          setImageUrl(fileLink.signedUrl);
         }
       }
       
@@ -90,10 +77,11 @@ export default function KycApprovalPage() {
           <span>←</span> กลับหน้าแอดมิน
         </button>
 
-        <h1 className="text-2xl font-black text-gray-800 mb-6 border-b pb-4">พิจารณาเอกสารยืนยันตัวตน</h1>
+        <h1 className="text-2xl font-black text-gray-800 mb-6 border-b pb-4 text-center">พิจารณาเอกสารยืนยันตัวตน</h1>
         
+        {/* ส่วนแสดงรูปบัตร */}
         <div className="mb-8">
-          <div className="text-sm font-black text-gray-500 mb-3 uppercase tracking-wider">หลักฐานรูปถ่ายบัตรประชาชน</div>
+          <div className="text-sm font-black text-gray-500 mb-3 uppercase tracking-wider text-center">หลักฐานรูปถ่ายบัตรประชาชน</div>
           <div className="bg-gray-100 rounded-3xl border-2 border-dashed border-gray-300 overflow-hidden flex items-center justify-center relative aspect-video shadow-inner">
             {imageUrl ? (
               <img src={imageUrl} alt="ID Card" className="object-contain w-full h-full" />
@@ -109,7 +97,8 @@ export default function KycApprovalPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+        {/* ข้อมูลเปรียบเทียบ */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10 p-4 bg-gray-50 rounded-2xl">
           <div className="space-y-6">
             <DataField label="ชื่อ-นามสกุล" value={profile.full_name} />
             <DataField label="เลขบัตรประชาชน" value={profile.national_id} isMono />
@@ -126,7 +115,8 @@ export default function KycApprovalPage() {
           </div>
         </div>
 
-        <div className="flex gap-4 sticky bottom-6">
+        {/* Action Buttons */}
+        <div className="flex gap-4 sticky bottom-6 bg-white p-2">
           <button onClick={() => handleDecision('approved')} disabled={isSubmitting} className="flex-1 bg-[#22C55E] hover:bg-green-600 text-white py-5 rounded-2xl font-black text-lg transition-all shadow-lg active:scale-95 disabled:opacity-50">
             อนุมัติข้อมูลถูกต้อง
           </button>
