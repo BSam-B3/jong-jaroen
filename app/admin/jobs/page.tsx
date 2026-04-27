@@ -16,12 +16,12 @@ export default function AdminJobsPage() {
     setLoading(true);
     try {
       // ดึงข้อมูลงาน (เดี๋ยวเราค่อยไปสร้างตาราง jobs ใน Supabase กันทีหลังค่ะ)
-      const { data, error } = await supabase
+    const { data, error } = await supabase
         .from('jobs')
         .select(`
           id, title, status, budget, created_at,
-          employer:employer_id(full_name),
-          worker:worker_id(full_name)
+          employer:profiles!employer_id(full_name, phone),
+          worker:profiles!worker_id(full_name, phone)
         `)
         .order('created_at', { ascending: false });
         
