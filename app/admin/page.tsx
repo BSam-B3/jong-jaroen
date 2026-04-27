@@ -2,16 +2,17 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
-export default function AdminDashboardPage() {
+export default function AdminDashboard() {
+  const router = useRouter();
   const [stats, setStats] = useState({
-    pendingKyc: 0,
     totalUsers: 0,
+    pendingKYC: 0,
     activeJobs: 0,
-    totalRevenue: 0
+    todayJobs: 0
   });
-  const [adminName, setAdminName] = useState('');
+  const [recentJobs, setRecentJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -21,116 +22,119 @@ export default function AdminDashboardPage() {
   async function fetchDashboardData() {
     setLoading(true);
     try {
-      // 1. ดึงชื่อคนล็อกอิน
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).single();
-        if (profile) setAdminName(profile.full_name);
-      }
+      // 1. ดึงจำนวน User ทั้งหมด
+      const { count: userCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
+      
+      // 2. ดึงจำนวนคนที่รอตรวจ KYC
+      const { count: kycCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('kyc_status', 'pending');
+      
+      // 3. ดึงจำนวนงานที่ยังเปิดอยู่ (Open & In Progress)
+      const { count: jobCount } = await supabase.from('jobs').select('*', { count: 'exact', head: true }).in('status', ['open', 'in_progress']);
+      
+      // 4. ดึงงานที่โพสต์วันนี้
+      const today = new Date().toISOString().split('T')[0];
+      const { count: todayCount } = await supabase.from('jobs').select('*', { count: 'exact', head: true }).gte('created_at', today);
 
-      // 2. นับจำนวน KYC ที่รอตรวจ
-      const { count: kycCount } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true })
-        .eq('kyc_status', 'pending');
-
-      // 3. นับจำนวนผู้ใช้งานในระบบทั้งหมด
-      const { count: userCount } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true });
+      // 5. ดึงรายการงานล่าสุด 5 รายการ
+      const { data: latestJobs } = await supabase
+        .from('jobs')
+        .select(`id, title, status, budget, employer:profiles!employer_id(full_name)`)
+        .order('created_at', { ascending: false })
+        .limit(5);
 
       setStats({
-        pendingKyc: kycCount || 0,
         totalUsers: userCount || 0,
-        activeJobs: 0, // TODO: รอเชื่อมต่อตารางงานในเฟสหน้า
-        totalRevenue: 0 // TODO: รอเชื่อมต่อตารางการเงินในเฟสหน้า
+        pendingKYC: kycCount || 0,
+        activeJobs: jobCount || 0,
+        todayJobs: todayCount || 0
       });
+      setRecentJobs(latestJobs || []);
     } catch (error) {
-      console.error("Error fetching stats:", error);
+      console.error('Error fetching dashboard stats:', error);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }
 
-  if (loading) return <div className="p-10 font-bold text-gray-400">กำลังโหลดสรุปข้อมูลแพลตฟอร์ม...</div>;
-
   return (
-    <div className="max-w-6xl mx-auto space-y-8 animate-fade-in">
-      
-      {/* --- ส่วนหัวทักทาย --- */}
+    <div className="space-y-10 animate-in fade-in duration-700">
+      {/* Header */}
       <div>
-        <h1 className="text-3xl font-black text-gray-900 tracking-tight">ภาพรวมระบบ (Dashboard)</h1>
-        <p className="text-gray-500 mt-2 font-medium">สวัสดีค่ะ {adminName || 'แอดมิน'}! นี่คือสรุปข้อมูลของแพลตฟอร์มจงเจริญในวันนี้ค่ะ</p>
+        <h2 className="text-4xl font-black text-gray-900 tracking-tighter">ภาพรวมระบบ</h2>
+        <p className="text-gray-400 mt-2 font-bold text-sm uppercase tracking-widest">Real-time Operations Insight</p>
       </div>
 
-      {/* --- การ์ดแสดงสถิติ 4 ช่อง --- */}
+      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        
-        {/* ช่องที่ 1: KYC (ใช้งานได้จริงแล้ว) */}
-        <div className="bg-white p-6 rounded-[2rem] border border-orange-100 shadow-sm flex flex-col justify-between hover:shadow-md transition">
-          <div className="flex justify-between items-start">
-            <div className="w-12 h-12 bg-orange-50 text-orange-500 rounded-2xl flex items-center justify-center text-2xl">🪪</div>
-            {stats.pendingKyc > 0 && (
-              <span className="bg-red-50 text-red-600 text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-widest border border-red-100 animate-pulse">
-                ด่วน
-              </span>
-            )}
-          </div>
-          <div className="mt-6">
-            <p className="text-4xl font-black text-gray-900">{stats.pendingKyc}</p>
-            <p className="text-xs font-black text-gray-400 mt-1 uppercase tracking-widest">KYC รอตรวจสอบ</p>
-          </div>
-          <Link href="/admin/kyc" className="mt-4 bg-orange-50 text-orange-600 text-center py-2 rounded-xl text-xs font-black hover:bg-orange-500 hover:text-white transition">
-            ไปหน้าตรวจเอกสาร
-          </Link>
-        </div>
-
-        {/* ช่องที่ 2: Users (ใช้งานได้จริงแล้ว) */}
-        <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col justify-between hover:shadow-md transition">
-           <div className="w-12 h-12 bg-blue-50 text-blue-500 rounded-2xl flex items-center justify-center text-2xl">👥</div>
-          <div className="mt-6">
-            <p className="text-4xl font-black text-gray-900">{stats.totalUsers}</p>
-            <p className="text-xs font-black text-gray-400 mt-1 uppercase tracking-widest">สมาชิกทั้งหมด</p>
-          </div>
-           <button disabled className="mt-4 bg-gray-50 text-gray-400 text-center py-2 rounded-xl text-xs font-black cursor-not-allowed">
-             จัดการสมาชิก (เร็วๆ นี้)
-           </button>
-        </div>
-
-        {/* ช่องที่ 3: Jobs (รอทำเฟสหน้า) */}
-        <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col justify-between opacity-60">
-          <div className="w-12 h-12 bg-green-50 text-green-500 rounded-2xl flex items-center justify-center text-2xl">💼</div>
-          <div className="mt-6">
-            <p className="text-4xl font-black text-gray-900">{stats.activeJobs}</p>
-            <p className="text-xs font-black text-gray-400 mt-1 uppercase tracking-widest">งานที่กำลังดำเนินการ</p>
-          </div>
-          <button disabled className="mt-4 bg-gray-50 text-gray-400 text-center py-2 rounded-xl text-xs font-black cursor-not-allowed">
-            ดูระบบงาน (เร็วๆ นี้)
-          </button>
-        </div>
-
-        {/* ช่องที่ 4: Revenue (รอทำเฟสหน้า) */}
-        <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col justify-between opacity-60">
-          <div className="w-12 h-12 bg-purple-50 text-purple-500 rounded-2xl flex items-center justify-center text-2xl">💰</div>
-          <div className="mt-6">
-            <p className="text-4xl font-black text-gray-900">{stats.totalRevenue.toLocaleString()} <span className="text-lg">บาท</span></p>
-            <p className="text-xs font-black text-gray-400 mt-1 uppercase tracking-widest">รายได้แพลตฟอร์ม</p>
-          </div>
-          <button disabled className="mt-4 bg-gray-50 text-gray-400 text-center py-2 rounded-xl text-xs font-black cursor-not-allowed">
-            ดูระบบการเงิน (เร็วๆ นี้)
-          </button>
-        </div>
-
+        <StatCard title="สมาชิกทั้งหมด" value={stats.totalUsers} icon="👥" color="text-blue-600" onClick={() => router.push('/admin/users')} />
+        <StatCard title="รอยืนยันตัวตน" value={stats.pendingKYC} icon="🪪" color="text-orange-500" onClick={() => router.push('/admin/kyc')} />
+        <StatCard title="งานที่กำลังวิ่ง" value={stats.activeJobs} icon="🛵" color="text-[#EE4D2D]" onClick={() => router.push('/admin/jobs')} />
+        <StatCard title="งานใหม่วันนี้" value={stats.todayJobs} icon="🔥" color="text-green-600" />
       </div>
 
-      {/* --- ส่วนคำแนะนำเริ่มต้น --- */}
-       <div className="bg-[#EE4D2D]/5 border border-[#EE4D2D]/20 rounded-3xl p-8 mt-8">
-         <h2 className="text-lg font-black text-gray-900 mb-2">🚀 ยินดีต้อนรับสู่ระบบหลังบ้าน</h2>
-         <p className="text-sm text-gray-600 mb-6 font-medium">
-           ขณะนี้ระบบเปิดให้ใช้งานฟีเจอร์ "ตรวจสอบเอกสาร (KYC)" แล้ว คุณบีสามสามารถคลิกที่เมนูด้านซ้าย 
-           หรือปุ่มส้มๆ ในการ์ดด้านบน เพื่อเริ่มตรวจสอบข้อมูลรูปบัตรประชาชนที่ลูกค้าส่งเข้ามาได้ทันทีค่ะ
-         </p>
-       </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Recent Jobs Table */}
+        <div className="lg:col-span-2 bg-white rounded-[2.5rem] shadow-xl border border-gray-100 overflow-hidden">
+          <div className="p-8 border-b border-gray-50 flex justify-between items-center">
+            <h3 className="font-black text-gray-800 uppercase text-xs tracking-widest">งานล่าสุดในระบบ</h3>
+            <button onClick={() => router.push('/admin/jobs')} className="text-[#EE4D2D] font-black text-[10px] uppercase hover:underline">ดูทั้งหมด ›</button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <tbody className="divide-y divide-gray-50">
+                {recentJobs.map(job => (
+                  <tr key={job.id} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => router.push(`/admin/jobs/${job.id}`)}>
+                    <td className="p-6">
+                      <p className="font-black text-sm text-gray-800">{job.title}</p>
+                      <p className="text-[10px] text-gray-400 font-bold uppercase">โดย: {job.employer?.full_name}</p>
+                    </td>
+                    <td className="p-6">
+                      <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase ${
+                        job.status === 'open' ? 'bg-orange-50 text-orange-600' : 'bg-blue-50 text-blue-600'
+                      }`}>
+                        {job.status}
+                      </span>
+                    </td>
+                    <td className="p-6 text-right font-black text-sm text-gray-700">฿{job.budget}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
 
+        {/* Quick Actions / Shortcuts */}
+        <div className="space-y-6">
+          <div className="bg-gray-900 p-8 rounded-[2.5rem] shadow-2xl text-white relative overflow-hidden">
+            <div className="absolute -right-4 -top-4 text-6xl opacity-20 rotate-12">⚙️</div>
+            <h3 className="text-lg font-black tracking-tight mb-2">ทางลัดแอดมิน</h3>
+            <p className="text-gray-400 text-xs font-bold mb-6">จัดการส่วนต่างๆ ได้รวดเร็วขึ้น</p>
+            <div className="space-y-3">
+              <button onClick={() => router.push('/admin/kyc')} className="w-full bg-white/10 hover:bg-white/20 py-3 rounded-xl text-xs font-black transition-all text-left px-4 flex justify-between">
+                <span>อนุมัติ KYC ด่วน</span>
+                <span>→</span>
+              </button>
+              <button onClick={() => router.push('/admin/users')} className="w-full bg-white/10 hover:bg-white/20 py-3 rounded-xl text-xs font-black transition-all text-left px-4 flex justify-between">
+                <span>ค้นหาสมาชิก</span>
+                <span>→</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatCard({ title, value, icon, color, onClick }: any) {
+  return (
+    <div 
+      onClick={onClick}
+      className={`bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-50 relative overflow-hidden group transition-all ${onClick ? 'cursor-pointer hover:shadow-xl hover:-translate-y-1' : ''}`}
+    >
+      <div className="absolute -right-2 -top-2 text-6xl opacity-5 group-hover:scale-110 transition-transform">{icon}</div>
+      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">{title}</p>
+      <p className={`text-4xl font-black ${color} tracking-tighter`}>{value.toLocaleString()}</p>
     </div>
   );
 }
