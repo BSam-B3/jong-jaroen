@@ -1,15 +1,19 @@
-import { createClient } from '@supabase/supabase-js';
+import { createBrowserClient } from '@supabase/ssr';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// 🛡️ อัปเกรดมาใช้ Browser Client เพื่อความปลอดภัยและรองรับ Next.js SSR
+export const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey);
 
+// ==========================================
 // Types for Jong Jaroen (จงเจริญ)
+// ==========================================
+
 export type Profile = {
   id: string;
   full_name: string;
-  role: 'freelancer' | 'customer';
+  role: 'freelancer' | 'customer' | 'admin' | 'super_admin'; // เจมแอบเติม role แอดมินให้ค่ะ
   location: string;
   created_at: string;
 };
@@ -27,7 +31,7 @@ export type Job = {
   id: string;
   customer_id: string;
   service_id: string;
-  status: 'pending' | 'completed';
+  status: 'open' | 'in_progress' | 'completed' | 'cancelled' | 'disputed'; // เจมปรับให้ตรงกับฐานข้อมูลจริงของเรา
   lottery_number: string | null;
   total_price_thb: number;
   created_at: string;
