@@ -109,11 +109,18 @@ export default function WinOnlinePage() {
 
   const fetchJobs = useCallback(async (userId?: string) => {
     setIsLoading(true);
-    const { data: openData } = await supabase.from('express_jobs').select(`*, profiles:customer_id (first_name, phone_number)`).eq('status', 'open').order('created_at', { ascending: false });
+    // 👇 แก้ไขการเรียกชื่อตารางจาก express_jobs เป็น jobs และเชื่อมตาราง profiles ให้ถูกต้อง
+    const { data: openData } = await supabase.from('jobs')
+      .select(`*, employer:profiles!employer_id (first_name, phone_number)`)
+      .eq('status', 'open')
+      .order('created_at', { ascending: false });
     if (openData) setJobs(openData);
 
     if (userId) {
-      const { data: myData } = await supabase.from('express_jobs').select(`*, customer:customer_id (first_name, phone_number), provider:provider_id (first_name, phone_number)`).or(`customer_id.eq.${userId},provider_id.eq.${userId}`).order('created_at', { ascending: false });
+      const { data: myData } = await supabase.from('jobs')
+        .select(`*, employer:profiles!employer_id (first_name, phone_number), worker:profiles!worker_id (first_name, phone_number)`)
+        .or(`employer_id.eq.${userId},worker_id.eq.${userId}`)
+        .order('created_at', { ascending: false });
       if (myData) setMyJobs(myData);
     }
     setIsLoading(false);
@@ -125,7 +132,8 @@ export default function WinOnlinePage() {
       fetchJobs(session?.user?.id);
     });
 
-    const jobChannel = supabase.channel('job-updates').on('postgres_changes', { event: '*', schema: 'public', table: 'express_jobs' }, () => {
+    // 👇 เปลี่ยนเป็น table: 'jobs'
+    const jobChannel = supabase.channel('job-updates').on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, () => {
       supabase.auth.getSession().then(({ data: { session } }) => fetchJobs(session?.user?.id));
     }).subscribe();
 
@@ -140,8 +148,18 @@ export default function WinOnlinePage() {
     e.preventDefault();
     if (!currentUser) return router.push('/auth/login');
     setIsSubmitting(true);
-    const { error } = await supabase.from('express_jobs').insert({
-      customer_id: currentUser.id, title, job_type: jobType, vehicle_type: vehicleType, pickup_location: pickup, dropoff_location: dropoff || null, distance_km: distanceKm, note: note || null, offered_price: fareBreakdown.totalFare, status: 'open'
+    // 👇 บันทึกข้อมูลเข้าตาราง jobs ให้ตรงกับโครงสร้าง
+    const { error } = await supabase.from('jobs').insert({
+      employer_id: currentUser.id, 
+      title, 
+      job_type: jobType, 
+      vehicle_type: vehicleType, 
+      pickup_location: pickup, 
+      dropoff_location: dropoff || null, 
+      distance_km: distanceKm, 
+      description: note || null, 
+      budget: fareBreakdown.totalFare, 
+      status: 'open'
     });
     if (!error) { 
       setIsModalOpen(false); alert('โพสต์งานเรียบร้อยค่ะ! 🚀'); 
@@ -152,14 +170,15 @@ export default function WinOnlinePage() {
     setIsSubmitting(false);
   };
 
-  const handleUpdateJobStatus = async (jobId: string, newStatus: 'accepted' | 'completed' | 'cancelled') => {
+  const handleUpdateJobStatus = async (jobId: string, newStatus: 'in_progress' | 'completed' | 'cancelled') => {
     if (!currentUser) return alert("กรุณาเข้าสู่ระบบค่ะ");
     if (!confirm("ยืนยันการทำรายการนี้ใช่ไหมคะ?")) return;
     const payload: any = { status: newStatus };
-    if (newStatus === 'accepted') payload.provider_id = currentUser.id;
-    const { error } = await supabase.from('express_jobs').update(payload).eq('id', jobId);
+    // 👇 เปลี่ยนจาก provider_id เป็น worker_id และสถานะ in_progress
+    if (newStatus === 'in_progress') payload.worker_id = currentUser.id;
+    const { error } = await supabase.from('jobs').update(payload).eq('id', jobId);
     if (!error) {
-       if (newStatus === 'accepted') setActiveTab('my_jobs');
+       if (newStatus === 'in_progress') setActiveTab('my_jobs');
        fetchJobs(currentUser.id);
     } else {
        alert("เกิดข้อผิดพลาด: " + error.message);
@@ -217,7 +236,7 @@ export default function WinOnlinePage() {
     <div className="min-h-screen bg-[#F4F6F8] flex justify-center font-sans relative">
       <div className="w-full max-w-3xl bg-[#F4F6F8] min-h-screen relative flex flex-col shadow-2xl overflow-hidden border-x border-gray-100">
         
-        {/* --- Header & Tabs (UI Clean ไม่มีปุ่มสลับโหมดแล้ว) --- */}
+        {/* --- Header & Tabs --- */}
         <div className="m-4 bg-gradient-to-b from-[#EE4D2D] to-[#FF7337] rounded-[2rem] p-6 shadow-md relative z-10">
           <div className="flex justify-between items-center mb-6 mt-2">
             <h1 className="text-white text-xl sm:text-2xl font-black tracking-tight flex items-center gap-2">
@@ -232,7 +251,6 @@ export default function WinOnlinePage() {
             </div>
           </div>
           
-          {/* แถบเมนู Tabs */}
           <div className="flex gap-2 sm:gap-3 px-1">
             <button onClick={() => setActiveTab('feed')} className={`flex-1 py-3 rounded-[1rem] sm:rounded-[1.5rem] text-xs sm:text-sm font-black transition-all duration-300 ${activeTab === 'feed' ? 'bg-white text-[#EE4D2D] shadow-lg scale-105' : 'bg-white/20 text-white hover:bg-white/30 backdrop-blur-sm border border-white/20'}`}>
               {userRole === 'customer' ? '🏠 เรียกวิน/ส่งของ' : '🔥 งานใหม่ (Live)'}
@@ -272,11 +290,11 @@ export default function WinOnlinePage() {
                       <div className="w-12 h-12 sm:w-14 sm:h-14 bg-orange-50 rounded-[1rem] flex items-center justify-center text-2xl sm:text-3xl shadow-inner border border-orange-100/50">{getVehicleIcon(job.vehicle_type)}</div>
                       <div>
                         <h3 className="font-black text-gray-800 text-sm sm:text-base">{job.title}</h3>
-                        <p className="text-[10px] sm:text-[11px] text-gray-400 mt-0.5 font-medium">ลูกค้า: {job.profiles?.first_name || 'ไม่ระบุ'}</p>
+                        <p className="text-[10px] sm:text-[11px] text-gray-400 mt-0.5 font-medium">ลูกค้า: {job.employer?.first_name || 'ไม่ระบุ'}</p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-lg sm:text-xl font-black text-[#EE4D2D] tracking-tight">฿{job.offered_price}</div>
+                      <div className="text-lg sm:text-xl font-black text-[#EE4D2D] tracking-tight">฿{job.budget}</div>
                       <div className="text-[9px] sm:text-[10px] text-gray-400 font-bold bg-gray-50 px-2 py-0.5 rounded-md mt-1 inline-block">{job.distance_km} กม.</div>
                     </div>
                   </div>
@@ -284,7 +302,7 @@ export default function WinOnlinePage() {
                      <div className="flex gap-2"><span className="text-green-500">📍</span><span className="line-clamp-1 font-medium">{job.pickup_location}</span></div>
                      {job.dropoff_location && <div className="flex gap-2 border-t border-gray-200/60 pt-2"><span className="text-red-500">🚩</span><span className="line-clamp-1 font-medium">{job.dropoff_location}</span></div>}
                   </div>
-                  <button onClick={() => handleUpdateJobStatus(job.id, 'accepted')} className="w-full bg-orange-50 hover:bg-[#EE4D2D] text-[#EE4D2D] hover:text-white border border-orange-200 hover:border-transparent py-3 sm:py-3.5 rounded-[1rem] text-xs sm:text-sm font-black active:scale-95 transition-all shadow-sm">
+                  <button onClick={() => handleUpdateJobStatus(job.id, 'in_progress')} className="w-full bg-orange-50 hover:bg-[#EE4D2D] text-[#EE4D2D] hover:text-white border border-orange-200 hover:border-transparent py-3 sm:py-3.5 rounded-[1rem] text-xs sm:text-sm font-black active:scale-95 transition-all shadow-sm">
                     รับงานนี้ ⚡
                   </button>
                 </div>
@@ -305,28 +323,28 @@ export default function WinOnlinePage() {
                 <div key={job.id} className="bg-white rounded-[1.5rem] p-5 shadow-sm border border-gray-100">
                   <div className="flex justify-between items-center mb-4 pb-3 border-b border-gray-50">
                     <span className="text-[10px] text-gray-400 font-bold bg-gray-50 px-2 py-1 rounded-md">{new Date(job.created_at).toLocaleString('th-TH', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short'})}</span>
-                    <span className={`text-[9px] sm:text-[10px] font-black px-3 py-1 rounded-full ${job.status === 'open' ? 'bg-orange-100 text-orange-600' : job.status === 'accepted' ? 'bg-blue-100 text-blue-600' : job.status === 'completed' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
-                      {job.status === 'open' ? '⏳ รอคนรับ' : job.status === 'accepted' ? '🛵 กำลังไป' : job.status === 'completed' ? '✅ สำเร็จ' : '❌ ยกเลิก'}
+                    <span className={`text-[9px] sm:text-[10px] font-black px-3 py-1 rounded-full ${job.status === 'open' ? 'bg-orange-100 text-orange-600' : job.status === 'in_progress' ? 'bg-blue-100 text-blue-600' : job.status === 'completed' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
+                      {job.status === 'open' ? '⏳ รอคนรับ' : job.status === 'in_progress' ? '🛵 กำลังไป' : job.status === 'completed' ? '✅ สำเร็จ' : '❌ ยกเลิก'}
                     </span>
                   </div>
                   <div className="flex gap-4 mb-4">
                     <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-50 rounded-xl flex items-center justify-center text-xl sm:text-2xl border border-gray-100">{getVehicleIcon(job.vehicle_type)}</div>
                     <div className="flex-1">
                       <h4 className="font-black text-gray-800 text-xs sm:text-sm line-clamp-1">{job.title}</h4>
-                      <p className="text-[10px] sm:text-[11px] text-[#EE4D2D] font-bold mt-0.5">฿{job.offered_price} <span className="text-gray-300 mx-1">|</span> <span className="text-gray-500">{job.distance_km} กม.</span></p>
+                      <p className="text-[10px] sm:text-[11px] text-[#EE4D2D] font-bold mt-0.5">฿{job.budget} <span className="text-gray-300 mx-1">|</span> <span className="text-gray-500">{job.distance_km} กม.</span></p>
                     </div>
                   </div>
 
-                  {job.status === 'accepted' && (
+                  {job.status === 'in_progress' && (
                     <div className="flex gap-2 mb-3">
-                      <a href={`tel:${userRole === 'customer' ? job.provider?.phone_number : job.customer?.phone_number}`} className="flex-1 bg-blue-50 text-blue-700 py-2.5 sm:py-3 rounded-[1rem] text-[10px] sm:text-[11px] font-black flex items-center justify-center gap-2 shadow-sm active:scale-95 transition-all">📞 โทรศัพท์</a>
+                      <a href={`tel:${userRole === 'customer' ? job.worker?.phone_number : job.employer?.phone_number}`} className="flex-1 bg-blue-50 text-blue-700 py-2.5 sm:py-3 rounded-[1rem] text-[10px] sm:text-[11px] font-black flex items-center justify-center gap-2 shadow-sm active:scale-95 transition-all">📞 โทรศัพท์</a>
                       <button onClick={() => { setActiveChatJob(job); fetchMessages(job.id); setIsChatOpen(true); }} className="flex-1 bg-orange-50 text-[#EE4D2D] py-2.5 sm:py-3 rounded-[1rem] text-[10px] sm:text-[11px] font-black flex items-center justify-center gap-2 shadow-sm active:scale-95 transition-all">💬 แชทข้อความ</button>
                     </div>
                   )}
 
                   <div className="flex gap-2 mt-2">
-                    {job.status === 'accepted' && userRole === 'provider' && <button onClick={() => handleUpdateJobStatus(job.id, 'completed')} className="w-full bg-green-500 text-white py-3 rounded-[1rem] text-xs font-black shadow-md active:scale-95 transition-all">จบงาน / รับเงินเรียบร้อย ✅</button>}
-                    {(job.status === 'open' || job.status === 'accepted') && userRole === 'customer' && <button onClick={() => handleUpdateJobStatus(job.id, 'cancelled')} className="w-full bg-gray-50 hover:bg-red-50 text-gray-500 hover:text-red-500 py-3 rounded-[1rem] text-xs font-bold transition-all border border-gray-200 hover:border-red-200">ยกเลิกงาน</button>}
+                    {job.status === 'in_progress' && userRole === 'provider' && <button onClick={() => handleUpdateJobStatus(job.id, 'completed')} className="w-full bg-green-500 text-white py-3 rounded-[1rem] text-xs font-black shadow-md active:scale-95 transition-all">จบงาน / รับเงินเรียบร้อย ✅</button>}
+                    {(job.status === 'open' || job.status === 'in_progress') && userRole === 'customer' && <button onClick={() => handleUpdateJobStatus(job.id, 'cancelled')} className="w-full bg-gray-50 hover:bg-red-50 text-gray-500 hover:text-red-500 py-3 rounded-[1rem] text-xs font-bold transition-all border border-gray-200 hover:border-red-200">ยกเลิกงาน</button>}
                   </div>
                 </div>
               ))}
@@ -334,8 +352,7 @@ export default function WinOnlinePage() {
           )}
         </div>
 
-        {/* --- MODALS คงเดิม --- */}
-        {/* Modal โพสต์งาน และ Location Picker โค้ดส่วนนี้เจมคงไว้สมบูรณ์เหมือนเดิม 100% ครับ */}
+        {/* Modal โพสต์งาน */}
         {isModalOpen && !isLocationPickerOpen && (
           <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/60 backdrop-blur-sm animate-fade-in sm:items-center">
             <div className="bg-white w-full sm:max-w-xl rounded-t-[2rem] sm:rounded-[2rem] p-6 sm:p-8 max-h-[90vh] overflow-y-auto pb-10 scrollbar-hide shadow-2xl relative">
@@ -512,7 +529,7 @@ export default function WinOnlinePage() {
           </div>
         )}
 
-        {/* ปุ่มลับสำหรับให้ Developer (คุณบีสาม) กดทดสอบสลับโหมดไรเดอร์ระหว่างพัฒนาระบบ Profile */}
+        {/* ปุ่มลับสำหรับให้ Developer กดทดสอบ */}
         <div className="fixed bottom-24 right-4 z-[90] opacity-10 hover:opacity-100 transition-opacity">
           <button onClick={() => { setUserRole(r => r === 'customer' ? 'provider' : 'customer'); setActiveTab('feed'); }} className="bg-black/50 text-white text-[8px] px-2 py-1 rounded-md backdrop-blur-sm">
             [Dev] สลับโหมด
