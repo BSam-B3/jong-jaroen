@@ -65,6 +65,12 @@ export default function WinOnlinePage() {
   const [showFareDetails, setShowFareDetails] = useState(false);
   const [fareBreakdown, setFareBreakdown] = useState({ base: 0, distanceFee: 0, fuelSurge: 0, platformFee: 0, totalFare: 0 });
 
+  const popularPlaces = [
+    { name: 'โรงพยาบาลแกลง', detail: 'Klaeng Hospital' },
+    { name: 'ตลาดสามย่าน แกลง', detail: 'Sam Yan Market' },
+    { name: 'เซเว่นอีเลฟเว่น ตลาดแกลง', detail: '7-Eleven Sam Yan' },
+  ];
+
   // --- Functions ---
   const fetchMessages = useCallback(async (jobId: string) => {
     const { data } = await supabase.from('job_messages').select('*').eq('job_id', jobId).order('created_at', { ascending: true });
