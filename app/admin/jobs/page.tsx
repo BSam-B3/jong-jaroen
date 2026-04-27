@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useRouter } from 'next/navigation'; // 👈 นำเข้าระบบเปลี่ยนหน้าของ Next.js
 
 export default function AdminJobsPage() {
+  const router = useRouter(); // 👈 เปิดใช้งาน router
   const [jobs, setJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -15,8 +17,8 @@ export default function AdminJobsPage() {
   async function fetchJobs() {
     setLoading(true);
     try {
-      // ดึงข้อมูลงาน (เดี๋ยวเราค่อยไปสร้างตาราง jobs ใน Supabase กันทีหลังค่ะ)
-    const { data, error } = await supabase
+      // ดึงข้อมูลงาน พร้อมชื่อและเบอร์โทรจากตาราง profiles
+      const { data, error } = await supabase
         .from('jobs')
         .select(`
           id, title, status, budget, created_at,
@@ -29,7 +31,7 @@ export default function AdminJobsPage() {
       if (data) setJobs(data);
     } catch (error) {
       console.log('ยังไม่มีตาราง Jobs หรือเกิดข้อผิดพลาด:', error);
-      // ใส่ข้อมูลจำลอง (Mock Data) ไปก่อนเพื่อให้เห็นหน้าตา UI
+      // ข้อมูลจำลองเผื่อฉุกเฉิน
       setJobs([
         { id: '1', title: 'ซ่อมท่อประปาแตกหน้าบ้าน', status: 'in_progress', budget: 500, employer: { full_name: 'คุณสมชาย' }, worker: { full_name: 'ช่างเอก ประแส' } },
         { id: '2', title: 'ล้างแอร์ 2 ตัว', status: 'completed', budget: 1000, employer: { full_name: 'ป้าศรี' }, worker: { full_name: 'ร้านแอร์เย็นเจี๊ยบ' } },
@@ -94,7 +96,7 @@ export default function AdminJobsPage() {
                   </td>
                   <td className="p-7">
                     <div className="space-y-1 whitespace-nowrap">
-                      <p className="text-xs font-bold text-gray-600"><span className="text-gray-400">จ้าง:</span> {job.employer?.full_name}</p>
+                      <p className="text-xs font-bold text-gray-600"><span className="text-gray-400">จ้าง:</span> {job.employer?.full_name || 'ไม่ระบุ'}</p>
                       <p className="text-xs font-bold text-gray-600"><span className="text-gray-400">ทำ:</span> {job.worker?.full_name || '-'}</p>
                     </div>
                   </td>
@@ -113,7 +115,11 @@ export default function AdminJobsPage() {
                     )}
                   </td>
                   <td className="p-7 text-right whitespace-nowrap">
-                    <button className="bg-gray-50 text-gray-400 hover:bg-blue-500 hover:text-white px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm">
+                    {/* 👇 ปุ่มกดวาร์ปทำงานตรงนี้ค่ะ 👇 */}
+                    <button 
+                      onClick={() => router.push(`/admin/jobs/${job.id}`)} 
+                      className="bg-gray-50 text-gray-400 hover:bg-blue-500 hover:text-white px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm"
+                    >
                       รายละเอียด
                     </button>
                   </td>
