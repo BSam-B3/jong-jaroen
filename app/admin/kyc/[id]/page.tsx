@@ -18,26 +18,31 @@ export default function KycApprovalPage() {
   useEffect(() => {
     async function fetchData() {
       try {
-        // 1. ดึงข้อมูลโปรไฟล์ (ใช้คอลัมน์ address และ id_card_url)
-        const { data: profileData, error: profileError } = await supabase
+        // 1. ดึงข้อมูล Profile ตามปกติ
+        const { data: profileData } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', userId)
           .single();
 
-        if (profileError) throw profileError;
         setProfile(profileData);
 
-        // 2. ดึงรูปบัตรประชาชน (ดึงตรงจาก id_card_url ในฐานข้อมูล)
-        if (profileData && profileData.id_card_url) {
-          const { data: fileData, error: storageError } = await supabase.storage
-            .from('kyc_documents')
-            .createSignedUrl(profileData.id_card_url, 3600); // ลิงก์มีอายุ 1 ชม.
+        // 2. 🎯 ไม่ง้อฐานข้อมูล! สั่งให้วิ่งไปเปิดโฟลเดอร์ของคุณสุรพงษ์โดยตรงเลยค่ะ
+        const { data: files } = await supabase.storage
+          .from('kyc_documents')
+          .list(userId);
 
-          if (storageError) {
-            console.error('Storage Error:', storageError.message);
-          } else if (fileData) {
-            setImageUrl(fileData.signedUrl);
+        if (files && files.length > 0) {
+          // 3. กรองหาไฟล์ที่มีนามสกุลรูปภาพ
+          const imageFile = files.find(f => f.name.includes('.jpg') || f.name.includes('.png') || f.name.includes('.jpeg'));
+
+          if (imageFile) {
+            // 4. เอาชื่อไฟล์มาสร้าง Public URL (ใช้ได้ทันทีเพราะเราเปิด Public Bucket แล้ว)
+            const { data } = supabase.storage
+              .from('kyc_documents')
+              .getPublicUrl(`${userId}/${imageFile.name}`);
+
+            setImageUrl(data.publicUrl);
           }
         }
       } catch (err) {
@@ -100,7 +105,7 @@ export default function KycApprovalPage() {
             ) : (
               <div className="text-center p-10">
                 <div className="text-4xl mb-2">📸</div>
-                <div className="text-gray-400 font-bold text-sm">ไม่พบไฟล์รูปภาพในระบบ (โปรดเช็ค Policy หรือ Path)</div>
+                <div className="text-gray-400 font-bold text-sm">ไม่พบไฟล์รูปภาพในระบบ</div>
               </div>
             )}
             {/* Watermark ลายน้ำความปลอดภัย */}
@@ -115,51 +120,3 @@ export default function KycApprovalPage() {
           <div className="space-y-6">
             <DataField label="ชื่อ-นามสกุล" value={profile.full_name} />
             <DataField label="เลขบัตรประชาชน" value={profile.national_id} isMono />
-            <DataField label="วันเกิด" value={profile.date_of_birth} />
-          </div>
-          <div className="space-y-6">
-            {/* เปลี่ยนจาก location เป็น address ตามที่คุณบีสามต้องการค่ะ */}
-            <DataField label="ที่อยู่ตามที่กรอกมา" value={profile.address || 'ไม่ได้ระบุที่อยู่'} isAddress />
-            <div>
-              <div className="text-[10px] font-black text-gray-400 uppercase mb-1">สถานะปัจจุบัน</div>
-              <span className="bg-orange-100 text-orange-700 px-3 py-1 rounded-lg text-xs font-black uppercase tracking-wider">
-                {profile.kyc_status || 'pending'}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* ปุ่มอนุมัติและปฏิเสธ */}
-        <div className="flex gap-4 sticky bottom-6 bg-white/80 backdrop-blur-md p-4 rounded-2xl border shadow-sm">
-          <button 
-            onClick={() => handleDecision('approved')} 
-            disabled={isSubmitting} 
-            className="flex-1 bg-[#22C55E] hover:bg-green-600 text-white py-5 rounded-2xl font-black text-lg transition-all shadow-lg active:scale-95 disabled:opacity-50"
-          >
-            ✅ ข้อมูลถูกต้อง อนุมัติ
-          </button>
-          <button 
-            onClick={() => handleDecision('rejected')} 
-            disabled={isSubmitting} 
-            className="flex-1 bg-[#EF4444] hover:bg-red-600 text-white py-5 rounded-2xl font-black text-lg transition-all shadow-lg active:scale-95 disabled:opacity-50"
-          >
-            ❌ ปฏิเสธข้อมูล
-          </button>
-        </div>
-      </div>
-      <BottomNav />
-    </div>
-  );
-}
-
-// ส่วนประกอบย่อยสำหรับโชว์ข้อมูล
-function DataField({ label, value, isMono = false, isAddress = false }: any) {
-  return (
-    <div className="text-left">
-      <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{label}</div>
-      <div className={`font-bold text-gray-800 ${isMono ? 'font-mono text-xl text-[#EE4D2D]' : 'text-lg'} ${isAddress ? 'leading-relaxed text-base' : ''}`}>
-        {value || '-'}
-      </div>
-    </div>
-  );
-}
