@@ -120,3 +120,50 @@ export default function KycApprovalPage() {
           <div className="space-y-6">
             <DataField label="ชื่อ-นามสกุล" value={profile.full_name} />
             <DataField label="เลขบัตรประชาชน" value={profile.national_id} isMono />
+            <DataField label="วันเกิด" value={profile.date_of_birth} />
+          </div>
+          <div className="space-y-6">
+            <DataField label="ที่อยู่ตามที่กรอกมา" value={profile.address || 'ไม่ได้ระบุที่อยู่'} isAddress />
+            <div>
+              <div className="text-[10px] font-black text-gray-400 uppercase mb-1">สถานะปัจจุบัน</div>
+              <span className="bg-orange-100 text-orange-700 px-3 py-1 rounded-lg text-xs font-black uppercase tracking-wider">
+                {profile.kyc_status || 'pending'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* ปุ่มอนุมัติและปฏิเสธ */}
+        <div className="flex gap-4 sticky bottom-6 bg-white/80 backdrop-blur-md p-4 rounded-2xl border shadow-sm">
+          <button 
+            onClick={() => handleDecision('approved')} 
+            disabled={isSubmitting} 
+            className="flex-1 bg-[#22C55E] hover:bg-green-600 text-white py-5 rounded-2xl font-black text-lg transition-all shadow-lg active:scale-95 disabled:opacity-50"
+          >
+            ✅ ข้อมูลถูกต้อง อนุมัติ
+          </button>
+          <button 
+            onClick={() => handleDecision('rejected')} 
+            disabled={isSubmitting} 
+            className="flex-1 bg-[#EF4444] hover:bg-red-600 text-white py-5 rounded-2xl font-black text-lg transition-all shadow-lg active:scale-95 disabled:opacity-50"
+          >
+            ❌ ปฏิเสธข้อมูล
+          </button>
+        </div>
+      </div>
+      <BottomNav />
+    </div>
+  );
+}
+
+// ส่วนประกอบย่อยสำหรับโชว์ข้อมูล
+function DataField({ label, value, isMono = false, isAddress = false }: any) {
+  return (
+    <div className="text-left">
+      <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{label}</div>
+      <div className={`font-bold text-gray-800 ${isMono ? 'font-mono text-xl text-[#EE4D2D]' : 'text-lg'} ${isAddress ? 'leading-relaxed text-base' : ''}`}>
+        {value || '-'}
+      </div>
+    </div>
+  );
+}
