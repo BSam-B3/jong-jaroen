@@ -33,7 +33,7 @@ const CATEGORIES = [
   { key: "บอร์ดหางาน", label: "บอร์ดหางาน", icon: "📋" },
 ];
 
-const DEFAULT_FILTER = "all"; // ✅ ปรับเป็น all เพื่อให้หน้าแรกโชว์งานทุกประเภท
+const DEFAULT_FILTER = "all";
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -57,8 +57,9 @@ export default async function JobBoardPage({ searchParams }: PageProps) {
   const filter = params.filter || DEFAULT_FILTER;
 
   const supabase = await createClient();
+  // ✅ ส่ง null ไปถ้าเลือก "all" เพื่อให้ฟังก์ชันใน DB ดึงงานทุกประเภทออกมา
   const { data, error } = await supabase.rpc("get_jobs_by_new_categories", {
-    p_filter: filter === "all" ? null : filter, // ✅ ถ้าเป็น all ให้ส่ง null ไปที่ฐานข้อมูลเพื่อดึงงานทั้งหมด
+    p_filter: filter === "all" ? null : filter,
   });
 
   const jobs: Job[] = (data || []) as Job[];
@@ -67,10 +68,9 @@ export default async function JobBoardPage({ searchParams }: PageProps) {
     <div className="min-h-screen bg-gray-100 flex justify-center pb-24 font-sans">
       <div className="w-full sm:max-w-2xl md:max-w-3xl bg-[#F4F6F8] min-h-screen relative flex flex-col shadow-xl overflow-x-hidden">
         
-        {/* ส่วนเนื้อหาที่ Scroll ได้ */}
         <div className="flex-1 overflow-y-auto pb-6 scrollbar-hide">
           
-          {/* 🔵 Header (การ์ดลอย โทนสีฟ้า สำหรับโหมดคนทำงาน) */}
+          {/* 🔵 Header สีฟ้าแบบเดียวกับที่บีสามชอบ */}
           <div className="bg-gradient-to-b from-[#0082FA] to-[#00A3FF] rounded-[2.5rem] pt-8 pb-6 px-6 shadow-md relative z-10 m-3 mt-4 overflow-hidden">
             <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-3xl pointer-events-none"></div>
             
@@ -90,12 +90,11 @@ export default async function JobBoardPage({ searchParams }: PageProps) {
               {jobs.length} งานที่เปิดรับในพื้นที่ของคุณ
             </p>
 
-            {/* 🔘 Filter Tabs แบบเลื่อนได้ (สีฟ้า) */}
+            {/* 🔘 Filter Tabs แก้ไข Link ให้ทำงานได้จริง */}
             <div className="-mx-6 px-6 overflow-x-auto scrollbar-hide relative z-10">
               <div className="flex gap-2 w-max pb-2 pt-2">
                 {CATEGORIES.map((c) => {
                   const active = filter === c.key;
-                  // ✅ ปรับ Link ให้ถูกต้องสำหรับหน้า job-board
                   const href = c.key === "all" ? "/job-board" : `/job-board?filter=${encodeURIComponent(c.key)}`;
                   return (
                     <Link
@@ -117,7 +116,6 @@ export default async function JobBoardPage({ searchParams }: PageProps) {
             </div>
           </div>
 
-          {/* 📋 รายการงาน */}
           <main className="px-5 mt-2 relative z-20 space-y-4">
             <div className="flex justify-between items-end mb-2 px-1">
               <h2 className="text-xs font-black text-gray-800 flex items-center gap-2">
@@ -146,7 +144,6 @@ export default async function JobBoardPage({ searchParams }: PageProps) {
                   key={job.id}
                   className="block bg-white rounded-3xl p-5 shadow-sm border border-gray-100 relative overflow-hidden group hover:shadow-md hover:border-[#0082FA]/30 transition-all active:scale-[0.98]"
                 >
-                  {/* 🔴 ป้ายกำกับความด่วน */}
                   {job.is_urgent ? (
                     <div className="absolute top-0 right-0 bg-gradient-to-r from-[#FF4B2B] to-[#FF416C] text-white text-[9px] font-black px-4 py-1.5 rounded-bl-2xl shadow-sm z-10 flex items-center gap-1">
                       <span className="animate-pulse">🔥</span> ด่วนมาก
@@ -157,13 +154,12 @@ export default async function JobBoardPage({ searchParams }: PageProps) {
                     </div>
                   )}
 
-                  {/* ข้อมูลผู้จ้าง */}
                   <div className="flex items-center gap-3 mb-4 pr-16">
                     <div className="w-12 h-12 rounded-full overflow-hidden bg-slate-100 shrink-0 border border-slate-200">
                       {job.employer_avatar ? (
                         <img src={job.employer_avatar} alt="Avatar" className="w-full h-full object-cover" />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center text-slate-400 text-lg font-black">
+                        <div className="w-full h-full flex items-center justify-center text-slate-400 text-lg font-black bg-slate-50">
                           {job.employer_name?.charAt(0) || "?"}
                         </div>
                       )}
@@ -176,10 +172,8 @@ export default async function JobBoardPage({ searchParams }: PageProps) {
                     </div>
                   </div>
 
-                  {/* หัวข้องาน */}
                   <h4 className="font-bold text-slate-800 text-sm mb-2">{job.title}</h4>
 
-                  {/* รายละเอียดเส้นทาง/ที่อยู่ */}
                   {job.is_urgent ? (
                     <div className="bg-gray-50 rounded-xl p-3 mb-3 border border-gray-100 relative">
                       <div className="absolute left-4 top-4 bottom-4 w-0.5 border-l-2 border-dashed border-gray-300"></div>
@@ -199,12 +193,10 @@ export default async function JobBoardPage({ searchParams }: PageProps) {
                     </div>
                   )}
 
-                  {/* โน้ตเพิ่มเติม (รายละเอียดที่บีสามกลัวหาย) */}
                   <p className="text-[11px] text-gray-600 font-medium leading-relaxed mb-4 bg-blue-50/50 p-2.5 rounded-lg border border-blue-100/50 line-clamp-2">
                     <span className="font-bold text-[#0082FA]">รายละเอียด:</span> {job.description}
                   </p>
 
-                  {/* Footer: ราคาและปุ่มรับงาน */}
                   <div className="flex items-center justify-between border-t border-gray-50 pt-3">
                     <div>
                       <span className="text-[9px] text-gray-400 block mb-0.5">ค่าตอบแทน</span>
@@ -222,15 +214,7 @@ export default async function JobBoardPage({ searchParams }: PageProps) {
           </main>
         </div>
 
-        {/* ✅ Bottom Navigation (Hardcode ค่า Active เพื่อเลี่ยงปัญหา Error Comparison) */}
-        <div className="fixed bottom-0 w-full sm:max-w-2xl md:max-w-3xl bg-white/95 backdrop-blur-md border-t border-gray-100 px-1 py-4 flex justify-between items-center shadow-[0_-4px_25px_rgba(0,0,0,0.06)] rounded-t-[2.5rem] z-50">
-          <NavItem icon="🏠" label="หน้าแรก" active={false} href="/" />
-          <NavItem icon="🛠️" label="บริการ" active={false} href="/services" />
-          <NavItem icon="📋" label="งานด่วน" active={true} href="/job-board" />
-          <NavItem icon="📰" label="ข่าวสาร" active={false} href="/news" />
-          <NavItem icon="🎟️" label="ปองเจริญ" active={false} href="/coupons" />
-          <NavItem icon="👤" label="ฉัน" active={false} href="/profile" />
-        </div>
+        {/* ❌ ลบ Bottom Navigation ชุดเดิมออกทั้งหมดเพื่อให้ไม่ซ้อนกัน */}
       </div>
 
       <style dangerouslySetInnerHTML={{__html: `
@@ -238,16 +222,5 @@ export default async function JobBoardPage({ searchParams }: PageProps) {
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
       `}} />
     </div>
-  );
-}
-
-// คอมโพเนนต์เมนูด้านล่าง (ธีมสีฟ้าสำหรับหน้านี้)
-function NavItem({ icon, label, active, href }: { icon: string, label: string, active: boolean, href: string }) {
-  return (
-    <Link href={href} className={`flex flex-col items-center gap-1.5 cursor-pointer transition-all ${active ? 'scale-110' : 'opacity-40 hover:opacity-100'} flex-1`}>
-      <span className="text-[22px]">{icon}</span>
-      <span className={`text-[9px] font-bold ${active ? 'text-[#0082FA]' : 'text-gray-500'} whitespace-nowrap`}>{label}</span>
-      {active && <div className="w-1.5 h-1.5 bg-[#0082FA] rounded-full shadow-sm mt-0.5"></div>}
-    </Link>
   );
 }
