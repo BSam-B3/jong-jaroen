@@ -23,7 +23,7 @@ interface PageProps {
   searchParams: Promise<{ category?: string; q?: string }>;
 }
 
-// หมวดหมู่อาชีพใหม่สไตล์ชุมชน (Emoji ครบถ้วน)
+// หมวดหมู่อาชีพใหม่สไตล์ชุมชน (อัปเดตเพิ่ม สัตว์เลี้ยง, เสริมสวย และ อื่นๆ)
 const CATEGORIES = [
   { key: "all", label: "ทั้งหมด", icon: "✨" },
   { key: "แม่บ้าน", label: "แม่บ้าน/ทำความสะอาด", icon: "🧹" },
@@ -33,9 +33,12 @@ const CATEGORIES = [
   { key: "วินส่งของ", label: "วิน/ส่งของ", icon: "🛵" },
   { key: "ทำสวน", label: "ดูแลสวน/ตัดหญ้า", icon: "🌿" },
   { key: "ผู้สูงอายุ", label: "ดูแลผู้สูงอายุ/เด็ก", icon: "👵" },
+  { key: "สัตว์เลี้ยง", label: "ดูแลสัตว์เลี้ยง", icon: "🐶" },
   { key: "นวด", label: "นวดแผนไทย", icon: "💆‍♀️" },
+  { key: "เสริมสวย", label: "ตัดผม/เสริมสวย", icon: "✂️" },
   { key: "ทำอาหาร", label: "ทำอาหาร/จัดเลี้ยง", icon: "🍳" },
   { key: "เอกสาร", label: "เอกสาร/แอดมิน", icon: "💻" },
+  { key: "อื่นๆ", label: "อื่นๆ / จิปาถะ", icon: "📌" },
 ];
 
 function formatPrice(n: number): string {
