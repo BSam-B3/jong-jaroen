@@ -26,14 +26,13 @@ export default function KycApprovalPage() {
           .single();
         setProfile(profileData);
 
-        // 🎯 แก้จุดนี้: ใช้ createSignedUrl เพื่อดึงรูปจาก Private Bucket
         const { data: files } = await supabase.storage.from('kyc_documents').list(userId);
         if (files && files.length > 0) {
           const imageFile = files.find(f => /\.(jpe?g|png|webp)$/i.test(f.name));
           if (imageFile) {
             const { data, error } = await supabase.storage
               .from('kyc_documents')
-              .createSignedUrl(`${userId}/${imageFile.name}`, 60); // ลิงก์มีอายุ 60 วินาที
+              .createSignedUrl(`${userId}/${imageFile.name}`, 60);
             if (data?.signedUrl) setImageUrl(data.signedUrl);
           }
         }
@@ -91,4 +90,24 @@ export default function KycApprovalPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10 p-6 bg-gray-50/50 rounded-2xl border shadow-sm">
           <div className="space-y-6">
             <DataField label="ชื่อ-นามสกุล" value={profile.full_name} />
-            <DataField label="เลขบัตร
+            <DataField label="เลขบัตรประชาชน" value={profile.national_id} isMono />
+            <DataField label="วันเกิด" value={profile.date_of_birth} />
+          </div>
+          <div className="space-y-6">
+            <DataField label="ที่อยู่" value={profile.address} isAddress />
+            <div><div className="text-[10px] font-bold text-gray-400 uppercase mb-1">สถานะ</div><span className="bg-orange-100 text-orange-600 px-3 py-0.5 rounded text-xs font-bold border border-orange-200">{profile.kyc_status || 'pending'}</span></div>
+          </div>
+        </div>
+        <div className="flex gap-4 sticky bottom-6 bg-white/90 backdrop-blur-md p-4 rounded-2xl border shadow-lg z-30">
+          <button onClick={() => handleDecision('approved')} disabled={isSubmitting} className="flex-1 bg-green-500 text-white py-4 rounded-xl font-black text-lg shadow-md active:scale-95 disabled:opacity-50">อนุมัติ ✅</button>
+          <button onClick={() => handleDecision('rejected')} disabled={isSubmitting} className="flex-1 bg-red-500 text-white py-4 rounded-xl font-black text-lg shadow-md active:scale-95 disabled:opacity-50">ปฏิเสธ ❌</button>
+        </div>
+      </div>
+      <BottomNav />
+    </div>
+  );
+}
+
+function DataField({ label, value, isMono = false, isAddress = false }: any) {
+  return (<div className="text-left"><div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">{label}</div><div className={`font-bold text-gray-800 ${isMono ? 'font-mono text-xl text-red-500' : 'text-lg'} ${isAddress ? 'leading-relaxed text-sm' : ''}`}>{value || '-'}</div></div>);
+}
