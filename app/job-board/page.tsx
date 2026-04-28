@@ -33,7 +33,7 @@ const CATEGORIES = [
   { key: "บอร์ดหางาน", label: "บอร์ดหางาน", icon: "📋" },
 ];
 
-const DEFAULT_FILTER = "งานประจำ";
+const DEFAULT_FILTER = "all"; // ✅ ปรับเป็น all เพื่อให้หน้าแรกโชว์งานทุกประเภท
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -58,7 +58,7 @@ export default async function JobBoardPage({ searchParams }: PageProps) {
 
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("get_jobs_by_new_categories", {
-    p_filter: filter,
+    p_filter: filter === "all" ? null : filter, // ✅ ถ้าเป็น all ให้ส่ง null ไปที่ฐานข้อมูลเพื่อดึงงานทั้งหมด
   });
 
   const jobs: Job[] = (data || []) as Job[];
@@ -95,6 +95,7 @@ export default async function JobBoardPage({ searchParams }: PageProps) {
               <div className="flex gap-2 w-max pb-2 pt-2">
                 {CATEGORIES.map((c) => {
                   const active = filter === c.key;
+                  // ✅ ปรับ Link ให้ถูกต้องสำหรับหน้า job-board
                   const href = c.key === "all" ? "/job-board" : `/job-board?filter=${encodeURIComponent(c.key)}`;
                   return (
                     <Link
@@ -131,13 +132,14 @@ export default async function JobBoardPage({ searchParams }: PageProps) {
             )}
 
             {!error && jobs.length === 0 && (
-              <div className="text-center py-10 bg-white rounded-3xl border border-gray-100 shadow-sm">
-                <div className="text-4xl mb-2 opacity-50">📭</div>
+              <div className="text-center py-12 bg-white rounded-[2rem] border border-gray-100 shadow-sm">
+                <div className="text-5xl mb-3 opacity-50">📬</div>
                 <p className="font-bold text-gray-500 text-sm">ยังไม่มีงานในหมวดหมู่นี้</p>
+                <p className="text-[10px] text-gray-400 mt-1">ลองเปลี่ยนหมวดหมู่ดูนะคะ</p>
               </div>
             )}
 
-            <div className="space-y-4">
+            <div className="space-y-4 pb-10">
               {jobs.map((job: any) => (
                 <Link
                   href={`/jobs/${job.id}`}
@@ -197,7 +199,7 @@ export default async function JobBoardPage({ searchParams }: PageProps) {
                     </div>
                   )}
 
-                  {/* โน้ตเพิ่มเติม */}
+                  {/* โน้ตเพิ่มเติม (รายละเอียดที่บีสามกลัวหาย) */}
                   <p className="text-[11px] text-gray-600 font-medium leading-relaxed mb-4 bg-blue-50/50 p-2.5 rounded-lg border border-blue-100/50 line-clamp-2">
                     <span className="font-bold text-[#0082FA]">รายละเอียด:</span> {job.description}
                   </p>
