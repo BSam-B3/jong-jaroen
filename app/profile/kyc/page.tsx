@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import BottomNav from '@/app/components/BottomNav';
 
 export default function KYCPage() {
   const router = useRouter();
@@ -10,12 +11,12 @@ export default function KYCPage() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [kycStatus, setKycStatus] = useState<string | null>(null);
   const [error, setError] = useState('');
-  
+
   // -- Form States --
   const [fullName, setFullName] = useState('');
   const [idNumber, setIdNumber] = useState('');
   const [dateOfBirth, setDateOfBirth] = useState('');
-  const [address, setAddress] = useState('');         
+  const [address, setAddress] = useState('');
   const [pdpaConsent, setPdpaConsent] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -35,46 +36,51 @@ export default function KYCPage() {
     return () => stopCamera();
   }, []);
 
-  useEffect(() => {
-    if (isCameraOpen && videoRef.current && streamRef.current) {
-      videoRef.current.srcObject = streamRef.current;
-      videoRef.current.onloadedmetadata = () => {
-        videoRef.current?.play().catch(e => console.error("Video play failed:", e));
-      };
-    }
-  }, [isCameraOpen]);
-
-  async function loadUserData() {
-    setLoading(true);
+  const loadUserData = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push('/login'); return; }
-      setCurrentUser(user);
-      const { data: profile } = await supabase.from('profiles')
-        .select('kyc_status, full_name, national_id, date_of_birth, address')
-        .eq('id', user.id).single();
-        
-      if (profile) {
-        setKycStatus(profile.kyc_status || 'none');
-        if (profile.full_name) setFullName(profile.full_name);
-        if (profile.national_id) setIdNumber(profile.national_id);
-        if (profile.date_of_birth) setDateOfBirth(profile.date_of_birth);
-        if (profile.address) setAddress(profile.address);
+      if (!user) {
+        router.push('/auth/login');
+        return;
       }
-    } catch (_e) {}
-    setLoading(false);
-  }
+      setCurrentUser(user);
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (profile) {
+        setKycStatus(profile.kyc_status);
+        setFullName(profile.full_name || '');
+        setIdNumber(profile.national_id || '');
+        setDateOfBirth(profile.date_of_birth || '');
+        setAddress(profile.address || '');
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const startCamera = async () => {
-    setError('');
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: { ideal: 'environment' } } 
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' } // ใช้กล้องหลังเป็นหลัก
       });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
       streamRef.current = stream;
       setIsCameraOpen(true);
+      setIdPreview(null);
+      setIdImageFile(null);
+      setError('');
+      setStatusMessage('');
     } catch (err) {
-      setError('ไม่สามารถเข้าถึงกล้องได้ กรุณาตรวจสอบการตั้งค่าเบราว์เซอร์ค่ะ');
+      setError('ไม่สามารถเปิดกล้องได้ กรุณาตรวจสอบสิทธิ์การเข้าถึงกล้องค่ะ');
     }
   };
 
@@ -98,91 +104,55 @@ export default function KYCPage() {
     canvas.width = width;
     canvas.height = height;
     ctx.drawImage(video, 0, 0, width, height);
-    
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
-    setIdPreview(dataUrl);
-    stopCamera();
 
+    const blob: Blob = await new Promise((resolve, reject) =>
+      canvas.toBlob(b => (b ? resolve(b) : reject(new Error('canvas empty'))), 'image/jpeg', 0.9)
+    );
+
+    setIdPreview(URL.createObjectURL(blob));
+    stopCamera();
     setIsScanning(true);
     setError('');
     setStatusMessage('ระบบกำลังวิเคราะห์ข้อมูลจากภาพถ่าย...');
-    
+
+    const file = new File([blob], `id_card_${Date.now()}.jpg`, { type: 'image/jpeg' });
+    setIdImageFile(file);
+
     try {
-      const base64Image = dataUrl.split(',')[1];
-      const apiKey = process.env.NEXT_PUBLIC_GOOGLE_VISION_API_KEY;
+      const fd = new FormData();
+      fd.append('file', file);
       
-      if (!apiKey) throw new Error("API Key ไม่พร้อมใช้งาน");
-
-      const response = await fetch(`https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          requests: [{
-            image: { content: base64Image },
-            features: [{ type: 'TEXT_DETECTION' }]
-          }]
-        })
-      });
-
-      const result = await response.json();
-      const rawText = result.responses?.[0]?.fullTextAnnotation?.text || '';
+      // ส่งรูปไปให้ API หลังบ้านประมวลผล (ปลอดภัย ไม่หลุด API Key)
+      const res = await fetch('/api/kyc/ocr', { method: 'POST', body: fd });
+      if (!res.ok) throw new Error(`OCR HTTP ${res.status}`);
       
-      const cleanText = rawText.replace(/\n/g, ' ');
+      const { text: rawText } = await res.json();
+      const cleanText = String(rawText).replace(/\n/g, ' ');
 
-      const isValid = rawText.includes('บัตรประจำตัวประชาชน') || rawText.includes('Identification') || rawText.includes('Thai National');
-      
-      if (!isValid) {
-        setError('❌ ตรวจไม่พบข้อมูลหน้าบัตร กรุณาถ่ายใหม่ให้ชัดเจนและเห็นเต็มใบค่ะ');
+      if (!cleanText.includes('บัตรประจำตัวประชาชน') && !cleanText.includes('Thai National')) {
+        setError('❌ ตรวจไม่พบข้อมูลหน้าบัตร กรุณาถ่ายใหม่ค่ะ');
         setIdPreview(null);
-      } else {
-        setStatusMessage('✅ วิเคราะห์สำเร็จ กรุณาตรวจสอบข้อมูลอีกครั้ง');
-        
-        // --- 🤖 ขุมพลัง AI Data Parsing (เวอร์ชันคุณบีสาม: ประกอบร่างเลโก้) ---
-        
-        // 1. เลขบัตร 13 หลัก
-        const idMatch = rawText.replace(/\D/g, '').match(/(\d{13})/);
-        if (idMatch) setIdNumber(idMatch[1]);
-
-        // 2. ชื่อ-นามสกุล
-        const nameMatch = cleanText.match(/(นาย|นาง|นางสาว)\s*([ก-๙]+)\s+([ก-๙]+)/);
-        if (nameMatch) setFullName(`${nameMatch[1]}${nameMatch[2]} ${nameMatch[3]}`);
-
-        // 3. วันเกิด
-        const dobMatch = cleanText.match(/(\d{1,2}\s*[ก-๙\.]+\s*\d{4})/);
-        if (dobMatch) setDateOfBirth(dobMatch[1]);
-
-        // 4. ที่อยู่ (แยกส่วนหาทีละคำ แล้วจับมาต่อกัน)
-        let extractedAddress = "";
-        
-        // 4.1 หาบ้านเลขที่ และ หมู่ (ดักจับตัวเลขและหมู่ที่อยู่หลังคำว่าที่อยู่)
-        const houseMatch = cleanText.match(/(?:ที่อยู่|Address)\s*([0-9/]+(?:\s*(?:หมู่ที่|หมู่|ม\.)\s*\d+)?)/);
-        if (houseMatch) extractedAddress += houseMatch[1] + " ";
-
-        // 4.2 หาตำบล หรือ แขวง
-        const subDistrictMatch = cleanText.match(/(?:ตำบล|ต\.|แขวง)\s*([ก-๙]+)/);
-        if (subDistrictMatch) extractedAddress += `ต.${subDistrictMatch[1]} `;
-
-        // 4.3 หาอำเภอ หรือ เขต
-        const districtMatch = cleanText.match(/(?:อำเภอ|อ\.|เขต)\s*([ก-๙]+)/);
-        if (districtMatch) extractedAddress += `อ.${districtMatch[1]} `;
-
-        // 4.4 หาจังหวัด
-        const provinceMatch = cleanText.match(/(?:จังหวัด|จ\.)\s*([ก-๙]+)/);
-        if (provinceMatch) extractedAddress += `จ.${provinceMatch[1]}`;
-
-        // นำข้อมูลที่ประกอบร่างแล้วไปใส่ในช่องฟอร์ม
-        if (extractedAddress.trim()) {
-          setAddress(extractedAddress.trim());
-        }
-
-        const blob = await (await fetch(dataUrl)).blob();
-        setIdImageFile(new File([blob], `verified_id_${Date.now()}.jpg`, { type: 'image/jpeg' }));
+        setIdImageFile(null);
+        return;
       }
+
+      setStatusMessage('✅ วิเคราะห์สำเร็จ กรุณาตรวจสอบข้อมูลอีกครั้ง');
+      
+      const idMatch = cleanText.match(/\b\d{1}\s\d{4}\s\d{5}\s\d{2}\s\d{1}\b/);
+      if (idMatch) setIdNumber(idMatch[0].replace(/\s/g, ''));
+
+      const nameMatch = cleanText.match(/(?:ชื่อ - นามสกุล|Name|Thai National)\s+([ก-๙]+\s+[ก-๙]+)/);
+      if (nameMatch) setFullName(nameMatch[1].trim());
+
+      const dobMatch = cleanText.match(/(?:เกิดวันที่|Date of Birth)\s+([0-9]+\s+[ก-๙]+\s+[0-9]+)/);
+      if (dobMatch) setDateOfBirth(dobMatch[1].trim());
+
+      const houseMatch = cleanText.match(/(?:ที่อยู่|Address)\s*([0-9/]+\s*หมู่ที่\s*[0-9]+.*?(?=เขต|อำเภอ|จังหวัด|$))/);
+      if (houseMatch) setAddress(houseMatch[1].trim());
+
     } catch (err) {
       console.error(err);
-      setStatusMessage('⚠️ ระบบดึงข้อมูลอัตโนมัติขัดข้อง กรุณากรอกด้วยตนเองค่ะ');
-      const blob = await (await fetch(dataUrl)).blob();
-      setIdImageFile(new File([blob], `id_card_${Date.now()}.jpg`, { type: 'image/jpeg' }));
+      setStatusMessage('⚠️ ระบบดึงข้อมูลอัตโนมัติขัดข้อง กรุณากรอกด้วยตนเอง');
     } finally {
       setIsScanning(false);
     }
@@ -190,144 +160,160 @@ export default function KYCPage() {
 
   const handleSubmitData = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!idImageFile || idNumber.length !== 13) return;
+    if (!idImageFile) return setError('กรุณาถ่ายรูปบัตรก่อนค่ะ');
+    if (!pdpaConsent) return setError('กรุณายอมรับ PDPA ก่อนค่ะ');
     setIsSubmitting(true);
+    setError('');
+
     try {
-      const fileName = `${currentUser.id}/${idImageFile.name}`;
-      const { data: uploadData, error: uploadErr } = await supabase.storage.from('kyc_documents').upload(fileName, idImageFile);
-      if (uploadErr) throw uploadErr;
+      const fd = new FormData();
+      fd.append('file', idImageFile);
+      fd.append('full_name', fullName);
+      fd.append('national_id', idNumber);
+      fd.append('date_of_birth', dateOfBirth);
+      fd.append('address', address);
+      fd.append('pdpa_consent', String(pdpaConsent));
+
+      // อัปโหลดไฟล์และอัปเดตข้อมูลผ่านช่องทางลับหลังบ้าน
+      const res = await fetch('/api/kyc/submit', { method: 'POST', body: fd });
+      const data = await res.json().catch(() => ({}));
       
-      await supabase.from('profiles').update({
-        kyc_status: 'pending', 
-        full_name: fullName, 
-        national_id: idNumber, 
-        date_of_birth: dateOfBirth,
-        address: address,
-        id_card_url: uploadData.path, 
-        pdpa_consented_at: new Date().toISOString()
-      }).eq('id', currentUser.id);
-      
+      if (!res.ok) {
+        const map: Record<string, string> = {
+          BAD_NATIONAL_ID: 'เลขบัตรประชาชนไม่ถูกต้อง (ตรวจสอบความถูกต้องของเลข 13 หลัก)',
+          TOO_LARGE: 'ไฟล์ใหญ่เกิน 5MB',
+          BAD_MIME: 'ไฟล์ต้องเป็น JPG/PNG/WEBP เท่านั้น',
+          MIME_SPOOF: 'ไฟล์ภาพไม่ถูกต้อง',
+          PDPA_REQUIRED: 'กรุณายอมรับข้อตกลง PDPA',
+        };
+        throw new Error(map[data?.error] ?? 'เกิดข้อผิดพลาดในการส่งข้อมูล');
+      }
       setKycStatus('pending');
-    } catch (err: any) { setError(err.message); }
-    setIsSubmitting(false);
+      alert('ส่งข้อมูลยืนยันตัวตนเรียบร้อยแล้วค่ะ แอดมินจะทำการตรวจสอบโดยเร็วที่สุด');
+      router.push('/profile');
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center font-bold">กำลังโหลด...</div>;
-  
-  if (kycStatus === 'approved' || kycStatus === 'pending') {
+  if (loading) return <div className="min-h-screen flex items-center justify-center font-bold text-gray-500">กำลังโหลดข้อมูล...</div>;
+
+  if (kycStatus === 'pending') {
     return (
-      <div className="min-h-screen bg-white flex flex-col items-center justify-center p-10 text-center">
-         <div className="text-8xl mb-6">{kycStatus === 'approved' ? '✅' : '⏳'}</div>
-         <h1 className="text-3xl font-black mb-4">{kycStatus === 'approved' ? 'ยืนยันตัวตนสำเร็จ' : 'ได้รับเอกสารแล้ว'}</h1>
-         <p className="text-gray-500 mb-8">เรากำลังตรวจสอบข้อมูลของคุณบีสาม กรุณารอสักครู่นะค๊ะ</p>
-         <button onClick={() => router.push('/profile')} className="bg-[#EE4D2D] text-white px-10 py-4 rounded-full font-black shadow-lg">กลับหน้าโปรไฟล์</button>
+      <div className="min-h-screen bg-[#F4F6F8] flex flex-col items-center justify-center p-6 text-center">
+        <div className="bg-white p-8 rounded-2xl shadow-lg max-w-md w-full">
+          <div className="text-4xl mb-4">⏳</div>
+          <h1 className="text-2xl font-black text-gray-800 mb-2">รอการตรวจสอบ</h1>
+          <p className="text-gray-500 font-bold mb-6">ระบบได้รับเอกสารของคุณแล้ว<br/>แอดมินกำลังดำเนินการตรวจสอบค่ะ</p>
+          <button onClick={() => router.push('/profile')} className="w-full bg-blue-500 text-white font-bold py-3 rounded-xl">กลับหน้าโปรไฟล์</button>
+        </div>
+        <BottomNav />
+      </div>
+    );
+  }
+
+  if (kycStatus === 'approved') {
+    return (
+      <div className="min-h-screen bg-[#F4F6F8] flex flex-col items-center justify-center p-6 text-center">
+        <div className="bg-white p-8 rounded-2xl shadow-lg max-w-md w-full">
+          <div className="text-4xl mb-4">✅</div>
+          <h1 className="text-2xl font-black text-green-600 mb-2">ยืนยันตัวตนสำเร็จ</h1>
+          <p className="text-gray-500 font-bold mb-6">บัญชีของคุณได้รับการอนุมัติแล้วค่ะ</p>
+          <button onClick={() => router.push('/profile')} className="w-full bg-blue-500 text-white font-bold py-3 rounded-xl">กลับหน้าโปรไฟล์</button>
+        </div>
+        <BottomNav />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 flex justify-center pb-24 relative overflow-hidden">
-      <div className="w-full sm:max-w-2xl bg-white min-h-screen flex flex-col shadow-2xl relative">
-        
-        {/* --- 📸 Dedicated Full-Screen Camera Interface --- */}
-        {isCameraOpen && (
-          <div className="fixed inset-0 z-[999] bg-black flex flex-col overflow-hidden">
-            <div className="p-6 flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent">
-               <button type="button" onClick={stopCamera} className="text-white text-sm font-bold bg-white/20 px-4 py-2 rounded-full backdrop-blur-md">ยกเลิก</button>
-               <span className="text-white font-black text-sm tracking-widest uppercase">Scan ID Card</span>
-               <div className="w-12"></div>
-            </div>
+    <div className="min-h-screen bg-[#F4F6F8] pb-24 text-left">
+      <div className="max-w-2xl mx-auto bg-white min-h-screen shadow-xl p-6 md:p-8">
+        <button onClick={() => router.back()} className="text-sm font-bold text-blue-500 mb-6 hover:underline">← กลับ</button>
+        <h1 className="text-2xl font-black text-gray-800 mb-2">ยืนยันตัวตน (KYC)</h1>
+        <p className="text-gray-500 text-sm font-bold mb-8">เพื่อความปลอดภัย กรุณาถ่ายรูปหน้าบัตรประชาชนและตรวจสอบข้อมูลให้ถูกต้องค่ะ</p>
 
-            <div className="relative flex-1 flex items-center justify-center px-6">
-              <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover opacity-80" />
-              
-              <div className="relative z-10 w-full aspect-[86/54] border-2 border-dashed border-orange-500 rounded-2xl shadow-[0_0_0_9999px_rgba(0,0,0,0.6)] flex items-center justify-center">
-                 <div className="absolute inset-0 border-2 border-white/20 rounded-2xl"></div>
-                 <p className="text-white/40 font-black text-xs tracking-tighter uppercase">วางหน้าบัตรให้พอดีกรอบ</p>
-                 
-                 <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-orange-500 rounded-tl-2xl"></div>
-                 <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-orange-500 rounded-tr-2xl"></div>
-                 <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-orange-500 rounded-bl-2xl"></div>
-                 <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-orange-500 rounded-br-2xl"></div>
+        {error && <div className="bg-red-100 border border-red-300 text-red-600 p-3 rounded-xl mb-6 text-sm font-bold">{error}</div>}
+        {statusMessage && <div className="bg-blue-100 border border-blue-300 text-blue-600 p-3 rounded-xl mb-6 text-sm font-bold">{statusMessage}</div>}
+
+        <div className="mb-8 bg-gray-50 p-4 rounded-2xl border border-gray-200">
+          <h2 className="font-bold text-gray-700 mb-4 text-sm uppercase">1. ถ่ายรูปบัตรประชาชน</h2>
+          
+          {!isCameraOpen && !idPreview && (
+            <button onClick={startCamera} className="w-full bg-gray-800 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 shadow-md">
+              <span>📸</span> เปิดกล้องเพื่อถ่ายรูป
+            </button>
+          )}
+
+          {isCameraOpen && (
+            <div className="relative rounded-xl overflow-hidden bg-black aspect-video mb-4 shadow-inner">
+              <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
+              <canvas ref={canvasRef} className="hidden" />
+              <div className="absolute inset-0 border-2 border-dashed border-white/50 m-4 rounded-xl pointer-events-none"></div>
+            </div>
+          )}
+
+          {isCameraOpen && (
+            <div className="flex gap-2">
+              <button onClick={captureAndProcess} disabled={isScanning} className="flex-1 bg-green-500 text-white font-black py-3 rounded-xl shadow-md disabled:opacity-50">
+                {isScanning ? 'กำลังวิเคราะห์...' : 'ถ่ายรูป 📸'}
+              </button>
+              <button onClick={stopCamera} className="bg-red-500 text-white font-bold px-4 rounded-xl shadow-md">ปิดกล้อง</button>
+            </div>
+          )}
+
+          {idPreview && (
+            <div className="space-y-4">
+              <div className="relative rounded-xl overflow-hidden border-2 border-green-400">
+                <img src={idPreview} alt="ID Preview" className="w-full object-cover aspect-video" />
               </div>
-            </div>
-
-            <div className="bg-black p-10 pb-16 flex flex-col items-center gap-4">
-              <p className="text-white/60 text-[10px] font-bold uppercase tracking-widest">แตะปุ่มด้านล่างเพื่อถ่ายรูป</p>
-              <button 
-                type="button" 
-                onClick={captureAndProcess} 
-                className="w-20 h-20 bg-white rounded-full border-[6px] border-gray-700 flex items-center justify-center active:scale-90 transition-transform shadow-2xl"
-              >
-                 <div className="w-14 h-14 bg-white rounded-full border-2 border-black/5"></div>
+              <button onClick={startCamera} className="w-full bg-gray-200 text-gray-700 font-bold py-3 rounded-xl border border-gray-300 hover:bg-gray-300">
+                ถ่ายใหม่ 🔄
               </button>
             </div>
-          </div>
-        )}
-
-        <div className="p-6 border-b sticky top-0 bg-white z-50 flex items-center gap-4">
-          <button type="button" onClick={() => router.back()} className="text-2xl font-bold">←</button>
-          <h1 className="font-black text-xl">ยืนยันตัวตน</h1>
+          )}
         </div>
 
-        <div className="p-8 space-y-8">
-          {error && <div className="bg-red-50 text-red-600 p-4 rounded-2xl text-xs font-black border border-red-100">{error}</div>}
+        <form onSubmit={handleSubmitData} className="space-y-5">
+          <h2 className="font-bold text-gray-700 mb-2 text-sm uppercase border-b pb-2">2. ตรวจสอบข้อมูล</h2>
           
-          <div className="space-y-3">
-            <label className="block text-[11px] font-black text-gray-400 uppercase">1. ถ่ายรูปหน้าบัตรประชาชน</label>
-            <div onClick={() => !isScanning && startCamera()} className={`border-4 border-dashed rounded-[2rem] p-8 text-center cursor-pointer transition-all ${idPreview ? 'border-green-100 bg-green-50' : 'border-gray-100 bg-gray-50 hover:bg-gray-100'}`}>
-               {isScanning ? (
-                 <div className="py-6 space-y-4">
-                    <div className="w-10 h-10 border-4 border-[#EE4D2D] border-t-transparent rounded-full animate-spin mx-auto"></div>
-                    <p className="text-sm font-black text-[#EE4D2D] animate-pulse">{statusMessage}</p>
-                 </div>
-               ) : idPreview ? (
-                 <div className="space-y-4">
-                   <img src={idPreview} className="max-h-48 mx-auto rounded-xl shadow-md border-2 border-white" alt="ID Preview" />
-                   <p className="text-xs font-black text-green-600 uppercase tracking-widest">✅ Ready to verify</p>
-                 </div>
-               ) : (
-                 <div className="py-10 space-y-3">
-                    <div className="text-5xl">📸</div>
-                    <p className="text-sm font-black text-[#EE4D2D]">แตะเพื่อเปิดกล้อง</p>
-                    <p className="text-[10px] text-gray-400">ระบบจะช่วยดึงข้อมูลจากรูปภาพอัตโนมัติ</p>
-                 </div>
-               )}
+          <div>
+            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">เลขบัตรประชาชน (13 หลัก)</label>
+            <input type="text" value={idNumber} onChange={(e) => setIdNumber(e.target.value)} maxLength={13} className="w-full border-gray-300 rounded-xl p-3 bg-gray-50 font-bold font-mono text-lg focus:ring-blue-500 focus:border-blue-500" required placeholder="0000000000000" />
+          </div>
+          
+          <div>
+            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">ชื่อ - นามสกุล</label>
+            <input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} className="w-full border-gray-300 rounded-xl p-3 bg-gray-50 font-bold focus:ring-blue-500 focus:border-blue-500" required placeholder="นาย จงเจริญ ดีงาม" />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="col-span-2">
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">วัน/เดือน/ปีเกิด</label>
+              <input type="text" value={dateOfBirth} onChange={(e) => setDateOfBirth(e.target.value)} className="w-full border-gray-300 rounded-xl p-3 bg-gray-50 font-bold focus:ring-blue-500 focus:border-blue-500" required placeholder="1 มกราคม 2500" />
             </div>
           </div>
 
-          <form onSubmit={handleSubmitData} className="space-y-6">
-            <label className="block text-[11px] font-black text-gray-400 uppercase pt-4 border-t">2. ตรวจสอบข้อมูล</label>
-            
-            <div>
-              <label className="block text-[11px] font-black text-gray-400 mb-2 uppercase">ชื่อ-นามสกุลจริง</label>
-              <input type="text" value={fullName} onChange={e => setFullName(e.target.value)} className="w-full p-4 bg-gray-50 border-none rounded-2xl font-bold focus:ring-2 focus:ring-orange-500" placeholder="กรอกชื่อตามบัตร" required />
-            </div>
-            <div>
-              <label className="block text-[11px] font-black text-gray-400 mb-2 uppercase">เลขบัตรประชาชน 13 หลัก</label>
-              <input type="text" value={idNumber} onChange={e => setIdNumber(e.target.value.replace(/\D/g,'').slice(0,13))} className="w-full p-4 bg-gray-50 border-none rounded-2xl font-black tracking-widest text-lg focus:ring-2 focus:ring-orange-500" placeholder="0000000000000" required />
-            </div>
-            <div>
-              <label className="block text-[11px] font-black text-gray-400 mb-2 uppercase">วัน/เดือน/ปีเกิด (ตามบัตร)</label>
-              <input type="text" value={dateOfBirth} onChange={e => setDateOfBirth(e.target.value)} className="w-full p-4 bg-gray-50 border-none rounded-2xl font-bold focus:ring-2 focus:ring-orange-500" placeholder="เช่น 1 ม.ค. 2540" />
-            </div>
-            <div>
-              <label className="block text-[11px] font-black text-gray-400 mb-2 uppercase">ที่อยู่ตามหน้าบัตร</label>
-              <textarea value={address} onChange={e => setAddress(e.target.value)} rows={3} className="w-full p-4 bg-gray-50 border-none rounded-2xl font-bold focus:ring-2 focus:ring-orange-500 resize-none" placeholder="บ้านเลขที่, หมู่, ตำบล, อำเภอ, จังหวัด" />
-            </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">ที่อยู่ตามบัตร</label>
+            <textarea value={address} onChange={(e) => setAddress(e.target.value)} rows={3} className="w-full border-gray-300 rounded-xl p-3 bg-gray-50 font-bold focus:ring-blue-500 focus:border-blue-500" required placeholder="123 หมู่ 1..."></textarea>
+          </div>
 
-            <div className="flex items-start gap-3 bg-blue-50 p-4 rounded-2xl">
-              <input type="checkbox" checked={pdpaConsent} onChange={e => setPdpaConsent(e.target.checked)} className="mt-1 h-5 w-5 rounded" required />
-              <p className="text-[10px] text-blue-800 leading-relaxed font-medium">ข้าพเจ้ายินยอมให้ประมวลผลข้อมูลส่วนบุคคลและรูปถ่ายหน้าบัตรเพื่อใช้ในการยืนยันตัวตน (KYC) ตามนโยบายความปลอดภัยของระบบ</p>
-            </div>
-            
-            <button type="submit" disabled={isSubmitting || !idImageFile || isScanning} className="w-full bg-[#EE4D2D] text-white py-5 rounded-full font-black text-sm shadow-xl active:scale-95 disabled:opacity-50 transition-all">
-              {isSubmitting ? 'กำลังส่งข้อมูล...' : 'ส่งข้อมูลเพื่อรับการตรวจสอบ'}
-            </button>
-          </form>
-        </div>
-        <canvas ref={canvasRef} className="hidden" />
+          <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex gap-3 items-start mt-6">
+            <input type="checkbox" id="pdpa" checked={pdpaConsent} onChange={(e) => setPdpaConsent(e.target.checked)} className="mt-1 w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500" required />
+            <label htmlFor="pdpa" className="text-xs font-bold text-gray-600 leading-relaxed">
+              ข้าพเจ้ายินยอมให้แพลตฟอร์มเก็บรวบรวม ใช้ และเปิดเผยข้อมูลส่วนบุคคล (รวมถึงรูปภาพบัตรประชาชน) เพื่อวัตถุประสงค์ในการยืนยันตัวตนตามกฎหมาย PDPA
+            </label>
+          </div>
+
+          <button type="submit" disabled={isSubmitting || !idImageFile} className="w-full bg-blue-600 text-white font-black py-4 rounded-xl text-lg shadow-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed mt-4">
+            {isSubmitting ? 'กำลังส่งข้อมูล...' : 'ส่งข้อมูลยืนยันตัวตน 🚀'}
+          </button>
+        </form>
       </div>
+      <BottomNav />
     </div>
   );
 }
