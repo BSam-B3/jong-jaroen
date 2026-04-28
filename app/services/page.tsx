@@ -1,177 +1,253 @@
-'use client';
+import Link from "next/link";
+import { createClient } from "@/lib/supabase/server";
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
-
-interface ProviderService {
+interface Service {
   id: string;
   title: string;
-  price_starting: number;
+  category: string;
+  cover_image_url: string | null;
+  starting_price: number;
   rating: number;
   review_count: number;
-  completed_jobs: number;
-  is_sponsored: boolean;
   created_at: string;
-  profiles?: {
-    first_name: string;
-    last_name: string;
-  };
-  service_categories?: {
-    title: string;
-    icon: string;
-  };
+  provider_id: string;
+  provider_name: string | null;
+  provider_avatar: string | null;
+  provider_kyc_status: string | null;
 }
 
-export default function ServicesPage() {
-  const router = useRouter();
-  
-  const [providers, setProviders] = useState<ProviderService[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<string>('all');
+interface PageProps {
+  searchParams: Promise<{ category?: string; q?: string }>;
+}
 
-  useEffect(() => {
-    const fetchProviders = async () => {
-      setIsLoading(true);
-      try {
-        const { data, error } = await supabase
-          .from('provider_services')
-          .select(`*, profiles:provider_id (first_name, last_name), service_categories:category_id (title, icon)`)
-          .order('created_at', { ascending: false });
+const CATEGORIES = [
+  { key: "all", label: "ทั้งหมด", icon: "✨" },
+  { key: "ล้างแอร์", label: "ล้างแอร์", icon: "❄️" },
+  { key: "ทำความสะอาด", label: "ทำความสะอาด", icon: "🧹" },
+  { key: "ซ่อมท่อ", label: "ซ่อมท่อ", icon: "🔧" },
+  { key: "ซ่อมไฟฟ้า", label: "ซ่อมไฟฟ้า", icon: "💡" },
+  { key: "ขนย้าย", label: "ขนย้าย", icon: "📦" },
+  { key: "สวน", label: "ดูแลสวน", icon: "🌿" },
+  { key: "ช่างทั่วไป", label: "ช่างทั่วไป", icon: "🛠️" },
+];
 
-        if (error) throw error;
-        if (data) setProviders(data);
-      } catch (error) {
-        console.error('Error fetching providers:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+function formatPrice(n: number): string {
+  return Number(n).toLocaleString("th-TH");
+}
 
-    fetchProviders();
-  }, []);
+export default async function ServicesPage({ searchParams }: PageProps) {
+  const params = await searchParams;
+  const category = params.category || "all";
+  const search = params.q || "";
 
-  const filteredProviders = providers.filter((provider) => {
-    const isNew = new Date(provider.created_at).getTime() > Date.now() - 30 * 24 * 60 * 60 * 1000;
-    if (activeTab === 'sponsored') return provider.is_sponsored;
-    if (activeTab === 'popular') return provider.rating >= 4.5 && provider.completed_jobs > 10;
-    if (activeTab === 'new') return isNew;
-    return true; 
-  }).sort((a, b) => {
-    if (activeTab === 'all') {
-      if (a.is_sponsored && !b.is_sponsored) return -1;
-      if (!a.is_sponsored && b.is_sponsored) return 1;
-      return b.rating - a.rating;
-    }
-    return 0;
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("get_active_services", {
+    p_category: category === "all" ? null : category,
+    p_search: search || null,
   });
 
+  const services: Service[] = (data || []) as Service[];
+
   return (
-    <div className="min-h-screen bg-gray-100 flex justify-center pb-24">
-      {/* ✅ ปรับขอบมน (rounded-t-[2.5rem]) ที่ container หลัก */}
-      <div className="w-full sm:max-w-2xl md:max-w-3xl bg-[#F4F6F8] min-h-screen relative flex flex-col shadow-xl overflow-x-hidden rounded-t-[2.5rem]">
+    <div className="min-h-screen bg-slate-50 pb-24 font-sans">
+      <div className="max-w-md mx-auto bg-slate-50 min-h-screen relative shadow-sm">
         
-        {/* 🟠 Header ปรับ rounded-[2.5rem] ให้มนทั้ง 4 มุม */}
-        <div className="bg-gradient-to-b from-[#EE4D2D] to-[#FF7337] rounded-[2.5rem] p-6 pt-10 shadow-md relative z-20">
-          <div className="flex items-center gap-4 mb-4">
-            <h1 className="text-white text-2xl font-black tracking-tight">ค้นหาช่าง / บริการ</h1>
-          </div>
-          
-          <div className="bg-white rounded-2xl p-1.5 flex items-center shadow-lg shadow-black/5">
-            <div className="pl-3 pr-2 text-gray-400">🔍</div>
-            <input 
-              type="text" 
-              placeholder="ค้นหาชื่อช่าง, บริการ..." 
-              className="w-full bg-transparent text-sm py-2 outline-none font-medium placeholder:text-gray-400"
-            />
-          </div>
-        </div>
-
-        <div className="bg-white px-4 py-3 shadow-sm border-b border-gray-100 sticky top-0 z-10 flex gap-2 overflow-x-auto scrollbar-hide mt-[-20px] pt-8 rounded-t-[2rem]">
-          <FilterTab label="ทั้งหมด" active={activeTab === 'all'} onClick={() => setActiveTab('all')} />
-          <FilterTab label="🌟 ผู้สนับสนุน" active={activeTab === 'sponsored'} onClick={() => setActiveTab('sponsored')} />
-          <FilterTab label="⭐ ยอดนิยม" active={activeTab === 'popular'} onClick={() => setActiveTab('popular')} />
-          <FilterTab label="🌱 หน้าใหม่" active={activeTab === 'new'} onClick={() => setActiveTab('new')} />
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-hide pb-24">
-          {isLoading ? (
-            Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="bg-white rounded-[1.5rem] p-4 shadow-sm border border-gray-50 flex gap-4 animate-pulse">
-                <div className="w-16 h-16 bg-gray-200 rounded-2xl shrink-0"></div>
-                <div className="flex-1 space-y-2">
-                  <div className="h-4 bg-gray-200 rounded w-1/3"></div>
-                  <div className="h-4 bg-gray-200 rounded w-2/3"></div>
-                  <div className="h-3 bg-gray-200 rounded w-1/2 mt-2"></div>
-                </div>
-              </div>
-            ))
-          ) : filteredProviders.length === 0 ? (
-            <div className="text-center py-10 text-gray-400 mt-8">
-              <div className="text-4xl mb-2">🤷‍♂️</div>
-              <p className="text-sm font-bold text-gray-600">ยังไม่มีช่างในหมวดหมู่นี้</p>
+        {/* Header with Search */}
+        <header className="sticky top-0 z-20 bg-white border-b border-slate-100 shadow-sm">
+          <div className="px-4 pt-4 pb-3">
+            <div className="flex items-center justify-between mb-4">
+              <h1 className="text-2xl font-black text-slate-800">บริการชุมชน</h1>
+              <Link
+                href="/notifications"
+                className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition"
+                aria-label="แจ้งเตือน"
+              >
+                <svg className="w-5 h-5 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+              </Link>
             </div>
-          ) : (
-            filteredProviders.map((provider) => {
-              const isNew = new Date(provider.created_at).getTime() > Date.now() - 30 * 24 * 60 * 60 * 1000;
-              return (
-                <div key={provider.id} className="bg-white rounded-[1.5rem] p-4 shadow-sm border border-gray-50 flex gap-4 active:scale-[0.98] transition-transform cursor-pointer hover:border-orange-100 hover:shadow-md relative overflow-hidden">
-                  {provider.is_sponsored && (
-                    <div className="absolute -right-6 top-3 bg-gradient-to-r from-yellow-400 to-orange-500 text-white text-[8px] font-black px-8 py-0.5 transform rotate-45 shadow-sm">
-                      แนะนำ
-                    </div>
-                  )}
-                  <div className="w-16 h-16 bg-orange-50 rounded-2xl flex items-center justify-center text-3xl shrink-0 border border-orange-100 shadow-inner">
-                    {provider.service_categories?.icon || '👨‍🔧'}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <span className="bg-gray-100 text-gray-600 text-[9px] font-bold px-2 py-0.5 rounded-md">
-                        {provider.service_categories?.title || 'บริการทั่วไป'}
-                      </span>
-                      {isNew && <span className="text-[9px] font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-md">🌱 หน้าใหม่</span>}
-                    </div>
-                    <h3 className="font-bold text-gray-800 text-sm truncate pr-4">
-                      {provider.title || `ช่าง${provider.profiles?.first_name || 'ทั่วไป'}`}
-                    </h3>
-                    <div className="flex items-center gap-2 mt-1 text-[10px] font-medium text-gray-500">
-                      <span className="flex items-center text-orange-500 font-bold">
-                        ⭐ {provider.rating > 0 ? provider.rating : 'ไม่มีคะแนน'}
-                      </span>
-                      <span>•</span>
-                      <span>ผ่านงาน {provider.completed_jobs || 0} ครั้ง</span>
-                    </div>
-                    <div className="mt-2 text-[#EE4D2D] font-bold text-[11px]">
-                      เริ่มต้น {provider.price_starting ? `${provider.price_starting} บาท` : 'ประเมินหน้างาน'}
-                    </div>
-                  </div>
-                </div>
-              );
-            })
-          )}
+
+            <form action="/services" method="GET" className="relative">
+              {category !== "all" && (
+                <input type="hidden" name="category" value={category} />
+              )}
+              <input
+                name="q"
+                defaultValue={search}
+                placeholder="ค้นหาช่าง หรือ บริการที่ต้องการ..."
+                className="w-full pl-11 pr-4 py-3 bg-slate-100 rounded-2xl text-sm font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#EE4D2D]/30 focus:bg-white border border-transparent focus:border-[#EE4D2D]/30 transition-all"
+              />
+              <svg
+                className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </form>
+          </div>
+
+          {/* Categories Pills */}
+          <div className="overflow-x-auto scrollbar-hide border-t border-slate-50">
+            <div className="flex gap-2 px-4 py-3 w-max">
+              {CATEGORIES.map((c) => {
+                const active = category === c.key;
+                const href = c.key === "all"
+                    ? search ? `/services?q=${encodeURIComponent(search)}` : "/services"
+                    : `/services?category=${encodeURIComponent(c.key)}${search ? `&q=${encodeURIComponent(search)}` : ""}`;
+                return (
+                  <Link
+                    key={c.key}
+                    href={href}
+                    scroll={false}
+                    className={`shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold transition-all ${
+                      active
+                        ? "bg-[#EE4D2D] text-white shadow-md shadow-orange-500/20"
+                        : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+                    }`}
+                  >
+                    <span className="text-sm">{c.icon}</span>
+                    {c.label}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        </header>
+
+        {/* Result count */}
+        <div className="px-5 pt-4 pb-2">
+          <p className="text-xs font-medium text-slate-500">
+            พบ <span className="font-bold text-slate-800">{services.length}</span> บริการ
+            {search && (<span> สำหรับ "<span className="text-[#EE4D2D] font-bold">{search}</span>"</span>)}
+          </p>
         </div>
 
-        
+        {/* Grid (Fastwork Style) */}
+        <main className="px-4 py-2">
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 text-sm font-bold rounded-2xl p-4 text-center">
+              เกิดข้อผิดพลาดในการโหลดข้อมูล
+            </div>
+          )}
+
+          {!error && services.length === 0 && (
+            <div className="text-center py-20">
+              <div className="text-6xl mb-4">🔍</div>
+              <p className="text-xl font-black text-slate-800">ไม่พบบริการที่ค้นหา</p>
+              <p className="text-sm font-medium text-slate-500 mt-2">ลองเลือกหมวดหมู่อื่นหรือเปลี่ยนคำค้นดูนะคะ</p>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            {services.map((s) => (
+              <ServiceCard key={s.id} service={s} />
+            ))}
+          </div>
+        </main>
+
+        {/* ✅ Bottom Navigation (ใช้เมนู Emoji ตามมาตรฐานแอป) */}
+        <div className="fixed bottom-0 w-full sm:max-w-2xl md:max-w-3xl bg-white/95 backdrop-blur-md border-t border-gray-100 px-1 py-4 flex justify-between items-center shadow-[0_-4px_25px_rgba(0,0,0,0.06)] rounded-t-[2.5rem] z-50">
+          <NavItem icon="🏠" label="หน้าแรก" active={false} href="/" />
+          <NavItem icon="🛠️" label="บริการ" active={true} href="/services" />
+          <NavItem icon="📋" label="งานด่วน" active={false} href="/job-board" />
+          <NavItem icon="📰" label="ข่าวสาร" active={false} href="/news" />
+          <NavItem icon="🎟️" label="ปองเจริญ" active={false} href="/coupons" />
+          <NavItem icon="👤" label="ฉัน" active={false} href="/profile" />
+        </div>
+      </div>
 
       <style dangerouslySetInnerHTML={{__html: `
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
       `}} />
     </div>
-  </div>
   );
 }
 
-function FilterTab({ label, active, onClick }: { label: string, active: boolean, onClick: () => void }) {
+// ---------------- Components ---------------- //
+
+function ServiceCard({ service }: { service: Service }) {
+  const isVerified = service.provider_kyc_status === "approved";
+
   return (
-    <button 
-      onClick={onClick}
-      className={`whitespace-nowrap px-4 py-2 rounded-full text-xs font-bold transition-all shadow-sm border ${
-        active ? 'bg-[#EE4D2D] text-white border-[#EE4D2D]' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
-      }`}
+    <Link
+      href={`/services/${service.id}`}
+      className="flex flex-col bg-white rounded-[1.25rem] overflow-hidden border border-slate-100 shadow-sm hover:border-orange-300 hover:shadow-md transition-all active:scale-[0.98]"
     >
-      {label}
-    </button>
+      {/* Cover Image (อัตราส่วน 4:3) */}
+      <div className="relative w-full aspect-[4/3] bg-slate-100 overflow-hidden">
+        {service.cover_image_url ? (
+          <img src={service.cover_image_url} alt={service.title} className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-4xl bg-slate-50 text-slate-300">
+            🛠️
+          </div>
+        )}
+      </div>
+
+      <div className="p-3 flex flex-col flex-1">
+        {/* Provider Row */}
+        <div className="flex items-center gap-1.5 mb-2">
+          <div className="w-5 h-5 rounded-full overflow-hidden bg-slate-200 shrink-0 border border-slate-100">
+            {service.provider_avatar ? (
+              <img src={service.provider_avatar} alt="Provider" className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-[9px] font-black text-slate-500">
+                {service.provider_name?.charAt(0).toUpperCase() || "?"}
+              </div>
+            )}
+          </div>
+          <span className="text-[10px] font-bold text-slate-500 truncate flex-1 min-w-0">
+            {service.provider_name || "ไม่ระบุชื่อช่าง"}
+          </span>
+          {isVerified && (
+            <span title="ยืนยันตัวตนแล้ว" className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-green-500 shrink-0 shadow-sm">
+              <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            </span>
+          )}
+        </div>
+
+        {/* Title */}
+        <h3 className="text-xs font-black text-slate-800 line-clamp-2 leading-relaxed min-h-[36px] mb-2 flex-1">
+          {service.title}
+        </h3>
+
+        {/* Rating */}
+        <div className="flex items-center gap-1 text-[10px] mb-2">
+          <svg className="w-3.5 h-3.5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.539 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+          </svg>
+          <span className="font-black text-slate-700">{Number(service.rating || 0).toFixed(1)}</span>
+          <span className="font-medium text-slate-400">({service.review_count || 0})</span>
+        </div>
+
+        {/* Price */}
+        <div className="pt-2 border-t border-slate-100/80">
+          <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">เริ่มต้น</p>
+          <p className="text-sm font-black text-[#EE4D2D]">
+            {formatPrice(service.starting_price)}<span className="text-[10px] font-bold text-slate-400 ml-1">บาท</span>
+          </p>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+// คอมโพเนนต์เมนูด้านล่าง
+function NavItem({ icon, label, active, href }: { icon: string, label: string, active: boolean, href: string }) {
+  return (
+    <Link href={href} className={`flex flex-col items-center gap-1.5 cursor-pointer transition-all ${active ? 'scale-110' : 'opacity-40 hover:opacity-100'} flex-1`}>
+      <span className="text-[22px]">{icon}</span>
+      <span className={`text-[9px] font-bold ${active ? 'text-[#EE4D2D]' : 'text-gray-500'} whitespace-nowrap`}>{label}</span>
+      {active && <div className="w-1.5 h-1.5 bg-[#EE4D2D] rounded-full shadow-sm mt-0.5"></div>}
+    </Link>
   );
 }
