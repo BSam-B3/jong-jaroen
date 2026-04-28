@@ -2,25 +2,17 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
 export async function createClient() {
-  const cookieStore = cookies();
-  
+  const cookieStore = await cookies();
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        // เจมแก้ตรงนี้โดยเพิ่ม : any เข้าไปค่ะ
-        setAll(cookiesToSet: any) {
+        getAll() { return cookieStore.getAll(); },
+        setAll(cookiesToSet) {
           try {
-            cookiesToSet.forEach(({ name, value, options }: any) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // ไม่เป็นไรในกรณีที่เรียกใช้งานใน Server Component
-          }
+            cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options));
+          } catch {}
         },
       },
     }
