@@ -1,49 +1,31 @@
-import { NextResponse, type NextRequest } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-
-export const dynamic = 'force-dynamic';
+import { createClient } from '@/lib/supabase/server';
 
 export async function GET(
-  _req: NextRequest,
-  { params }: { params: { id: string } }
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id: targetUserId } = params;
-
-  // 1. ตรวจสอบสิทธิ์แอดมิน (ตรวจสอบที่ Server ชัวร์ที่สุด)
-  const sb = await createClient();
-  const { data: { user } } = await sb.auth.getUser();
-  if (!user) return new NextResponse('UNAUTHORIZED', { status: 401 });
-
-  const { data: isAdmin } = await sb.rpc('is_admin');
-  if (!isAdmin) return new NextResponse('FORBIDDEN', { status: 403 });
-
-  // 2. ใช้ Admin Client ไปหาไฟล์รูปใน Bucket ส่วนตัว
+  const { id } = await params;
+  const supabase = await createClient();
   const admin = createAdminClient();
-  const { data: files } = await admin.storage.from('kyc_documents').list(targetUserId);
 
+  // 1. เช็คว่าเป็นแอดมินจริงไหม
+  const { data: isAdmin } = await supabase.rpc('is_admin');
+  if (!isAdmin) return new NextResponse('Unauthorized', { status: 403 });
+
+  // 2. ไปหยิบรูปลับมาจาก Storage
+  const { data: files } = await admin.storage.from('kyc_documents').list(id);
   const imageFile = files?.find(f => /\.(jpe?g|png|webp)$/i.test(f.name));
-  if (!imageFile) return new NextResponse('NOT_FOUND', { status: 404 });
 
-  // 3. 📝 บันทึกลง Log ว่าแอดมินคนนี้มาแอบส่องรูปคนนี้แล้วนะ (Audit Trail)
-  await admin.from('kyc_access_log').insert({
-    target_user: targetUserId,
-    viewer: user.id,
-    action: 'view_id_card_image',
-  });
+  if (!imageFile) return new NextResponse('Not Found', { status: 404 });
 
-  // 4. ดาวน์โหลดไฟล์และส่งคืนเป็น Raw Bytes (ไม่มีลิงก์หลุดไปที่เบราว์เซอร์)
-  const { data: blob, error: dlErr } = await admin.storage
+  const { data, error } = await admin.storage
     .from('kyc_documents')
-    .download(`${targetUserId}/${imageFile.name}`);
+    .createSignedUrl(`${id}/${imageFile.name}`, 60);
 
-  if (dlErr || !blob) return new NextResponse('INTERNAL_ERROR', { status: 500 });
+  if (error || !data.signedUrl) return new NextResponse('Error', { status: 500 });
 
-  const buf = await blob.arrayBuffer();
-  return new NextResponse(buf, {
-    headers: {
-      'Content-Type': blob.type || 'image/jpeg',
-      'Cache-Control': 'private, no-store, no-cache, must-revalidate',
-    },
-  });
+  // 3. ส่งแอดมินไปที่ลิงก์ลับนั้น
+  return NextResponse.redirect(data.signedUrl);
 }
