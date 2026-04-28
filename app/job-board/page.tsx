@@ -9,7 +9,7 @@ interface Job {
   title: string;
   description: string;
   category: string;
-  budget: number;
+  budget: number | null;
   location: string;
   status: string;
   is_urgent: boolean;
@@ -20,16 +20,22 @@ interface Job {
 }
 
 interface PageProps {
-  searchParams: Promise<{ filter?: "all" | "urgent" | "service" }>;
+  searchParams: Promise<{ filter?: string }>;
 }
 
-const FILTERS = [
-  { key: "all", label: "ทั้งหมด" },
-  { key: "urgent", label: "ด่วนมาก" },
-  { key: "service", label: "งานบริการ" },
-] as const;
+// หมวดหมู่สำหรับบอร์ดหางาน
+const CATEGORIES = [
+  { key: "all", label: "ทั้งหมด", icon: "🗂️" },
+  { key: "งานประจำ", label: "งานประจำ", icon: "🏢" },
+  { key: "งานขนส่ง", label: "งานขนส่ง", icon: "🚚" },
+  { key: "งานบริการ", label: "งานบริการ", icon: "🛠️" },
+  { key: "งานทั่วไป", label: "งานทั่วไป", icon: "📦" },
+  { key: "บอร์ดหางาน", label: "บอร์ดหางาน", icon: "📋" },
+];
 
-// ฟังก์ชันแปลงเวลา
+const DEFAULT_FILTER = "งานประจำ";
+const ACTIVE_NAV = "jobs";
+
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
   const m = Math.floor(diff / 60000);
@@ -42,33 +48,21 @@ function timeAgo(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString("th-TH");
 }
 
-// ฟังก์ชันจัดรูปแบบเงินบาท
-function formatBudget(n: number): string {
-  if (!n) return "เสนอราคา";
+function formatBudget(n: number | null): string {
+  if (n === null || n === undefined) return "เสนอราคา";
   return `${Number(n).toLocaleString("th-TH")} บาท`;
 }
 
-// ฟังก์ชันเลือกไอคอนตามหมวดหมู่
-function getCategoryIcon(category: string) {
-  const icons: any = {
-    urgent: '🥡', ac: '❄️', cleaning: '🧹', 
-    ride: '🛵', delivery: '📦', repair: '⚡'
-  };
-  return icons[category] || '✨';
-}
-
 export default async function JobBoardPage({ searchParams }: PageProps) {
-  const { filter = "all" } = await searchParams;
+  const params = await searchParams;
+  const filter = params.filter || DEFAULT_FILTER;
+
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("get_open_jobs");
+  const { data, error } = await supabase.rpc("get_jobs_by_new_categories", {
+    p_filter: filter,
+  });
 
   const jobs: Job[] = (data || []) as Job[];
-  const filtered =
-    filter === "urgent"
-      ? jobs.filter((j) => j.is_urgent)
-      : filter === "service"
-      ? jobs.filter((j) => !j.is_urgent)
-      : jobs;
 
   return (
     <div className="min-h-screen bg-gray-100 flex justify-center pb-24 font-sans">
@@ -94,28 +88,32 @@ export default async function JobBoardPage({ searchParams }: PageProps) {
             </div>
             
             <p className="text-white/90 text-xs font-medium pl-8 relative z-10 mb-2">
-              {filtered.length} งานที่เปิดรับในพื้นที่ของคุณ
+              {jobs.length} งานที่เปิดรับในพื้นที่ของคุณ
             </p>
 
-            {/* 🔘 Filter Tabs */}
-            <div className="mt-4 flex gap-2 pl-2 relative z-10">
-              {FILTERS.map((f) => {
-                const active = filter === f.key;
-                return (
-                  <Link
-                    key={f.key}
-                    href={f.key === "all" ? "/job-board" : `/job-board?filter=${f.key}`}
-                    scroll={false}
-                    className={`px-5 py-2 rounded-full text-[11px] font-bold transition-all shadow-sm ${
-                      active
-                        ? "bg-white text-[#0082FA]"
-                        : "bg-white/20 text-white border border-white/30 hover:bg-white/30"
-                    }`}
-                  >
-                    {f.label}
-                  </Link>
-                );
-              })}
+            {/* 🔘 Filter Tabs แบบเลื่อนได้ (สีฟ้า) */}
+            <div className="-mx-6 px-6 overflow-x-auto scrollbar-hide relative z-10">
+              <div className="flex gap-2 w-max pb-2 pt-2">
+                {CATEGORIES.map((c) => {
+                  const active = filter === c.key;
+                  const href = c.key === "all" ? "/jobs?filter=all" : `/jobs?filter=${encodeURIComponent(c.key)}`;
+                  return (
+                    <Link
+                      key={c.key}
+                      href={href}
+                      scroll={false}
+                      className={`shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full text-[12px] font-bold transition-all shadow-sm ${
+                        active
+                          ? "bg-white text-[#0082FA]"
+                          : "bg-white/20 text-white border border-white/30 hover:bg-white/30"
+                      }`}
+                    >
+                      <span>{c.icon}</span>
+                      {c.label}
+                    </Link>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
@@ -133,7 +131,7 @@ export default async function JobBoardPage({ searchParams }: PageProps) {
               </div>
             )}
 
-            {!error && filtered.length === 0 && (
+            {!error && jobs.length === 0 && (
               <div className="text-center py-10 bg-white rounded-3xl border border-gray-100 shadow-sm">
                 <div className="text-4xl mb-2 opacity-50">📭</div>
                 <p className="font-bold text-gray-500 text-sm">ยังไม่มีงานในหมวดหมู่นี้</p>
@@ -141,7 +139,7 @@ export default async function JobBoardPage({ searchParams }: PageProps) {
             )}
 
             <div className="space-y-4">
-              {filtered.map((job) => (
+              {jobs.map((job) => (
                 <Link
                   href={`/jobs/${job.id}`}
                   key={job.id}
@@ -154,11 +152,11 @@ export default async function JobBoardPage({ searchParams }: PageProps) {
                     </div>
                   ) : (
                     <div className="absolute top-0 right-0 bg-blue-50 text-blue-600 text-[9px] font-black px-4 py-1.5 rounded-bl-2xl border-b border-l border-blue-100 z-10">
-                      งานบริการ
+                      งานทั่วไป
                     </div>
                   )}
 
-                  {/* ข้อมูลลูกค้าและประเภทงาน */}
+                  {/* ข้อมูลผู้จ้าง */}
                   <div className="flex items-center gap-3 mb-4 pr-16">
                     <div className="w-12 h-12 rounded-full overflow-hidden bg-slate-100 shrink-0 border border-slate-200">
                       {job.employer_avatar ? (
@@ -172,7 +170,7 @@ export default async function JobBoardPage({ searchParams }: PageProps) {
                     <div>
                       <h3 className="font-black text-gray-800 text-sm">{job.category ? `หมวด: ${job.category}` : job.title}</h3>
                       <p className="text-[10px] text-gray-500 font-medium flex items-center gap-1 mt-0.5">
-                        👤 {job.employer_name || 'ไม่ระบุชื่อ'} <span className="text-gray-300">•</span> <span className="text-[#0082FA] font-bold">{timeAgo(job.created_at)}</span>
+                        👤 {job.employer_name || 'ไม่ระบุผู้จ้าง'} <span className="text-gray-300">•</span> <span className="text-[#0082FA] font-bold">{timeAgo(job.created_at)}</span>
                       </p>
                     </div>
                   </div>
@@ -201,8 +199,8 @@ export default async function JobBoardPage({ searchParams }: PageProps) {
                   )}
 
                   {/* โน้ตเพิ่มเติม */}
-                  <p className="text-[11px] text-gray-600 font-medium leading-relaxed mb-4 bg-yellow-50/50 p-2.5 rounded-lg border border-yellow-100/50 line-clamp-2">
-                    <span className="font-bold text-gray-800">รายละเอียด:</span> {job.description}
+                  <p className="text-[11px] text-gray-600 font-medium leading-relaxed mb-4 bg-blue-50/50 p-2.5 rounded-lg border border-blue-100/50 line-clamp-2">
+                    <span className="font-bold text-[#0082FA]">รายละเอียด:</span> {job.description}
                   </p>
 
                   {/* Footer: ราคาและปุ่มรับงาน */}
@@ -214,7 +212,7 @@ export default async function JobBoardPage({ searchParams }: PageProps) {
                       </span>
                     </div>
                     <button className="bg-[#0082FA] text-white px-6 py-2.5 rounded-full text-xs font-black shadow-md hover:bg-[#0070D6] transition-all">
-                      รับงานนี้ 🚀
+                      สมัคร / รับงาน 🚀
                     </button>
                   </div>
                 </Link>
@@ -223,14 +221,14 @@ export default async function JobBoardPage({ searchParams }: PageProps) {
           </main>
         </div>
 
-        {/* ✅ Bottom Navigation (ใช้เมนูเดิมที่สวยงามของบีสาม) */}
+        {/* ✅ Bottom Navigation (ไอคอน Emoji + Active สีฟ้าสำหรับหน้านี้โดยเฉพาะ) */}
         <div className="fixed bottom-0 w-full sm:max-w-2xl md:max-w-3xl bg-white/95 backdrop-blur-md border-t border-gray-100 px-1 py-4 flex justify-between items-center shadow-[0_-4px_25px_rgba(0,0,0,0.06)] rounded-t-[2.5rem] z-50">
-          <NavItem icon="🏠" label="หน้าแรก" active={false} href="/" />
-          <NavItem icon="🛠️" label="บริการ" active={false} href="/services" />
-          <NavItem icon="📋" label="งานด่วน" active={true} href="/job-board" />
-          <NavItem icon="📰" label="ข่าวสาร" active={false} href="/news" />
-          <NavItem icon="🎟️" label="ปองเจริญ" active={false} href="/coupons" />
-          <NavItem icon="👤" label="ฉัน" active={false} href="/profile" />
+          <NavItem icon="🏠" label="หน้าแรก" active={ACTIVE_NAV === "home"} href="/" />
+          <NavItem icon="🛠️" label="บริการ" active={ACTIVE_NAV === "services"} href="/services" />
+          <NavItem icon="📋" label="งานด่วน" active={ACTIVE_NAV === "jobs"} href="/jobs" />
+          <NavItem icon="📰" label="ข่าวสาร" active={ACTIVE_NAV === "news"} href="/news" />
+          <NavItem icon="🎟️" label="ปองเจริญ" active={ACTIVE_NAV === "coupons"} href="/coupons" />
+          <NavItem icon="👤" label="ฉัน" active={ACTIVE_NAV === "profile"} href="/profile" />
         </div>
       </div>
 
@@ -242,13 +240,13 @@ export default async function JobBoardPage({ searchParams }: PageProps) {
   );
 }
 
-// คอมโพเนนต์เมนูด้านล่าง (ปรับให้ใช้ Link เพื่อรองรับ Server Component)
+// คอมโพเนนต์เมนูด้านล่าง (ปรับ Active เป็นสีฟ้า #0082FA เฉพาะหน้า Jobs)
 function NavItem({ icon, label, active, href }: { icon: string, label: string, active: boolean, href: string }) {
   return (
     <Link href={href} className={`flex flex-col items-center gap-1.5 cursor-pointer transition-all ${active ? 'scale-110' : 'opacity-40 hover:opacity-100'} flex-1`}>
       <span className="text-[22px]">{icon}</span>
-      <span className={`text-[9px] font-bold ${active ? 'text-[#EE4D2D]' : 'text-gray-500'} whitespace-nowrap`}>{label}</span>
-      {active && <div className="w-1.5 h-1.5 bg-[#EE4D2D] rounded-full shadow-sm mt-0.5"></div>}
+      <span className={`text-[9px] font-bold ${active ? 'text-[#0082FA]' : 'text-gray-500'} whitespace-nowrap`}>{label}</span>
+      {active && <div className="w-1.5 h-1.5 bg-[#0082FA] rounded-full shadow-sm mt-0.5"></div>}
     </Link>
   );
 }
