@@ -59,7 +59,7 @@ export default async function ServicesPage({ searchParams }: PageProps) {
     <div className="min-h-screen bg-gray-100 flex justify-center pb-24 font-sans">
       <div className="w-full sm:max-w-2xl md:max-w-3xl bg-[#F4F6F8] min-h-screen relative flex flex-col shadow-xl overflow-x-hidden">
         
-        {/* 🟠 Header (คืนชีพสีส้มไล่สีสุดพรีเมียมจากโค้ดเก่าของบีสาม) */}
+        {/* 🟠 Header (สีส้มไล่สีสุดพรีเมียม) */}
         <div className="bg-gradient-to-b from-[#EE4D2D] to-[#FF7337] rounded-[2.5rem] p-6 pt-8 shadow-md relative z-20 m-3 mt-4">
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-white text-2xl font-black tracking-tight">ค้นหาช่าง / บริการ</h1>
@@ -72,7 +72,7 @@ export default async function ServicesPage({ searchParams }: PageProps) {
             </Link>
           </div>
 
-          {/* ช่องค้นหาสไตล์โค้ดเก่าที่บีสามชอบ */}
+          {/* ช่องค้นหาสไตล์พรีเมียม */}
           <form action="/services" method="GET" className="relative bg-white rounded-2xl p-1.5 flex items-center shadow-lg shadow-black/5 mb-4">
             {category !== "all" && <input type="hidden" name="category" value={category} />}
             <div className="pl-3 pr-2 text-gray-400">🔍</div>
@@ -84,7 +84,7 @@ export default async function ServicesPage({ searchParams }: PageProps) {
             />
           </form>
 
-          {/* 🔘 Categories Pills แบบเลื่อนได้ (ปรับให้เข้ากับพื้นหลังสีส้ม) */}
+          {/* 🔘 Categories Pills แบบเลื่อนได้ */}
           <div className="-mx-6 px-6 overflow-x-auto scrollbar-hide">
             <div className="flex gap-2 w-max pb-2">
               {CATEGORIES.map((c) => {
@@ -140,17 +140,6 @@ export default async function ServicesPage({ searchParams }: PageProps) {
             ))}
           </div>
         </main>
-
-        {/* ✅ Bottom Navigation (คืนชีพเมนู Emoji 6 อัน สีส้มแดง) */}
-        <div className="fixed bottom-0 w-full sm:max-w-2xl md:max-w-3xl bg-white/95 backdrop-blur-md border-t border-gray-100 px-1 py-4 flex justify-between items-center shadow-[0_-4px_25px_rgba(0,0,0,0.06)] rounded-t-[2.5rem] z-50">
-          <NavItem icon="🏠" label="หน้าหลัก" active={false} href="/" />
-          <NavItem icon="🛠️" label="บริการ" active={true} href="/services" />
-          <NavItem icon="📋" label="งานด่วน" active={false} href="/job-board" />
-          <NavItem icon="📰" label="ข่าวสาร" active={false} href="/news" />
-          <NavItem icon="🎟️" label="ปองเจริญ" active={false} href="/coupons" />
-          <NavItem icon="👤" label="ฉัน" active={false} href="/profile" />
-        </div>
-
       </div>
 
       <style dangerouslySetInnerHTML={{__html: `
@@ -223,16 +212,6 @@ function ServiceCard({ service }: { service: Service }) {
           </div>
         </div>
       </div>
-    </Link>
-  );
-}
-
-function NavItem({ icon, label, active, href }: { icon: string, label: string, active: boolean, href: string }) {
-  return (
-    <Link href={href} className={`flex flex-col items-center gap-1.5 cursor-pointer transition-all ${active ? 'scale-110' : 'opacity-40 hover:opacity-100'} flex-1`}>
-      <span className="text-[22px]">{icon}</span>
-      <span className={`text-[9px] font-bold ${active ? 'text-[#EE4D2D]' : 'text-gray-500'} whitespace-nowrap`}>{label}</span>
-      {active && <div className="w-1.5 h-1.5 bg-[#EE4D2D] rounded-full shadow-sm mt-0.5"></div>}
     </Link>
   );
 }
