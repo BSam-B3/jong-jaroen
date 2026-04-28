@@ -1,24 +1,23 @@
-import { notFound, redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+import { notFound } from 'next/navigation';
+import { requireAdmin } from '../../_lib/requireAdmin';
 import KycReviewClient from './KycReviewClient';
 
-export default async function KycReviewPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function AdminKycReviewPage({ params }: any) {
   const { id } = await params;
-  const supabase = await createClient();
+  const { sb } = await requireAdmin(`/admin/kyc/${id}`);
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/auth/login');
-
-  const { data: profile } = await supabase
+  const { data: profile } = await sb
     .from('profiles')
-    .select('*')
+    .select('id, full_name, national_id, date_of_birth, address, kyc_status, id_card_url, kyc_reviewed_at')
     .eq('id', id)
     .single();
 
   if (!profile) notFound();
 
-  // ลิงก์รูปจะเรียกผ่าน API Proxy ที่เราสร้างไว้ในข้อ 2
-  const imageProxyUrl = `/api/admin/kyc/${id}/image`;
-
-  return <KycReviewClient profile={profile} imageProxyUrl={imageProxyUrl} userId={id} />;
+  return (
+    <KycReviewClient 
+      profile={profile} 
+      imageProxyUrl={profile.id_card_url ? `/api/admin/kyc/${profile.id}/image` : null} 
+    />
+  );
 }
