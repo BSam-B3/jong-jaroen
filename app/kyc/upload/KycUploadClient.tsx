@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
-import { compressImage } from '@/lib/image-compress';
+import { compressImage } from '../../lib/image-compress';
 
 type Step = 'id_card' | 'selfie' | 'review' | 'uploading';
 
