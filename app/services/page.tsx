@@ -23,15 +23,19 @@ interface PageProps {
   searchParams: Promise<{ category?: string; q?: string }>;
 }
 
+// อัปเดตหมวดหมู่อาชีพสไตล์ Fastwork ชุมชน
 const CATEGORIES = [
   { key: "all", label: "ทั้งหมด", icon: "✨" },
-  { key: "ล้างแอร์", label: "ล้างแอร์", icon: "❄️" },
-  { key: "ทำความสะอาด", label: "ทำความสะอาด", icon: "🧹" },
-  { key: "ซ่อมท่อ", label: "ซ่อมท่อ", icon: "🔧" },
-  { key: "ซ่อมไฟฟ้า", label: "ซ่อมไฟฟ้า", icon: "💡" },
-  { key: "ขนย้าย", label: "ขนย้าย", icon: "📦" },
-  { key: "สวน", label: "ดูแลสวน", icon: "🌿" },
-  { key: "ช่างทั่วไป", label: "ช่างทั่วไป", icon: "🛠️" },
+  { key: "แม่บ้าน", label: "แม่บ้าน/ทำความสะอาด", icon: "🧹" },
+  { key: "ช่างแอร์", label: "ช่างล้างแอร์", icon: "❄️" },
+  { key: "ช่างซ่อม", label: "ช่างไฟ/ประปา", icon: "🔧" },
+  { key: "ขนย้าย", label: "รับจ้างขนย้าย", icon: "🚚" },
+  { key: "วินส่งของ", label: "วิน/ส่งของ", icon: "🛵" },
+  { key: "ทำสวน", label: "ดูแลสวน/ตัดหญ้า", icon: "🌿" },
+  { key: "ผู้สูงอายุ", label: "ดูแลผู้สูงอายุ/เด็ก", icon: "👵" },
+  { key: "นวด", label: "นวดแผนไทย", icon: "💆‍♀️" },
+  { key: "ทำอาหาร", label: "ทำอาหาร/จัดเลี้ยง", icon: "🍳" },
+  { key: "เอกสาร", label: "เอกสาร/แอดมิน", icon: "💻" },
 ];
 
 function formatPrice(n: number): string {
@@ -59,7 +63,7 @@ export default async function ServicesPage({ searchParams }: PageProps) {
         <header className="sticky top-0 z-20 bg-white border-b border-slate-100 shadow-sm">
           <div className="px-4 pt-4 pb-3">
             <div className="flex items-center justify-between mb-4">
-              <h1 className="text-2xl font-black text-slate-800">บริการชุมชน</h1>
+              <h1 className="text-2xl font-black text-slate-800">ค้นหาช่าง / บริการ</h1>
               <Link
                 href="/notifications"
                 className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition"
@@ -78,7 +82,7 @@ export default async function ServicesPage({ searchParams }: PageProps) {
               <input
                 name="q"
                 defaultValue={search}
-                placeholder="ค้นหาช่าง หรือ บริการที่ต้องการ..."
+                placeholder="ค้นหาชื่อช่าง, บริการ..."
                 className="w-full pl-11 pr-4 py-3 bg-slate-100 rounded-2xl text-sm font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#EE4D2D]/30 focus:bg-white border border-transparent focus:border-[#EE4D2D]/30 transition-all"
               />
               <svg
@@ -138,8 +142,8 @@ export default async function ServicesPage({ searchParams }: PageProps) {
 
           {!error && services.length === 0 && (
             <div className="text-center py-20">
-              <div className="text-6xl mb-4">🔍</div>
-              <p className="text-xl font-black text-slate-800">ไม่พบบริการที่ค้นหา</p>
+              <div className="text-6xl mb-4">🤷‍♂️</div>
+              <p className="text-xl font-black text-slate-800">ยังไม่มีช่างในหมวดหมู่นี้</p>
               <p className="text-sm font-medium text-slate-500 mt-2">ลองเลือกหมวดหมู่อื่นหรือเปลี่ยนคำค้นดูนะคะ</p>
             </div>
           )}
@@ -151,14 +155,14 @@ export default async function ServicesPage({ searchParams }: PageProps) {
           </div>
         </main>
 
-        {/* ✅ Bottom Navigation (ใช้เมนู Emoji ตามมาตรฐานแอป) */}
+        {/* ✅ Bottom Navigation (โหมดลูกค้า สีส้มแดง) */}
         <div className="fixed bottom-0 w-full sm:max-w-2xl md:max-w-3xl bg-white/95 backdrop-blur-md border-t border-gray-100 px-1 py-4 flex justify-between items-center shadow-[0_-4px_25px_rgba(0,0,0,0.06)] rounded-t-[2.5rem] z-50">
-          <NavItem icon="🏠" label="หน้าแรก" active={false} href="/" />
+          <NavItem icon="🏠" label="หน้าหลัก" active={false} href="/" />
           <NavItem icon="🛠️" label="บริการ" active={true} href="/services" />
           <NavItem icon="📋" label="งานด่วน" active={false} href="/job-board" />
           <NavItem icon="📰" label="ข่าวสาร" active={false} href="/news" />
-          <NavItem icon="🎟️" label="ปองเจริญ" active={false} href="/coupons" />
-          <NavItem icon="👤" label="ฉัน" active={false} href="/profile" />
+          <NavItem icon="🎟️" label="ลุ้นโชค" active={false} href="/coupons" />
+          <NavItem icon="👤" label="โปรไฟล์" active={false} href="/profile" />
         </div>
       </div>
 
@@ -241,7 +245,7 @@ function ServiceCard({ service }: { service: Service }) {
   );
 }
 
-// คอมโพเนนต์เมนูด้านล่าง
+// คอมโพเนนต์เมนูด้านล่าง (ธีมสีส้มแดง)
 function NavItem({ icon, label, active, href }: { icon: string, label: string, active: boolean, href: string }) {
   return (
     <Link href={href} className={`flex flex-col items-center gap-1.5 cursor-pointer transition-all ${active ? 'scale-110' : 'opacity-40 hover:opacity-100'} flex-1`}>
