@@ -2,22 +2,20 @@ import { notFound } from 'next/navigation';
 import { requireAdmin } from '../../_lib/requireAdmin';
 import KycReviewClient from './KycReviewClient';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export default async function AdminKycReviewPage({ params }: any) {
   const { id } = await params;
   const { sb } = await requireAdmin(`/admin/kyc/${id}`);
 
-  const { data: profile } = await sb
-    .from('profiles')
-    .select('id, full_name, national_id, date_of_birth, address, kyc_status, id_card_url, kyc_reviewed_at')
-    .eq('id', id)
-    .single();
+  // เรียกใช้ RPC ตัวใหม่ ทะลวงตู้เซฟดึง Email มาครบ
+  const { data, error } = await sb.rpc('admin_get_kyc_data', { p_target_user_id: id });
 
-  if (!profile) notFound();
+  if (error || !data) {
+    console.error('KYC ID Fetch Error:', error.message);
+    notFound();
+  }
 
-  return (
-    <KycReviewClient 
-      profile={profile} 
-      imageProxyUrl={profile.id_card_url ? `/api/admin/kyc/${profile.id}/image` : null} 
-    />
-  );
+  return <KycReviewClient profile={data.profile} />;
 }
