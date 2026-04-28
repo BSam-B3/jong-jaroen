@@ -142,7 +142,4 @@ export default async function ServicesPage({ searchParams }: PageProps) {
         </main>
 
         {/* ✅ Bottom Navigation (คืนชีพเมนู Emoji สีส้มแดงที่ถูกต้อง!) */}
-        <div className="fixed bottom-0 w-full sm:max-w-2xl md:max-w-3xl bg-white/95 backdrop-blur-md border-t border-gray-100 px-1 py-4 flex justify-between items-center shadow-[0_-4px_25px_rgba(0,0,0,0.06)] rounded-t-[2.5rem] z-50">
-          <NavItem icon="🏠" label="หน้าหลัก" active={false} href="/" />
-          <NavItem icon="🛠️" label="บริการ" active={true} href="/services" />
-          <NavItem icon="📋" label="งานด
+        <div className="fixed bottom-0 w-full sm:max-w-2xl md:max-w-3xl bg-white/95 backdrop-blur-md border-t border-gray-100 px-1 py-4 flex justify-between items-center shadow-[0_-4px_25px_rgba(0,0,0,
