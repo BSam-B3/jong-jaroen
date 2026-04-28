@@ -34,7 +34,6 @@ const CATEGORIES = [
 ];
 
 const DEFAULT_FILTER = "งานประจำ";
-const ACTIVE_NAV = "jobs";
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -96,7 +95,7 @@ export default async function JobBoardPage({ searchParams }: PageProps) {
               <div className="flex gap-2 w-max pb-2 pt-2">
                 {CATEGORIES.map((c) => {
                   const active = filter === c.key;
-                  const href = c.key === "all" ? "/jobs?filter=all" : `/jobs?filter=${encodeURIComponent(c.key)}`;
+                  const href = c.key === "all" ? "/job-board" : `/job-board?filter=${encodeURIComponent(c.key)}`;
                   return (
                     <Link
                       key={c.key}
@@ -139,7 +138,7 @@ export default async function JobBoardPage({ searchParams }: PageProps) {
             )}
 
             <div className="space-y-4">
-              {jobs.map((job) => (
+              {jobs.map((job: any) => (
                 <Link
                   href={`/jobs/${job.id}`}
                   key={job.id}
@@ -221,14 +220,14 @@ export default async function JobBoardPage({ searchParams }: PageProps) {
           </main>
         </div>
 
-        {/* ✅ Bottom Navigation (ไอคอน Emoji + Active สีฟ้าสำหรับหน้านี้โดยเฉพาะ) */}
+        {/* ✅ Bottom Navigation (Hardcode ค่า Active เพื่อเลี่ยงปัญหา Error Comparison) */}
         <div className="fixed bottom-0 w-full sm:max-w-2xl md:max-w-3xl bg-white/95 backdrop-blur-md border-t border-gray-100 px-1 py-4 flex justify-between items-center shadow-[0_-4px_25px_rgba(0,0,0,0.06)] rounded-t-[2.5rem] z-50">
-          <NavItem icon="🏠" label="หน้าแรก" active={ACTIVE_NAV === "home"} href="/" />
-          <NavItem icon="🛠️" label="บริการ" active={ACTIVE_NAV === "services"} href="/services" />
-          <NavItem icon="📋" label="งานด่วน" active={ACTIVE_NAV === "jobs"} href="/jobs" />
-          <NavItem icon="📰" label="ข่าวสาร" active={ACTIVE_NAV === "news"} href="/news" />
-          <NavItem icon="🎟️" label="ปองเจริญ" active={ACTIVE_NAV === "coupons"} href="/coupons" />
-          <NavItem icon="👤" label="ฉัน" active={ACTIVE_NAV === "profile"} href="/profile" />
+          <NavItem icon="🏠" label="หน้าแรก" active={false} href="/" />
+          <NavItem icon="🛠️" label="บริการ" active={false} href="/services" />
+          <NavItem icon="📋" label="งานด่วน" active={true} href="/job-board" />
+          <NavItem icon="📰" label="ข่าวสาร" active={false} href="/news" />
+          <NavItem icon="🎟️" label="ปองเจริญ" active={false} href="/coupons" />
+          <NavItem icon="👤" label="ฉัน" active={false} href="/profile" />
         </div>
       </div>
 
@@ -240,7 +239,7 @@ export default async function JobBoardPage({ searchParams }: PageProps) {
   );
 }
 
-// คอมโพเนนต์เมนูด้านล่าง (ปรับ Active เป็นสีฟ้า #0082FA เฉพาะหน้า Jobs)
+// คอมโพเนนต์เมนูด้านล่าง (ธีมสีฟ้าสำหรับหน้านี้)
 function NavItem({ icon, label, active, href }: { icon: string, label: string, active: boolean, href: string }) {
   return (
     <Link href={href} className={`flex flex-col items-center gap-1.5 cursor-pointer transition-all ${active ? 'scale-110' : 'opacity-40 hover:opacity-100'} flex-1`}>
