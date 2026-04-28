@@ -20,14 +20,16 @@ export default function KycApprovalPage() {
     async function fetchData() {
       try {
         // 1. ดึงข้อมูลโปรไฟล์
-        const { data: profileData } = await supabase
+        const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', userId)
           .single();
+
+        if (profileError) throw profileError;
         setProfile(profileData);
 
-        // 2. ดึงรูปภาพ (ดึงจากโฟลเดอร์ userId ใน Storage)
+        // 2. ดึงรูปภาพ (ค้นหาในโฟลเดอร์ userId ใน Storage)
         const { data: files } = await supabase.storage.from('kyc_documents').list(userId);
         if (files && files.length > 0) {
           const imageFile = files.find(f => /\.(jpe?g|png|webp)$/i.test(f.name));
@@ -46,8 +48,7 @@ export default function KycApprovalPage() {
   }, [userId]);
 
   const handleDecision = async (decision: 'approved' | 'rejected') => {
-    const confirmMsg = decision === 'approved' ? 'อนุมัติ' : 'ปฏิเสธ';
-    if (!confirm(`คุณแน่ใจหรือไม่ที่จะ ${confirmMsg} ผู้ใช้นี้?`)) return;
+    if (!confirm(`คุณแน่ใจหรือไม่ที่จะ ${decision === 'approved' ? 'อนุมัติ' : 'ปฏิเสธ'} ผู้ใช้นี้?`)) return;
 
     setIsSubmitting(true);
     try {
