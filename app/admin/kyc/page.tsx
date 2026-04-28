@@ -1,40 +1,22 @@
-import { requireAdmin } from '../_lib/requireAdmin';
-import KycListClient, { type KycListResponse } from './KycListClient';
+import { notFound } from 'next/navigation';
+import { requireAdmin } from '../../_lib/requireAdmin';
+import KycReviewClient from './KycReviewClient';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-const PAGE_SIZE = 20;
+export default async function AdminKycReviewPage({ params }: any) {
+  const { id } = await params;
+  const { sb } = await requireAdmin(`/admin/kyc/${id}`);
 
-type SearchParams = { page?: string };
+  // เรียกใช้ RPC ตัวใหม่ ทะลวงตู้เซฟดึง Email มาครบ
+  const { data, error } = await sb.rpc('admin_get_kyc_data', { p_target_user_id: id });
 
-export default async function AdminKYCPage({
-  searchParams,
-}: {
-  searchParams: Promise<SearchParams>;
-}) {
-  const { sb } = await requireAdmin('/admin/kyc');
-  const { page } = await searchParams;
-
-  const pageNum = Math.max(1, Number.parseInt(page ?? '1', 10) || 1);
-  const offset = (pageNum - 1) * PAGE_SIZE;
-
-  const { data, error } = await sb.rpc('admin_list_pending_kyc', {
-    p_limit: PAGE_SIZE,
-    p_offset: offset,
-  });
-
-  if (error) {
-    console.error('[admin/kyc] rpc error:', error.message);
-    throw new Error('ไม่สามารถโหลดรายการ KYC ได้');
+  // แก้ไขจุดนี้: ป้องกัน Error เป็น null
+  if (error || !data) {
+    console.error('KYC ID Fetch Error:', error?.message || 'No data found');
+    notFound();
   }
 
-  const safe: KycListResponse = {
-    total: data?.total ?? 0,
-    limit: data?.limit ?? PAGE_SIZE,
-    offset: data?.offset ?? 0,
-    items: Array.isArray(data?.items) ? data.items : [],
-  };
-
-  return <KycListClient data={safe} pageNum={pageNum} pageSize={PAGE_SIZE} />;
+  return <KycReviewClient profile={data.profile} />;
 }
