@@ -20,28 +20,32 @@ export default function KycApprovalPage() {
     async function fetchData() {
       try {
         // 1. ดึงข้อมูลโปรไฟล์ (รวมถึง id_card_url จาก DB)
-        const { data: profileData } = await supabase
+        const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', userId)
           .single();
-        
+
+        if (profileError) throw profileError;
         setProfile(profileData);
 
         // 2. ดึงรูปภาพ: ใช้จาก DB ก่อน ถ้าไม่มีค่อยไปควานหาใน Storage
         if (profileData?.id_card_url) {
-          const { data } = await supabase.storage
+          const { data } = supabase.storage
             .from('kyc_documents')
-            .createSignedUrl(profileData.id_card_url.trim(), 3600); // ลิงก์มีอายุ 1 ชม.
-          if (data?.signedUrl) setImageUrl(data.signedUrl);
+            .getPublicUrl(profileData.id_card_url.trim());
+          setImageUrl(data.publicUrl);
         } else {
+          // แผนสำรอง: ถ้าใน DB ไม่มีชื่อไฟล์ ให้ไป list ดูในโฟลเดอร์ userId
           const { data: files } = await supabase.storage.from('kyc_documents').list(userId);
-          const imageFile = files?.find(f => /\.(jpe?g|png|webp)$/i.test(f.name));
-          if (imageFile) {
-            const { data } = await supabase.storage
-              .from('kyc_documents')
-              .createSignedUrl(`${userId}/${imageFile.name}`, 3600);
-            if (data?.signedUrl) setImageUrl(data.signedUrl);
+          if (files && files.length > 0) {
+            const imageFile = files.find(f => /\.(jpe?g|png|webp)$/i.test(f.name));
+            if (imageFile) {
+              const { data } = supabase.storage
+                .from('kyc_documents')
+                .getPublicUrl(`${userId}/${imageFile.name}`);
+              setImageUrl(data.publicUrl);
+            }
           }
         }
       } catch (err) {
@@ -54,7 +58,9 @@ export default function KycApprovalPage() {
   }, [userId]);
 
   const handleDecision = async (decision: 'approved' | 'rejected') => {
-    if (!confirm(`คุณแน่ใจหรือไม่ที่จะ ${decision === 'approved' ? 'อนุมัติ' : 'ปฏิเสธ'} ผู้ใช้นี้?`)) return;
+    const confirmMsg = decision === 'approved' ? 'อนุมัติ' : 'ปฏิเสธ';
+    if (!confirm(`คุณแน่ใจหรือไม่ที่จะ ${confirmMsg} ผู้ใช้นี้?`)) return;
+
     setIsSubmitting(true);
     try {
       const res = await fetch('/api/admin/kyc/approve', {
@@ -63,13 +69,21 @@ export default function KycApprovalPage() {
         body: JSON.stringify({ 
           user_id: userId, 
           decision, 
-          reviewer_note: `Admin Review: ${new Date().toLocaleString('th-TH')}` 
+          reviewer_note: `ตรวจสอบโดยแอดมิน เมื่อ ${new Date().toLocaleString('th-TH')}` 
         })
       });
-      if (res.ok) { alert('บันทึกเรียบร้อยค่ะ!'); router.push('/admin/kyc'); }
-      else alert('เกิดข้อผิดพลาดในการบันทึกค่ะ');
-    } catch (error) { alert('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ค่ะ'); } 
-    finally { setIsSubmitting(false); }
+
+      if (res.ok) {
+        alert('บันทึกเรียบร้อยค่ะ!');
+        router.push('/admin/kyc');
+      } else {
+        alert('เกิดข้อผิดพลาดในการบันทึกค่ะ');
+      }
+    } catch (error) {
+      alert('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ค่ะ');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center font-bold text-gray-500">กำลังโหลดข้อมูล...</div>;
@@ -77,25 +91,37 @@ export default function KycApprovalPage() {
 
   return (
     <div className="min-h-screen bg-[#F4F6F8] flex justify-center font-sans pb-24 text-left">
+      
       {/* 🔍 ระบบซูมรูปภาพ */}
       {isZoomed && imageUrl && (
-        <div className="fixed inset-0 bg-black/95 z-[100] flex justify-center items-center p-4 cursor-zoom-out" onClick={() => setIsZoomed(false)}>
+        <div 
+          className="fixed inset-0 bg-black/95 z-[100] flex justify-center items-center p-4 cursor-zoom-out animate-in fade-in duration-300"
+          onClick={() => setIsZoomed(false)}
+        >
           <img src={imageUrl} alt="Zoomed ID" className="max-w-full max-h-[90vh] object-contain rounded-xl shadow-2xl" />
         </div>
       )}
 
       <div className="w-full max-w-3xl bg-white min-h-screen shadow-xl p-6 md:p-10 border-x">
-        <button onClick={() => router.back()} className="text-sm font-bold text-blue-500 mb-6 flex items-center gap-1 hover:underline">← กลับไปหน้าแอดมิน</button>
+        <button onClick={() => router.back()} className="text-sm font-bold text-blue-500 mb-6 flex items-center gap-1 hover:underline">
+          <span>←</span> กลับไปหน้าแอดมิน
+        </button>
+
         <h1 className="text-2xl font-black text-gray-800 mb-6 border-b pb-4 text-center">พิจารณาเอกสารยืนยันตัวตน</h1>
-        
-        {/* กล่องโชว์รูป */}
+
+        {/* กล่องแสดงรูปบัตรประชาชน */}
         <div className="mb-8">
           <div className="text-sm font-bold text-gray-500 mb-2 uppercase">หลักฐานรูปถ่ายบัตรประชาชน</div>
-          <div className="bg-gray-50 rounded-2xl border overflow-hidden flex items-center justify-center relative aspect-video cursor-zoom-in group shadow-inner" onClick={() => imageUrl && setIsZoomed(true)}>
+          <div 
+            className="bg-gray-50 rounded-2xl border overflow-hidden flex items-center justify-center relative aspect-video cursor-zoom-in group shadow-inner"
+            onClick={() => imageUrl && setIsZoomed(true)}
+          >
             {imageUrl ? (
               <>
                 <img src={imageUrl} alt="ID Card" className="object-contain w-full h-full z-10 transition-transform duration-300 group-hover:scale-[1.02]" />
-                <div className="absolute top-3 right-3 bg-black/60 text-white text-[10px] px-3 py-1 rounded-full z-20 opacity-0 group-hover:opacity-100 transition-opacity">🔍 คลิกเพื่อขยาย</div>
+                <div className="absolute top-3 right-3 bg-black/60 text-white text-[10px] px-3 py-1 rounded-full z-20 opacity-0 group-hover:opacity-100 transition-opacity">
+                  🔍 คลิกเพื่อขยาย
+                </div>
               </>
             ) : (
               <div className="text-gray-400 font-bold text-center p-10">ไม่พบรูปภาพในระบบ</div>
@@ -103,7 +129,7 @@ export default function KycApprovalPage() {
           </div>
         </div>
 
-        {/* ข้อมูลโปรไฟล์ (สวยงามแบบเมื่อวาน) */}
+        {/* ตารางข้อมูลโปรไฟล์ */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10 p-6 bg-gray-50/50 rounded-2xl border shadow-sm">
           <div className="space-y-6">
             <DataField label="ชื่อ-นามสกุล" value={profile.full_name} />
@@ -121,10 +147,22 @@ export default function KycApprovalPage() {
           </div>
         </div>
 
-        {/* ปุ่มควบคุม */}
+        {/* ปุ่มตัดสินใจ */}
         <div className="flex gap-4 sticky bottom-6 bg-white/90 backdrop-blur-md p-4 rounded-2xl border shadow-lg z-30">
-          <button onClick={() => handleDecision('approved')} disabled={isSubmitting} className="flex-1 bg-green-500 text-white py-4 rounded-xl font-black text-lg shadow-md active:scale-95 disabled:opacity-50">อนุมัติ ✅</button>
-          <button onClick={() => handleDecision('rejected')} disabled={isSubmitting} className="flex-1 bg-red-500 text-white py-4 rounded-xl font-black text-lg shadow-md active:scale-95 disabled:opacity-50">ปฏิเสธ ❌</button>
+          <button 
+            onClick={() => handleDecision('approved')} 
+            disabled={isSubmitting} 
+            className="flex-1 bg-green-500 text-white py-4 rounded-xl font-black text-lg shadow-md active:scale-95 disabled:opacity-50"
+          >
+            อนุมัติ ✅
+          </button>
+          <button 
+            onClick={() => handleDecision('rejected')} 
+            disabled={isSubmitting} 
+            className="flex-1 bg-red-500 text-white py-4 rounded-xl font-black text-lg shadow-md active:scale-95 disabled:opacity-50"
+          >
+            ปฏิเสธ ❌
+          </button>
         </div>
       </div>
       <BottomNav />
@@ -132,6 +170,7 @@ export default function KycApprovalPage() {
   );
 }
 
+// คอมโพเนนต์แสดงกล่องข้อมูล
 function DataField({ label, value, isMono = false, isAddress = false }: any) {
   return (
     <div className="text-left">
