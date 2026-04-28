@@ -23,7 +23,7 @@ interface PageProps {
   searchParams: Promise<{ category?: string; q?: string }>;
 }
 
-// หมวดหมู่อาชีพใหม่สไตล์ Fastwork ชุมชน (Emoji ครบถ้วน)
+// หมวดหมู่อาชีพสไตล์ Fastwork ชุมชน
 const CATEGORIES = [
   { key: "all", label: "ทั้งหมด", icon: "✨" },
   { key: "แม่บ้าน", label: "แม่บ้าน/ทำความสะอาด", icon: "🧹" },
@@ -141,5 +141,98 @@ export default async function ServicesPage({ searchParams }: PageProps) {
           </div>
         </main>
 
-        {/* ✅ Bottom Navigation (คืนชีพเมนู Emoji สีส้มแดงที่ถูกต้อง!) */}
-        <div className="fixed bottom-0 w-full sm:max-w-2xl md:max-w-3xl bg-white/95 backdrop-blur-md border-t border-gray-100 px-1 py-4 flex justify-between items-center shadow-[0_-4px_25px_rgba(0,0,0,
+        {/* ✅ Bottom Navigation */}
+        <div className="fixed bottom-0 w-full sm:max-w-2xl md:max-w-3xl bg-white/95 backdrop-blur-md border-t border-gray-100 px-1 py-4 flex justify-between items-center shadow-[0_-4px_25px_rgba(0,0,0,0.06)] rounded-t-[2.5rem] z-50">
+          <NavItem icon="🏠" label="หน้าหลัก" active={false} href="/" />
+          <NavItem icon="🛠️" label="บริการ" active={true} href="/services" />
+          <NavItem icon="📋" label="งานด่วน" active={false} href="/job-board" />
+          <NavItem icon="📰" label="ข่าวสาร" active={false} href="/news" />
+          <NavItem icon="🎟️" label="ลุ้นโชค" active={false} href="/coupons" />
+          <NavItem icon="👤" label="โปรไฟล์" active={false} href="/profile" />
+        </div>
+
+      </div>
+
+      <style dangerouslySetInnerHTML={{__html: `
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+      `}} />
+    </div>
+  );
+}
+
+// ---------------- Components ---------------- //
+
+function ServiceCard({ service }: { service: Service }) {
+  const isVerified = service.provider_kyc_status === "approved";
+
+  return (
+    <Link
+      href={`/services/${service.id}`}
+      className="flex flex-col bg-white rounded-[1.5rem] overflow-hidden border border-slate-100 shadow-sm hover:border-[#EE4D2D]/30 hover:shadow-md transition-all active:scale-[0.98] group"
+    >
+      {/* Cover Image (4:3) */}
+      <div className="relative w-full aspect-[4/3] bg-slate-200 overflow-hidden">
+        {service.cover_image_url ? (
+          <img src={service.cover_image_url} alt={service.title} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-4xl bg-slate-100 text-slate-300">🛠️</div>
+        )}
+      </div>
+
+      <div className="p-3.5 flex flex-col flex-1">
+        {/* Provider Row */}
+        <div className="flex items-center gap-1.5 mb-2">
+          <div className="w-5 h-5 rounded-full overflow-hidden bg-slate-200 shrink-0 border border-slate-50">
+            {service.provider_avatar ? (
+              <img src={service.provider_avatar} alt="Provider" className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-[8px] font-black text-slate-500">
+                {service.provider_name?.charAt(0).toUpperCase() || "?"}
+              </div>
+            )}
+          </div>
+          <span className="text-[10px] font-bold text-slate-500 truncate flex-1">{service.provider_name || "ไม่ระบุชื่อช่าง"}</span>
+          {isVerified && (
+            <span className="w-3.5 h-3.5 rounded-full bg-green-500 flex items-center justify-center shadow-sm">
+              <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" strokeWidth={4} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            </span>
+          )}
+        </div>
+
+        {/* Title */}
+        <h3 className="text-[13px] font-black text-slate-800 line-clamp-2 leading-relaxed min-h-[38px] mb-2">
+          {service.title}
+        </h3>
+
+        {/* Rating Row */}
+        <div className="flex items-center gap-1 mb-3">
+          <span className="text-yellow-400 text-xs">⭐</span>
+          <span className="text-[11px] font-black text-slate-700">{Number(service.rating || 0).toFixed(1)}</span>
+          <span className="text-[10px] font-bold text-slate-400">({service.review_count || 0})</span>
+        </div>
+
+        {/* Price Row */}
+        <div className="mt-auto pt-2.5 border-t border-slate-50 flex flex-col">
+          <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter mb-0.5">เริ่มต้นที่</span>
+          <div className="flex items-baseline gap-0.5">
+            <span className="text-sm font-black text-[#EE4D2D]">{formatPrice(service.starting_price)}</span>
+            <span className="text-[10px] font-black text-[#EE4D2D]">บาท</span>
+          </div>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function NavItem({ icon, label, active, href }: { icon: string, label: string, active: boolean, href: string }) {
+  return (
+    <Link href={href} className={`flex flex-col items-center gap-1.5 cursor-pointer transition-all ${active ? 'scale-110' : 'opacity-40 hover:opacity-100'} flex-1`}>
+      <span className="text-[22px]">{icon}</span>
+      <span className={`text-[9px] font-bold ${active ? 'text-[#EE4D2D]' : 'text-gray-500'} whitespace-nowrap`}>{label}</span>
+      {active && <div className="w-1.5 h-1.5 bg-[#EE4D2D] rounded-full shadow-sm mt-0.5"></div>}
+    </Link>
+  );
+}
