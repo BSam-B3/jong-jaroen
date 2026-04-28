@@ -9,7 +9,7 @@ interface Job {
   title: string;
   description: string;
   category: string;
-  budget: number;
+  budget: number | null;
   location: string;
   status: string;
   is_urgent: boolean;
@@ -20,19 +20,20 @@ interface Job {
 }
 
 interface PageProps {
-  searchParams: Promise<{ category?: string }>;
+  searchParams: Promise<{ filter?: string }>;
 }
 
+// อัปเดตหมวดหมู่ใหม่ตามบรีฟ พร้อมไอคอน Emoji ที่เข้ากับแอป
 const CATEGORIES = [
   { key: "all", label: "ทั้งหมด", icon: "🗂️" },
-  { key: "urgent", label: "ด่วน", icon: "⚡" },
-  { key: "ac", label: "ซ่อมแอร์", icon: "❄️" },
-  { key: "cleaning", label: "ทำความสะอาด", icon: "🧹" },
-  { key: "ride", label: "รับส่ง", icon: "🛵" },
-  { key: "delivery", label: "ส่งของ", icon: "📦" },
-  { key: "repair", label: "ซ่อมแซม", icon: "🔧" },
-  { key: "other", label: "อื่นๆ", icon: "✨" },
+  { key: "งานประจำ", label: "งานประจำ", icon: "🏢" },
+  { key: "งานขนส่ง", label: "งานขนส่ง", icon: "🚚" },
+  { key: "งานบริการ", label: "งานบริการ", icon: "🛠️" },
+  { key: "งานทั่วไป", label: "งานทั่วไป", icon: "📦" },
+  { key: "บอร์ดหางาน", label: "บอร์ดหางาน", icon: "📋" },
 ];
+
+const DEFAULT_FILTER = "งานประจำ";
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -46,155 +47,205 @@ function timeAgo(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString("th-TH");
 }
 
+function formatBudget(n: number | null): string {
+  if (n === null || n === undefined) return "เสนอราคา";
+  return `${Number(n).toLocaleString("th-TH")} บาท`;
+}
+
 export default async function JobsPage({ searchParams }: PageProps) {
-  const { category = "all" } = await searchParams;
+  const params = await searchParams;
+  const filter = params.filter || DEFAULT_FILTER;
+
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("get_open_jobs");
+  const { data, error } = await supabase.rpc("get_jobs_by_new_categories", {
+    p_filter: filter,
+  });
 
   const jobs: Job[] = (data || []) as Job[];
-  const filtered =
-    category === "all"
-      ? jobs
-      : category === "urgent"
-      ? jobs.filter((j) => j.is_urgent)
-      : jobs.filter((j) => j.category === category);
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-24 font-sans">
-      <div className="max-w-md mx-auto bg-white min-h-screen shadow-sm relative">
+    <div className="min-h-screen bg-gray-100 flex justify-center pb-24 font-sans">
+      <div className="w-full sm:max-w-2xl md:max-w-3xl bg-[#F4F6F8] min-h-screen relative flex flex-col shadow-xl overflow-x-hidden">
         
-        {/* Header & Categories */}
-        <header className="sticky top-0 z-20 bg-white/90 backdrop-blur-md border-b border-slate-100 px-5 py-4">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h1 className="text-2xl font-black text-slate-900 tracking-tight">งานในชุมชน</h1>
-              <p className="text-sm font-bold text-[#EE4D2D]">
-                {filtered.length} งานที่เปิดรับตอนนี้
-              </p>
+        {/* ส่วนเนื้อหาที่ Scroll ได้ */}
+        <div className="flex-1 overflow-y-auto pb-6 scrollbar-hide">
+          
+          {/* 🔵 Header (การ์ดลอย โทนสีฟ้า สำหรับโหมดคนทำงาน) */}
+          <div className="bg-gradient-to-b from-[#0082FA] to-[#00A3FF] rounded-[2.5rem] pt-8 pb-6 px-6 shadow-md relative z-10 m-3 mt-4 overflow-hidden">
+            <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-3xl pointer-events-none"></div>
+            
+            <div className="flex items-center justify-between mb-4 relative z-10">
+              <div className="flex items-center gap-3">
+                <Link href="/" className="text-white font-bold text-lg active:scale-90 transition-transform">←</Link>
+                <h1 className="text-xl font-black text-white tracking-tight">กระดานหางาน</h1>
+              </div>
+              <div className="bg-white/20 px-3 py-1 rounded-full border border-white/30 backdrop-blur-sm">
+                <span className="text-white text-[10px] font-bold flex items-center gap-1.5">
+                  <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></div> พร้อมรับงาน
+                </span>
+              </div>
             </div>
-            <Link
-              href="/"
-              className="w-10 h-10 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors"
-              aria-label="หน้าหลัก"
-            >
-              <svg className="w-5 h-5 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-              </svg>
-            </Link>
+            
+            <p className="text-white/90 text-xs font-medium pl-8 relative z-10 mb-2">
+              {jobs.length} งานที่เปิดรับในพื้นที่ของคุณ
+            </p>
+
+            {/* 🔘 Filter Tabs แบบเลื่อนได้ */}
+            <div className="-mx-6 px-6 overflow-x-auto scrollbar-hide relative z-10">
+              <div className="flex gap-2 w-max pb-2 pt-2">
+                {CATEGORIES.map((c) => {
+                  const active = filter === c.key;
+                  const href = c.key === "all" ? "/jobs?filter=all" : `/jobs?filter=${encodeURIComponent(c.key)}`;
+                  return (
+                    <Link
+                      key={c.key}
+                      href={href}
+                      scroll={false}
+                      className={`shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full text-[12px] font-bold transition-all shadow-sm ${
+                        active
+                          ? "bg-white text-[#0082FA]"
+                          : "bg-white/20 text-white border border-white/30 hover:bg-white/30"
+                      }`}
+                    >
+                      <span>{c.icon}</span>
+                      {c.label}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
           </div>
 
-          <div className="-mx-5 px-5 overflow-x-auto scrollbar-hide">
-            <div className="flex gap-2 w-max pb-2">
-              {CATEGORIES.map((c) => {
-                const active = category === c.key;
-                return (
-                  <Link
-                    key={c.key}
-                    href={c.key === "all" ? "/jobs" : `/jobs?category=${c.key}`}
-                    scroll={false}
-                    className={`shrink-0 px-4 py-2 rounded-xl text-sm font-black border transition-all ${
-                      active
-                        ? "bg-[#EE4D2D] text-white border-[#EE4D2D] shadow-md shadow-orange-500/20"
-                        : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
-                    }`}
-                  >
-                    <span className="mr-1.5">{c.icon}</span>
-                    {c.label}
-                  </Link>
-                );
-              })}
+          {/* 📋 รายการงาน */}
+          <main className="px-5 mt-2 relative z-20 space-y-4">
+            <div className="flex justify-between items-end mb-2 px-1">
+              <h2 className="text-xs font-black text-gray-800 flex items-center gap-2">
+                <span className="text-[#0082FA] text-base">📍</span> งานที่เปิดรับอยู่ตอนนี้
+              </h2>
             </div>
-          </div>
-        </header>
 
-        {/* Job Feed */}
-        <main className="px-5 py-6 space-y-4">
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 text-sm font-bold rounded-2xl p-4 text-center">
-              เกิดข้อผิดพลาดในการโหลดข้อมูลงาน
+            {error && (
+              <div className="bg-red-50 text-red-600 p-4 rounded-xl text-xs font-bold text-center border border-red-100">
+                เกิดข้อผิดพลาดในการโหลดข้อมูล
+              </div>
+            )}
+
+            {!error && jobs.length === 0 && (
+              <div className="text-center py-10 bg-white rounded-3xl border border-gray-100 shadow-sm">
+                <div className="text-4xl mb-2 opacity-50">📭</div>
+                <p className="font-bold text-gray-500 text-sm">ยังไม่มีงานในหมวดหมู่นี้</p>
+              </div>
+            )}
+
+            <div className="space-y-4">
+              {jobs.map((job) => (
+                <Link
+                  href={`/jobs/${job.id}`}
+                  key={job.id}
+                  className="block bg-white rounded-3xl p-5 shadow-sm border border-gray-100 relative overflow-hidden group hover:shadow-md hover:border-[#0082FA]/30 transition-all active:scale-[0.98]"
+                >
+                  {/* 🔴 ป้ายกำกับความด่วน */}
+                  {job.is_urgent ? (
+                    <div className="absolute top-0 right-0 bg-gradient-to-r from-[#FF4B2B] to-[#FF416C] text-white text-[9px] font-black px-4 py-1.5 rounded-bl-2xl shadow-sm z-10 flex items-center gap-1">
+                      <span className="animate-pulse">🔥</span> ด่วนมาก
+                    </div>
+                  ) : (
+                    <div className="absolute top-0 right-0 bg-blue-50 text-blue-600 text-[9px] font-black px-4 py-1.5 rounded-bl-2xl border-b border-l border-blue-100 z-10">
+                      งานบริการ
+                    </div>
+                  )}
+
+                  {/* ข้อมูลลูกค้าและประเภทงาน */}
+                  <div className="flex items-center gap-3 mb-4 pr-16">
+                    <div className="w-12 h-12 rounded-full overflow-hidden bg-slate-100 shrink-0 border border-slate-200">
+                      {job.employer_avatar ? (
+                        <img src={job.employer_avatar} alt="Avatar" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-slate-400 text-lg font-black">
+                          {job.employer_name?.charAt(0) || "?"}
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <h3 className="font-black text-gray-800 text-sm">{job.category ? `หมวด: ${job.category}` : job.title}</h3>
+                      <p className="text-[10px] text-gray-500 font-medium flex items-center gap-1 mt-0.5">
+                        👤 {job.employer_name || 'ไม่ระบุชื่อ'} <span className="text-gray-300">•</span> <span className="text-[#0082FA] font-bold">{timeAgo(job.created_at)}</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* หัวข้องาน */}
+                  <h4 className="font-bold text-slate-800 text-sm mb-2">{job.title}</h4>
+
+                  {/* รายละเอียดเส้นทาง/ที่อยู่ */}
+                  {job.is_urgent ? (
+                    <div className="bg-gray-50 rounded-xl p-3 mb-3 border border-gray-100 relative">
+                      <div className="absolute left-4 top-4 bottom-4 w-0.5 border-l-2 border-dashed border-gray-300"></div>
+                      <div className="flex items-center gap-2.5 mb-2 relative z-10">
+                        <div className="w-2.5 h-2.5 bg-blue-500 rounded-full border-2 border-white shadow-sm shrink-0"></div>
+                        <span className="text-[10px] font-bold text-gray-700 truncate">{job.location || 'จุดรับของ/ผู้โดยสาร'}</span>
+                      </div>
+                      <div className="flex items-center gap-2.5 relative z-10">
+                        <div className="w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white shadow-sm shrink-0"></div>
+                        <span className="text-[10px] font-bold text-gray-700 truncate">ดูพิกัดปลายทางในประกาศ</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-gray-50 rounded-xl p-3 mb-3 border border-gray-100 flex items-start gap-2">
+                      <span className="text-red-500 text-xs shrink-0 mt-0.5">📍</span>
+                      <span className="text-[10px] font-bold text-gray-700 leading-relaxed">{job.location || 'ไม่ระบุสถานที่'}</span>
+                    </div>
+                  )}
+
+                  {/* โน้ตเพิ่มเติม */}
+                  <p className="text-[11px] text-gray-600 font-medium leading-relaxed mb-4 bg-yellow-50/50 p-2.5 rounded-lg border border-yellow-100/50 line-clamp-2">
+                    <span className="font-bold text-gray-800">รายละเอียด:</span> {job.description}
+                  </p>
+
+                  {/* Footer: ราคาและปุ่มรับงาน */}
+                  <div className="flex items-center justify-between border-t border-gray-50 pt-3">
+                    <div>
+                      <span className="text-[9px] text-gray-400 block mb-0.5">ค่าตอบแทน</span>
+                      <span className={`text-sm font-black ${!job.budget ? 'text-orange-500' : 'text-[#0082FA]'}`}>
+                        {formatBudget(job.budget)}
+                      </span>
+                    </div>
+                    <button className="bg-[#0082FA] text-white px-6 py-2.5 rounded-full text-xs font-black shadow-md hover:bg-[#0070D6] transition-all">
+                      รับงานนี้ 🚀
+                    </button>
+                  </div>
+                </Link>
+              ))}
             </div>
-          )}
+          </main>
+        </div>
 
-          {!error && filtered.length === 0 && (
-            <div className="text-center py-20">
-              <div className="text-6xl mb-4">📭</div>
-              <p className="text-xl font-black text-slate-800">ยังไม่มีงานในหมวดนี้</p>
-              <p className="text-sm font-medium text-slate-500 mt-2">ลองเลือกหมวดหมู่อื่น หรือลงประกาศงานของคุณเองสิ!</p>
-            </div>
-          )}
-
-          {filtered.map((job) => (
-            <JobCard key={job.id} job={job} />
-          ))}
-        </main>
-      </div>
-
-      {/* Floating Action Button (+ ลงประกาศงาน) */}
-      <div className="fixed bottom-0 inset-x-0 z-30 pointer-events-none">
-        <div className="max-w-md mx-auto relative h-24">
-          <Link
-            href="/jobs/new"
-            className="pointer-events-auto absolute bottom-6 right-5 flex items-center gap-2 bg-gradient-to-r from-[#EE4D2D] to-[#FF7043] text-white font-black pl-5 pr-6 py-4 rounded-full shadow-lg shadow-orange-500/40 hover:shadow-xl hover:-translate-y-1 active:scale-95 transition-all"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-            </svg>
-            ลงประกาศงาน
-          </Link>
+        {/* ✅ Bottom Navigation (ใช้เมนูเดิมที่สวยงามของบีสาม) */}
+        <div className="fixed bottom-0 w-full sm:max-w-2xl md:max-w-3xl bg-white/95 backdrop-blur-md border-t border-gray-100 px-1 py-4 flex justify-between items-center shadow-[0_-4px_25px_rgba(0,0,0,0.06)] rounded-t-[2.5rem] z-50">
+          <NavItem icon="🏠" label="หน้าแรก" active={false} href="/" />
+          <NavItem icon="🛠️" label="บริการ" active={false} href="/services" />
+          <NavItem icon="📋" label="งานด่วน" active={true} href="/jobs" />
+          <NavItem icon="📰" label="ข่าวสาร" active={false} href="/news" />
+          <NavItem icon="🎟️" label="ปองเจริญ" active={false} href="/coupons" />
+          <NavItem icon="👤" label="ฉัน" active={false} href="/profile" />
         </div>
       </div>
+
+      <style dangerouslySetInnerHTML={{__html: `
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+      `}} />
     </div>
   );
 }
 
-function JobCard({ job }: { job: Job }) {
+// คอมโพเนนต์เมนูด้านล่าง
+function NavItem({ icon, label, active, href }: { icon: string, label: string, active: boolean, href: string }) {
   return (
-    <Link
-      href={`/jobs/${job.id}`}
-      className="block bg-white border border-slate-100 rounded-[1.5rem] p-5 shadow-sm hover:border-orange-300 hover:shadow-md transition-all active:scale-[0.98]"
-    >
-      <div className="flex items-center gap-3 mb-4">
-        <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-100 shrink-0 border border-slate-200">
-          {job.employer_avatar ? (
-            <img src={job.employer_avatar} alt={job.employer_name || "employer"} className="w-full h-full object-cover" />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-slate-400 text-lg font-black">
-              {job.employer_name?.charAt(0).toUpperCase() || "?"}
-            </div>
-          )}
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-black text-slate-800 truncate">
-            {job.employer_name || "ไม่ระบุชื่อผู้จ้าง"}
-          </p>
-          <p className="text-xs font-bold text-slate-400">{timeAgo(job.created_at)}</p>
-        </div>
-        {job.is_urgent && (
-          <span className="text-[10px] font-black uppercase tracking-widest text-red-600 bg-red-50 border border-red-200 px-3 py-1 rounded-full animate-pulse">
-            ⚡ ด่วน
-          </span>
-        )}
-      </div>
-
-      <h3 className="text-lg font-black text-slate-900 leading-tight mb-2 line-clamp-2">
-        {job.title}
-      </h3>
-      <p className="text-sm font-medium text-slate-500 line-clamp-2 leading-relaxed mb-4">
-        {job.description}
-      </p>
-
-      <div className="flex items-center justify-between pt-4 border-t border-slate-100/80">
-        <div className="flex items-center gap-1.5 text-xs font-bold text-slate-400 min-w-0">
-          <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-          <span className="truncate">{job.location || "ไม่ระบุพิกัด"}</span>
-        </div>
-        <span className="text-lg font-black text-[#EE4D2D] shrink-0 ml-2">
-          {Number(job.budget).toLocaleString("th-TH")} บาท
-        </span>
-      </div>
+    <Link href={href} className={`flex flex-col items-center gap-1.5 cursor-pointer transition-all ${active ? 'scale-110' : 'opacity-40 hover:opacity-100'} flex-1`}>
+      <span className="text-[22px]">{icon}</span>
+      <span className={`text-[9px] font-bold ${active ? 'text-[#EE4D2D]' : 'text-gray-500'} whitespace-nowrap`}>{label}</span>
+      {active && <div className="w-1.5 h-1.5 bg-[#EE4D2D] rounded-full shadow-sm mt-0.5"></div>}
     </Link>
   );
 }
