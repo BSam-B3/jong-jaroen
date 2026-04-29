@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase/client'; // ✅ เปลี่ยนมาใช้ Client ตัวใหม่
 import BottomNav from '@/app/components/BottomNav';
 import { useLoadScript, GoogleMap, MarkerF } from '@react-google-maps/api';
 import usePlacesAutocomplete, { getGeocode, getLatLng } from 'use-places-autocomplete';
@@ -12,6 +12,7 @@ const DEFAULT_CENTER = { lat: 12.7844, lng: 101.6500 };
 
 export default function WinOnlinePage() {
   const router = useRouter();
+  const supabase = createClient(); // ✅ ประกาศใช้ Supabase Client ที่ถูกต้อง
 
   const { isLoaded } = useLoadScript({
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY as string,
@@ -27,7 +28,7 @@ export default function WinOnlinePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<any>(null);
 
-  // --- Chat & Realtime Refs (P1 Fix: Prevent Subscription Churn) ---
+  // --- Chat & Realtime Refs ---
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [activeChatJob, setActiveChatJob] = useState<any>(null);
   const activeChatJobRef = useRef<any>(null);
@@ -75,7 +76,7 @@ export default function WinOnlinePage() {
   const fetchMessages = useCallback(async (jobId: string) => {
     const { data } = await supabase.from('job_messages').select('*').eq('job_id', jobId).order('created_at', { ascending: true });
     if (data) setMessages(data);
-  }, []);
+  }, [supabase]);
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,14 +87,12 @@ export default function WinOnlinePage() {
 
   const fetchJobs = useCallback(async (userId?: string) => {
     setIsLoading(true);
-    // Fetch Open Jobs (PII Sanitization: Fetch only first_name for public feed)
     const { data: openData } = await supabase.from('jobs')
       .select(`*, employer:profiles!employer_id (first_name)`)
       .eq('status', 'open')
       .order('created_at', { ascending: false });
     if (openData) setJobs(openData);
 
-    // Fetch My Jobs (Full PII for involved parties)
     if (userId) {
       const { data: myData } = await supabase.from('jobs')
         .select(`*, employer:profiles!employer_id (first_name, phone_number), worker:profiles!worker_id (first_name, phone_number)`)
@@ -102,9 +101,9 @@ export default function WinOnlinePage() {
       if (myData) setMyJobs(myData);
     }
     setIsLoading(false);
-  }, []);
+  }, [supabase]);
 
-  // --- Realtime & Initial Fetch (P1 Fix: Split Effects) ---
+  // --- Realtime & Initial Fetch ---
   useEffect(() => {
     let mounted = true;
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -114,7 +113,7 @@ export default function WinOnlinePage() {
       }
     });
     return () => { mounted = false; };
-  }, [fetchJobs]);
+  }, [fetchJobs, supabase.auth]);
 
   useEffect(() => {
     const jobChannel = supabase.channel('job-updates')
@@ -134,14 +133,13 @@ export default function WinOnlinePage() {
       supabase.removeChannel(jobChannel);
       supabase.removeChannel(chatChannel);
     };
-  }, [currentUser, fetchMessages, fetchJobs]);
+  }, [currentUser, fetchMessages, fetchJobs, supabase]);
 
-  // --- Job Handlers (P0 Fix: Atomic RPC & Sanitized Error) ---
+  // --- Job Handlers ---
   const handleUpdateJobStatus = async (jobId: string, newStatus: 'in_progress' | 'completed' | 'cancelled') => {
     if (!currentUser) return alert("กรุณาเข้าสู่ระบบค่ะ");
     
     if (newStatus === 'in_progress') {
-      // ✅ ATOMIC CLAIM via RPC (Day 1 P0 Fix)
       const { data, error } = await supabase.rpc('claim_job', { p_job_id: jobId });
       if (error) {
         if (error.message.includes('JOB_ALREADY_TAKEN')) {
@@ -155,7 +153,6 @@ export default function WinOnlinePage() {
       setActiveTab('my_jobs');
       fetchJobs(currentUser.id);
     } else {
-      // For Completion/Cancellation
       if (!confirm("ยืนยันการทำรายการนี้ใช่ไหมคะ?")) return;
       const { error } = await supabase.from('jobs').update({ status: newStatus }).eq('id', jobId);
       if (!error) {
@@ -166,7 +163,7 @@ export default function WinOnlinePage() {
     }
   };
 
-  // --- Map & Form Logic (Same as before but with fare fixes) ---
+  // --- Map & Form Logic ---
   const calculateRoute = useCallback(async (origin: google.maps.LatLngLiteral, destination: google.maps.LatLngLiteral) => {
     if (!isLoaded) return;
     const directionsService = new google.maps.DirectionsService();
@@ -361,7 +358,7 @@ export default function WinOnlinePage() {
           )}
         </div>
 
-        {/* Modals & Chat (Pasted exactly for consistency) */}
+        {/* Modals & Chat */}
         {isModalOpen && !isLocationPickerOpen && (
           <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/60 backdrop-blur-sm animate-fade-in">
             <div className="bg-white w-full max-w-xl rounded-t-[2rem] p-8 max-h-[90vh] overflow-y-auto pb-10 shadow-2xl relative">
