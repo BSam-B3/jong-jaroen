@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
-import BottomNav from '@/app/components/BottomNav';
+
 
 export default function ProfilePage() {
   const router = useRouter();
