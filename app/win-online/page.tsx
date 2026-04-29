@@ -390,7 +390,7 @@ export default function WinOnlinePage() {
           <button onClick={() => setUserRole(r => r === 'customer' ? 'provider' : 'customer')} className="bg-black/50 text-white text-[8px] px-2 py-1 rounded-md">[Dev] สลับโหมด</button>
         </div>
 
-        {!isModalOpen && !isLocationPickerOpen && !isChatOpen && <BottomNav />}
+        {!isModalOpen && !isLocationPickerOpen && !isChatOpen }
       </div>
     </div>
   );
