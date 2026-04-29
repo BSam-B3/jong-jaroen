@@ -1,14 +1,13 @@
 "use client";
 import { useEffect, useState } from "react";
-// ✅ แก้ไข Path ให้ตรงตามโครงสร้างไฟล์ของบีสาม
-import { enablePush, disablePush } from "../lib/push";
+// ✅ แก้ไข Path ชี้มาที่โฟลเดอร์ lib นอกสุด
+import { enablePush, disablePush } from "@/lib/push";
 
 export default function PushToggle() {
   const [on, setOn] = useState(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    // ตรวจสอบสถานะการลงทะเบียนแจ้งเตือนเมื่อหน้าจอโหลด
     if (typeof window !== "undefined" && "serviceWorker" in navigator) {
       navigator.serviceWorker.ready.then((reg) => {
         reg.pushManager.getSubscription().then((sub) => {
