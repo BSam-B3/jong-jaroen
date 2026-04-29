@@ -1,62 +1,54 @@
 "use client";
-import React, { useState, useCallback, useImperativeHandle, forwardRef } from "react";
-import { GoogleMap, useJsApiLoader, Marker } from "@react-google-maps/api";
+import { useEffect, useRef } from "react";
+// ✅ แก้ไข Path ให้ถูกต้องตามโครงสร้างใหม่
+import { useRiderLocation } from "../hooks/useRiderLocation";
+import MapPinPicker from "./MapPinPicker";
 
-const containerStyle = { width: "100%", height: "100%" };
+export default function RiderTrackingMap({ jobId, dropoff }: {
+  jobId: string;
+  dropoff: { lat: number; lng: number };
+}) {
+  const { loc, online } = useRiderLocation(jobId);
+  const mapRef = useRef<any>(null);
 
-const MapPinPicker = forwardRef((props: any, ref) => {
-  const { isLoaded } = useJsApiLoader({
-    id: "google-map-script",
-    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "",
-  });
-
-  const [map, setMap] = useState<google.maps.Map | null>(null);
-  const [markers, setMarkers] = useState<any[]>(props.initialMarkers || []);
-
-  const onUnmount = useCallback(function callback() { setMap(null); }, []);
-
-  // 🌟 เปิดช่องทางให้ RiderTrackingMap ส่งคำสั่งเข้ามาควบคุมแผนที่ได้
-  useImperativeHandle(ref, () => ({
-    panTo: (latLng: { lat: number; lng: number }) => {
-      if (map) map.panTo(latLng);
-    },
-    setMarker: (id: string, data: any) => {
-      setMarkers((prev) => {
-        const others = prev.filter((m) => m.id !== id);
-        return [...others, { id, ...data }];
+  useEffect(() => {
+    if (!loc || !mapRef.current) return;
+    
+    // 🛵 สั่งให้หมุดมอเตอร์ไซค์ขยับ
+    if (mapRef.current.setMarker) {
+      mapRef.current.setMarker("rider", {
+        lat: loc.lat,
+        lng: loc.lng,
+        rotation: loc.heading ?? 0,
+        icon: "rider"
       });
-    },
-  }));
-
-  if (!isLoaded) return <div className="w-full h-full bg-gray-100 animate-pulse rounded-2xl" />;
+    }
+    
+    // 📍 สั่งให้หน้าจอเลื่อนตามรถ
+    if (mapRef.current.panTo) {
+      mapRef.current.panTo({ lat: loc.lat, lng: loc.lng });
+    }
+  }, [loc]);
 
   return (
-    <GoogleMap
-      mapContainerStyle={containerStyle}
-      center={props.initialMarkers?.[0] || { lat: 13.7563, lng: 100.5018 }}
-      zoom={15}
-      onLoad={(m) => setMap(m)}
-      onUnmount={onUnmount}
-      options={{
-        disableDefaultUI: true,
-        zoomControl: false,
-        gestureHandling: props.readOnly ? "none" : "greedy",
-      }}
-    >
-      {markers.map((m) => (
-        <Marker
-          key={m.id}
-          position={{ lat: m.lat, lng: m.lng }}
-          icon={m.icon === "rider" ? {
-            url: "https://cdn-icons-png.flaticon.com/512/713/713437.png", // รูปมอเตอร์ไซค์
-            scaledSize: new google.maps.Size(40, 40),
-            rotation: m.rotation || 0,
-          } : undefined}
-        />
-      ))}
-    </GoogleMap>
+    <div className="relative w-full h-[300px] rounded-[2rem] overflow-hidden shadow-lg border border-gray-100">
+      <MapPinPicker
+        ref={mapRef}
+        readOnly={true}
+        initialMarkers={[
+          { id: "dropoff", ...dropoff, icon: "pin" },
+          ...(loc ? [{ id: "rider", lat: loc.lat, lng: loc.lng, icon: "rider" }] : []),
+        ]}
+      />
+      
+      {/* สถานะ GPS ดีไซน์พรีเมียม */}
+      <div className={`absolute top-4 right-4 px-3 py-1.5 text-[10px] font-black rounded-full shadow-2xl flex items-center gap-2 transition-all duration-500 ${online ? "bg-emerald-500 text-white" : "bg-gray-900 text-gray-200"}`}>
+        <span className="relative flex h-2 w-2">
+          {online && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>}
+          <span className={`relative inline-flex rounded-full h-2 w-2 ${online ? 'bg-white' : 'bg-gray-500'}`}></span>
+        </span>
+        {online ? "RIDER IS LIVE" : "SEARCHING GPS"}
+      </div>
+    </div>
   );
-});
-
-MapPinPicker.displayName = "MapPinPicker";
-export default MapPinPicker;
+}
