@@ -20,33 +20,23 @@ export default function MyJobsPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [jobs, setJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  
-  // 🕵️‍♀️ ตัวแปรสำหรับเก็บ Error มาโชว์หน้าจอ
   const [debugLog, setDebugLog] = useState<string>('กำลังโหลด...');
-
-  const [reviewJob, setReviewJob] = useState<any>(null);
-  const [rating, setRating] = useState(5);
-  const [comment, setComment] = useState('');
 
   const fetchMyJobs = useCallback(async (uid: string) => {
     setLoading(true);
-    setDebugLog('กำลังเริ่มดึงข้อมูล...');
+    setDebugLog('กำลังดึงข้อมูลงาน...');
     
+    // 🌟 Fix: ดึงเฉพาะข้อมูลงานเพียวๆ ก่อน (ไม่ Join profiles ที่มีปัญหาเรื่องชื่อคอลัมน์)
     const { data, error } = await supabase
       .from('jobs')
-      .select(`
-        *,
-        employer:profiles!employer_id (first_name, phone),
-        worker:profiles!worker_id (first_name, phone)
-      `)
+      .select('*')
       .or(`employer_id.eq.${uid},worker_id.eq.${uid}`)
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('Fetch Error:', error.message);
       setDebugLog(`❌ Error: ${error.message}`);
     } else {
-      setDebugLog(`✅ สำเร็จ! ดึงข้อมูลมาได้ ${data?.length} รายการ`);
+      setDebugLog(`✅ ดึงข้อมูลสำเร็จ! พบทั้งหมด ${data?.length} รายการ`);
       setJobs(data || []);
     }
     setLoading(false);
@@ -58,14 +48,14 @@ export default function MyJobsPage() {
         setUserId(session.user.id);
         fetchMyJobs(session.user.id);
       } else {
-        setDebugLog('❌ ไม่พบ Session การล็อกอิน (คุณยังไม่ได้ล็อกอิน)');
+        setDebugLog('❌ ยังไม่ได้ล็อกอิน');
         setLoading(false);
       }
     });
   }, [fetchMyJobs, supabase.auth]);
 
   const handleUpdateStatus = async (jobId: string, newStatus: Status) => {
-    if (!confirm(`ยืนยันการเปลี่ยนสถานะเป็น ${newStatus === 'completed' ? 'เสร็จสิ้น' : 'ยกเลิกงาน'}?`)) return;
+    if (!confirm(`ยืนยันการเปลี่ยนสถานะ?`)) return;
     const { error } = await supabase.from('jobs').update({ status: newStatus }).eq('id', jobId);
     if (!error && userId) fetchMyJobs(userId);
   };
@@ -85,11 +75,10 @@ export default function MyJobsPage() {
           <h1 className="text-gray-900 text-3xl font-black italic">MY <span className="text-[#EE4D2D] not-italic">JOBS</span></h1>
         </header>
 
-        {/* 🚨 DEBUG BOX 🚨 */}
-        <div className="m-5 p-5 bg-red-50 border-2 border-red-500 rounded-2xl shadow-sm text-xs font-mono break-all">
-          <h3 className="text-red-700 font-black mb-3 text-sm">🕵️‍♀️ กล่องตรวจสอบ (ถ่ายรูปส่งให้เจมดู)</h3>
-          <p className="mb-2 text-gray-700"><b>1. UID ปัจจุบันของคุณ:</b> <br/><span className="text-blue-600 bg-blue-50 px-1">{userId || 'กำลังโหลด...'}</span></p>
-          <p className="mb-1 text-gray-700"><b>2. สถานะฐานข้อมูล:</b> <br/><span className={debugLog.includes('Error') ? 'text-red-600 font-bold' : 'text-green-600 font-bold'}>{debugLog}</span></p>
+        {/* Debug Box (เก็บไว้ดูจนกว่าจะชัวร์ค่ะ) */}
+        <div className="m-5 p-4 bg-gray-900 text-[10px] text-green-400 font-mono rounded-xl break-all">
+          <p>User ID: {userId}</p>
+          <p>Status: {debugLog}</p>
         </div>
 
         <div className="px-5">
@@ -102,11 +91,11 @@ export default function MyJobsPage() {
 
         <main className="px-5 mt-6 flex-1 space-y-4">
           {loading ? (
-            <div className="text-center py-10 font-bold text-gray-400 animate-pulse">กำลังดึงข้อมูลงาน...</div>
+            <div className="text-center py-10 font-bold text-gray-400 animate-pulse">กำลังโหลด...</div>
           ) : displayJobs.length === 0 ? (
             <div className="bg-white rounded-[2rem] p-12 text-center border border-gray-100">
               <div className="text-6xl mb-4">📭</div>
-              <p className="font-black text-gray-700">ยังไม่มีงานในรายการนี้</p>
+              <p className="font-black text-gray-700 italic">ไม่พบรายการงานของคุณในขณะนี้</p>
             </div>
           ) : (
             displayJobs.map((job) => {
@@ -117,26 +106,20 @@ export default function MyJobsPage() {
                     <span className="text-[10px] font-black uppercase tracking-wider bg-gray-50 px-3 py-1.5 rounded-full">{job.job_type || 'บริการ'}</span>
                     <span className={`text-[10px] font-black px-3 py-1.5 rounded-full ${s.bg} ${s.text} border ${s.ring}`}>{s.icon} {s.label}</span>
                   </div>
-                  <h3 className="font-black text-gray-900 text-base mb-3 leading-snug">{job.title || 'บริการรับ-ส่งด่วน'}</h3>
+                  <h3 className="font-black text-gray-900 text-base mb-3 leading-snug">{job.title || 'ไม่มีชื่อหัวข้อ'}</h3>
                   <div className="flex justify-between items-end pt-4 border-t border-gray-100">
                     <div>
-                      <p className="text-[10px] text-gray-400 font-bold uppercase">ค่าบริการ</p>
+                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">งบประมาณ</p>
                       <p className={`font-black text-xl ${accent.text}`}>{job.budget?.toLocaleString()} บาท</p>
                     </div>
                     <div className="flex gap-2">
-                      {isHired && job.status === 'open' && (
-                        <button onClick={() => handleUpdateStatus(job.id, 'cancelled')} className="bg-gray-100 text-gray-500 px-4 py-2 rounded-xl text-[11px] font-black">ยกเลิก</button>
-                      )}
                       {job.status === 'in_progress' && (
-                        <Link href={`/chat/${job.id}`} className="bg-blue-50 text-blue-600 px-5 py-2 rounded-xl text-[11px] font-black border border-blue-100 flex items-center justify-center shadow-sm active:scale-95 transition-transform">
+                        <Link href={`/chat/${job.id}`} className="bg-blue-50 text-blue-600 px-5 py-2 rounded-xl text-[11px] font-black border border-blue-100 flex items-center justify-center active:scale-95 transition-transform">
                           💬 แชท
                         </Link>
                       )}
-                      {isHired && job.status === 'completed' && (
-                        <button onClick={() => setReviewJob(job)} className="bg-orange-50 text-[#EE4D2D] px-4 py-2 rounded-xl text-[11px] font-black border border-orange-100">⭐ ให้คะแนน</button>
-                      )}
                       {!isHired && job.status === 'in_progress' && (
-                        <button onClick={() => handleUpdateStatus(job.id, 'completed')} className="bg-emerald-500 text-white px-5 py-2 rounded-xl text-[11px] font-black shadow-md active:scale-95 transition-transform">✅ จบงาน</button>
+                        <button onClick={() => handleUpdateStatus(job.id, 'completed')} className="bg-emerald-500 text-white px-5 py-2 rounded-xl text-[11px] font-black shadow-md active:scale-95">✅ จบงาน</button>
                       )}
                     </div>
                   </div>
