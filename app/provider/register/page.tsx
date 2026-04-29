@@ -12,14 +12,16 @@ export default function RiderRegisterPage() {
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState<any>(null);
 
-  // --- 1. License State ---
-  const [hasMotoLicense, setHasMotoLicense] = useState(false);
-  const [hasCarLicense, setHasCarLicense] = useState(false);
-
-  // --- 2. Vehicles State (Support Multiple) ---
-  const [vehicles, setVehicles] = useState([
-    { id: Date.now(), type: 'motorcycle', registration: '', photos: { front: null, back: null, left: null, right: null } }
-  ]);
+  // --- States ---
+  const [licenseType, setLicenseType] = useState('motorcycle');
+  const [vehicle, setVehicle] = useState({
+    type: 'motorcycle',
+    brand: '',
+    model: '',
+    color: '',
+    registration: ''
+  });
+  const [isAgreed, setIsAgreed] = useState(false);
 
   useEffect(() => {
     const checkUser = async () => {
@@ -30,165 +32,197 @@ export default function RiderRegisterPage() {
     checkUser();
   }, [router, supabase]);
 
-  const addVehicle = () => {
-    setVehicles([...vehicles, { id: Date.now(), type: 'car', registration: '', photos: { front: null, back: null, left: null, right: null } }]);
-  };
-
-  const removeVehicle = (id: number) => {
-    if (vehicles.length > 1) setVehicles(vehicles.filter(v => v.id !== id));
-  };
-
-  const updateVehicle = (id: number, field: string, value: any) => {
-    setVehicles(vehicles.map(v => v.id === id ? { ...v, [field]: value } : v));
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!hasMotoLicense && !hasCarLicense) return alert('กรุณาอัปโหลดใบขับขี่อย่างน้อย 1 ประเภทค่ะ');
+    if (!isAgreed) return alert('กรุณายอมรับเงื่อนไขการให้บริการค่ะ');
     setLoading(true);
 
-    const { error } = await supabase
-      .from('profiles')
-      .update({
-        is_rider: true,
-        rider_status: 'pending',
-        vehicle_type: vehicles[0].type, // เก็บตัวหลักไว้ก่อน (รอทำระบบแยกคันทีหลัง)
-        vehicle_registration: vehicles[0].registration,
-      })
-      .eq('id', user.id);
+    try {
+      // 1. อัปเดตสถานะในโปรไฟล์หลัก
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          is_rider: true,
+          rider_status: 'pending'
+        })
+        .eq('id', user.id);
+      if (profileError) throw profileError;
 
-    if (error) {
-      alert('Error: ' + error.message);
-    } else {
-      alert('ส่งใบสมัครเรียบร้อย! 🎉 ขั้นตอนถัดไปคือการยืนยันบัญชีธนาคารในหน้าโปรไฟล์นะคะ');
+      // 2. บันทึกข้อมูลรถลงตารางใหม่ (rider_vehicles)
+      const { error: vehicleError } = await supabase
+        .from('rider_vehicles')
+        .insert({
+          rider_id: user.id,
+          vehicle_type: vehicle.type,
+          brand: vehicle.brand,
+          model: vehicle.model,
+          color: vehicle.color,
+          registration: vehicle.registration,
+          status: 'pending'
+        });
+      if (vehicleError) throw vehicleError;
+
+      alert('ส่งใบสมัครและข้อมูลรถเรียบร้อย! 🎉 รอแอดมินตรวจสอบนะคะ');
       router.push('/profile');
+
+    } catch (error: any) {
+      alert('Error: ' + error.message);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
     <div className="min-h-screen bg-[#F4F6F8] flex justify-center font-sans pb-20">
-      <div className="w-full max-w-xl bg-[#F4F6F8] min-h-screen shadow-xl flex flex-col border-x border-gray-100">
+      {/* 🌟 ขยายความกว้างเป็น max-w-5xl สำหรับ 2 คอลัมน์ */}
+      <div className="w-full max-w-5xl bg-[#F4F6F8] min-h-screen flex flex-col">
         
-        {/* Header สไตล์จงเจริญ (Orange Theme) */}
-        <div className="p-6 pt-12 bg-gradient-to-b from-[#EE4D2D] to-[#FF7337] text-white rounded-b-[2.5rem] shadow-sm relative z-20">
-          <Link href="/profile" className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center text-xl mb-4 active:scale-95 transition-transform">←</Link>
-          <h1 className="text-3xl font-black tracking-tight">สมัครเป็นคนขับ 🛵</h1>
-          <p className="text-white/90 text-xs font-bold mt-2">ลงทะเบียนคนขับและจัดการรถของคุณ</p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="px-5 mt-6 space-y-8 flex-1 pb-10">
-          
-          {/* SECTION 1: หมวดเอกสารใบขับขี่ */}
-          <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-50 space-y-6">
-            <div className="flex items-center gap-3 border-b border-gray-50 pb-4">
-              <span className="w-10 h-10 bg-orange-50 text-[#EE4D2D] rounded-full flex items-center justify-center text-xl shadow-inner">📋</span>
-              <div>
-                <h2 className="text-sm font-black text-gray-800">หมวดเอกสารสำคัญ</h2>
-                <p className="text-[10px] text-gray-400 font-bold uppercase">Drivers Licenses</p>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <LicenseUpload 
-                label="ใบอนุญาตขับรถจักรยานยนต์" 
-                active={hasMotoLicense} 
-                onToggle={() => setHasMotoLicense(!hasMotoLicense)} 
-              />
-              <LicenseUpload 
-                label="ใบอนุญาตขับรถยนต์" 
-                active={hasCarLicense} 
-                onToggle={() => setHasCarLicense(!hasCarLicense)} 
-              />
+        {/* Header */}
+        <div className="p-8 pt-12 bg-gradient-to-r from-[#EE4D2D] to-[#FF7337] text-white rounded-b-[3rem] shadow-md relative z-20 mx-4 sm:mx-0">
+          <Link href="/profile" className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center text-xl mb-6 hover:bg-white/30 transition-colors">←</Link>
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-3xl shadow-lg">🛵</div>
+            <div>
+              <h1 className="text-3xl sm:text-4xl font-black tracking-tight">ลงทะเบียนคนขับ</h1>
+              <p className="text-white/90 text-sm font-bold mt-2">Driver Onboarding & Vehicle Registration</p>
             </div>
           </div>
+        </div>
 
-          {/* SECTION 2: หมวดจัดการรถ (My Garage) */}
-          <div className="space-y-6">
-            <div className="flex justify-between items-end px-2">
-              <div>
-                <h2 className="text-sm font-black text-gray-800">ยานพาหนะของคุณ</h2>
-                <p className="text-[10px] text-gray-400 font-bold uppercase">My Garage</p>
-              </div>
-              <button type="button" onClick={addVehicle} className="bg-[#0082FA] text-white text-[10px] font-black px-4 py-2 rounded-full shadow-sm active:scale-95 transition-transform">+ เพิ่มรถ</button>
-            </div>
-
-            {vehicles.map((v, index) => (
-              <div key={v.id} className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-50 space-y-6 relative overflow-hidden">
-                <div className="absolute top-0 right-0 bg-[#EE4D2D] text-white text-[10px] font-black px-4 py-1.5 rounded-bl-2xl shadow-sm">
-                  คันที่ {index + 1}
-                </div>
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 mt-4 flex-1">
+          {/* 🌟 Grid 2 คอลัมน์ (จอคอมแบ่งซ้าย-ขวา / จอมือถือเรียงบน-ล่าง) */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            
+            {/* ============================== */}
+            {/* คอลัมน์ซ้าย: กรอกข้อมูล (Text)  */}
+            {/* ============================== */}
+            <div className="space-y-6">
+              
+              {/* 1. ข้อมูลรถยนต์ */}
+              <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100">
+                <h2 className="text-lg font-black text-gray-800 mb-4 border-b pb-3 flex items-center gap-2">
+                  <span>🚗</span> ข้อมูลยานพาหนะ
+                </h2>
                 
-                {/* เลือกประเภทรถ */}
-                <div className="grid grid-cols-3 gap-2 pt-4">
-                  {['motorcycle', 'saleng', 'car', 'suv', 'van', 'pickup'].map((type) => (
-                    <button 
-                      key={type} type="button"
-                      onClick={() => updateVehicle(v.id, 'type', type)}
-                      className={`p-3 rounded-xl border-2 text-center transition-all ${v.type === type ? 'border-[#EE4D2D] bg-orange-50 shadow-sm scale-100' : 'border-gray-50 scale-95 hover:bg-gray-50'}`}
-                    >
-                      <div className="text-xl mb-1">{getIcon(type)}</div>
-                      <div className={`text-[8px] font-black uppercase ${v.type === type ? 'text-[#EE4D2D]' : 'text-gray-500'}`}>{type}</div>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-[11px] font-black text-gray-500 uppercase mb-2 block">ประเภทรถ</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {['motorcycle', 'saleng', 'car', 'suv', 'van', 'pickup'].map((type) => (
+                        <button key={type} type="button" onClick={() => setVehicle({...vehicle, type})} className={`p-3 rounded-xl border-2 text-center transition-all ${vehicle.type === type ? 'border-[#EE4D2D] bg-orange-50' : 'border-gray-50'}`}>
+                          <div className="text-xl">{getIcon(type)}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[11px] font-black text-gray-500 uppercase mb-2 block">ยี่ห้อ (Brand)</label>
+                      <input required placeholder="เช่น Honda, Toyota" value={vehicle.brand} onChange={(e) => setVehicle({...vehicle, brand: e.target.value})} className="w-full p-3.5 rounded-xl bg-gray-50 border border-gray-100 text-sm font-bold outline-none focus:ring-2 focus:ring-[#EE4D2D]" />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-black text-gray-500 uppercase mb-2 block">รุ่น (Model)</label>
+                      <input required placeholder="เช่น Wave 110i, Yaris" value={vehicle.model} onChange={(e) => setVehicle({...vehicle, model: e.target.value})} className="w-full p-3.5 rounded-xl bg-gray-50 border border-gray-100 text-sm font-bold outline-none focus:ring-2 focus:ring-[#EE4D2D]" />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[11px] font-black text-gray-500 uppercase mb-2 block">สีรถ (Color)</label>
+                      <input required placeholder="เช่น แดง-ดำ, ขาว" value={vehicle.color} onChange={(e) => setVehicle({...vehicle, color: e.target.value})} className="w-full p-3.5 rounded-xl bg-gray-50 border border-gray-100 text-sm font-bold outline-none focus:ring-2 focus:ring-[#EE4D2D]" />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-black text-gray-500 uppercase mb-2 block">ป้ายทะเบียน (Plate)</label>
+                      <input required placeholder="เช่น 1กข 1234 ระยอง" value={vehicle.registration} onChange={(e) => setVehicle({...vehicle, registration: e.target.value})} className="w-full p-3.5 rounded-xl bg-gray-50 border border-gray-100 text-sm font-black outline-none focus:ring-2 focus:ring-[#EE4D2D] text-[#EE4D2D]" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. ประเภทใบขับขี่ */}
+              <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100">
+                <h2 className="text-lg font-black text-gray-800 mb-4 border-b pb-3 flex items-center gap-2">
+                  <span>🪪</span> ประเภทใบอนุญาตขับขี่
+                </h2>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {[
+                    { id: 'motorcycle', label: 'รถจักรยานยนต์' },
+                    { id: 'car', label: 'รถยนต์ส่วนบุคคล' },
+                    { id: 'transport', label: 'ท.1 / ท.2 (รับจ้าง)' }
+                  ].map((lic) => (
+                    <button key={lic.id} type="button" onClick={() => setLicenseType(lic.id)} className={`p-4 rounded-xl border-2 text-left transition-all ${licenseType === lic.id ? 'border-[#EE4D2D] bg-orange-50' : 'border-gray-50'}`}>
+                      <div className={`w-4 h-4 rounded-full border-2 mb-2 flex items-center justify-center ${licenseType === lic.id ? 'border-[#EE4D2D] bg-[#EE4D2D]' : 'border-gray-300'}`}>
+                         {licenseType === lic.id && <span className="text-[8px] text-white">✓</span>}
+                      </div>
+                      <div className="text-[10px] font-black">{lic.label}</div>
                     </button>
                   ))}
                 </div>
+              </div>
 
-                <input 
-                  required
-                  placeholder="เลขทะเบียน (เช่น 1กข 1234 ระยอง)"
-                  value={v.registration}
-                  onChange={(e) => updateVehicle(v.id, 'registration', e.target.value)}
-                  className="w-full p-4 rounded-xl bg-gray-50 border border-gray-100 text-sm font-bold outline-none focus:ring-2 focus:ring-[#EE4D2D]"
-                />
+            </div>
 
-                {/* รูปรถ 4 ด้าน */}
-                <div className="grid grid-cols-2 gap-3">
-                  {['หน้า', 'หลัง', 'ซ้าย', 'ขวา'].map(side => (
-                    <div key={side} className="border-2 border-dashed border-gray-200 rounded-2xl p-4 text-center bg-gray-50/50 flex flex-col items-center justify-center gap-1 active:scale-95 transition-transform cursor-pointer hover:bg-gray-50">
-                      <span className="text-lg opacity-80">📸</span>
-                      <p className="text-[9px] font-black text-gray-500">รูปด้าน{side}</p>
-                    </div>
-                  ))}
+            {/* ============================== */}
+            {/* คอลัมน์ขวา: อัปโหลดเอกสาร (Photos) */}
+            {/* ============================== */}
+            <div className="space-y-6">
+              
+              {/* ยืนยันตัวตนคนขับ */}
+              <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100">
+                <h2 className="text-lg font-black text-gray-800 mb-4 border-b pb-3">👤 เอกสารคนขับ (Driver Docs)</h2>
+                <div className="grid grid-cols-2 gap-4">
+                  <UploadBox icon="🪪" title="รูปถ่ายใบขับขี่" desc="ด้านหน้าชัดเจน" />
+                  <UploadBox icon="🤳" title="เซลฟี่คู่ใบขับขี่" desc="ถือบัตรไว้ใต้คาง" />
+                </div>
+              </div>
+
+              {/* รูปรถและป้ายภาษี */}
+              <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100">
+                <h2 className="text-lg font-black text-gray-800 mb-4 border-b pb-3">📸 รูปรถยนต์ (Vehicle Photos)</h2>
+                
+                <div className="mb-4">
+                  <UploadBox icon="📄" title="ป้ายภาษีรถยนต์ / พ.ร.บ." desc="ต้องยังไม่หมดอายุ" />
                 </div>
 
-                {vehicles.length > 1 && (
-                  <button type="button" onClick={() => removeVehicle(v.id)} className="w-full text-[11px] text-red-500 font-bold pt-2 flex items-center justify-center gap-1 hover:underline">
-                    <span>✕</span> ลบรถคันนี้ออกจากรายการ
-                  </button>
-                )}
+                <div className="grid grid-cols-2 gap-4">
+                  <UploadBox icon="🚘" title="รูปรถด้านหน้า" desc="เห็นหน้ารถเต็มคัน" />
+                  <UploadBox icon="🚙" title="รูปรถด้านหลัง" desc="เห็นป้ายทะเบียนชัดเจน" />
+                  <UploadBox icon="🚗" title="รูปรถด้านซ้าย" desc="ด้านข้างเต็มคัน" />
+                  <UploadBox icon="🚗" title="รูปรถด้านขวา" desc="ด้านข้างเต็มคัน" />
+                </div>
               </div>
-            ))}
+
+            </div>
           </div>
 
-          {/* บัญชีรับเงิน Info */}
-          <div className="bg-blue-50/50 rounded-[1.5rem] p-5 border border-blue-100/50">
-            <p className="text-[11px] text-[#0082FA] font-black flex items-center gap-2">
-              <span className="bg-white rounded-full w-5 h-5 flex items-center justify-center shadow-sm">ℹ️</span> ข้อมูลบัญชีรับเงิน
-            </p>
-            <p className="text-[10px] text-gray-500 font-bold mt-2 leading-relaxed">
-              หลังจากส่งข้อมูลสมัครแล้ว คุณต้องยืนยันตัวตน (KYC) และผูกบัญชีธนาคารในหน้าโปรไฟล์ โดยชื่อผู้สมัครและหน้าสมุดบัญชีต้องตรงกัน 100% เพื่อความปลอดภัยในการรับเงินค่ะ
-            </p>
+          {/* Footer Submit */}
+          <div className="mt-8 bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-start gap-3 flex-1">
+              <input type="checkbox" checked={isAgreed} onChange={(e) => setIsAgreed(e.target.checked)} className="mt-1 w-5 h-5 accent-[#EE4D2D]" />
+              <p className="text-xs text-gray-500 font-bold leading-relaxed">
+                ฉันขอยืนยันว่าเอกสารและข้อมูลทั้งหมดเป็นความจริง และยินยอมให้บริษัทตรวจสอบประวัติเพื่อความปลอดภัยในการให้บริการ
+              </p>
+            </div>
+            <button disabled={loading} className="w-full sm:w-auto px-10 py-4 bg-[#EE4D2D] text-white rounded-2xl font-black shadow-lg active:scale-95 transition-transform disabled:opacity-50 whitespace-nowrap">
+              {loading ? 'กำลังส่งข้อมูล...' : 'ส่งใบสมัคร 🚀'}
+            </button>
           </div>
 
-          <button disabled={loading} className="w-full bg-gradient-to-r from-[#EE4D2D] to-[#FF7337] text-white py-5 rounded-[2rem] font-black shadow-lg active:scale-95 transition-transform disabled:opacity-50 text-sm">
-            {loading ? 'กำลังประมวลผล...' : 'ยืนยันข้อมูลและสมัครไรเดอร์ 🚀'}
-          </button>
         </form>
       </div>
     </div>
   );
 }
 
-function LicenseUpload({ label, active, onToggle }: { label: string, active: boolean, onToggle: () => void }) {
+// Component เสริมสำหรับทำปุ่มอัปโหลดรูปให้ดูสวยงาม
+function UploadBox({ icon, title, desc }: { icon: string, title: string, desc: string }) {
   return (
-    <div onClick={onToggle} className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex items-center justify-between ${active ? 'border-[#EE4D2D] bg-orange-50 shadow-sm' : 'border-gray-100 bg-white hover:bg-gray-50'}`}>
-      <div className="flex items-center gap-3">
-        <span className="text-xl opacity-80">🪪</span>
-        <span className={`text-xs font-black ${active ? 'text-[#EE4D2D]' : 'text-gray-700'}`}>{label}</span>
-      </div>
-      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${active ? 'bg-[#EE4D2D] border-[#EE4D2D]' : 'border-gray-300'}`}>
-        {active && <span className="text-[10px] text-white">✓</span>}
-      </div>
+    <div className="border-2 border-dashed border-gray-200 rounded-2xl p-4 text-center bg-gray-50 hover:bg-orange-50 hover:border-[#EE4D2D] transition-colors cursor-pointer group flex flex-col items-center justify-center gap-1 min-h-[120px]">
+      <span className="text-3xl mb-1 group-hover:scale-110 transition-transform">{icon}</span>
+      <p className="text-[11px] font-black text-gray-700">{title}</p>
+      <p className="text-[9px] font-bold text-gray-400">{desc}</p>
+      <input type="file" className="hidden" /> {/* ซ่อน Input จริงไว้ รอเชื่อม Storage */}
     </div>
   );
 }
