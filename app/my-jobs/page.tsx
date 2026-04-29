@@ -223,3 +223,32 @@ export default function MyJobsPage() {
                     </div>
                     
                     <div className="flex gap-2">
+                      {/* ปุ่มสำหรับ ฝั่งลูกค้า (Hired) */}
+                      {isHiredMode && job.status === 'open' && (
+                        <button onClick={() => handleUpdateStatus(job.id, 'cancelled')} className="bg-gray-100 text-gray-500 px-5 py-3 rounded-2xl text-[11px] font-black hover:bg-red-50 hover:text-red-600 transition-colors">
+                          ยกเลิกคำขอ
+                        </button>
+                      )}
+                      {isHiredMode && job.status === 'in_progress' && (
+                        <button className="bg-blue-50 text-blue-600 border border-blue-100 px-5 py-3 rounded-2xl text-[11px] font-black hover:bg-blue-100 transition-colors">
+                          💬 คุยกับไรเดอร์
+                        </button>
+                      )}
+
+                      {/* ปุ่มสำหรับ ฝั่งไรเดอร์ (Received) */}
+                      {!isHiredMode && job.status === 'in_progress' && (
+                        <button onClick={() => handleUpdateStatus(job.id, 'completed')} className="bg-emerald-500 text-white shadow-md px-6 py-3 rounded-2xl text-[11px] font-black hover:bg-emerald-600 transition-transform active:scale-95">
+                          ✅ จบงานเรียบร้อย
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </article>
+              );
+            })
+          )}
+        </main>
+      </div>
+    </div>
+  );
+}
