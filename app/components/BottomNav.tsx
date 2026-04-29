@@ -16,10 +16,10 @@ export default function BottomNav() {
   );
 }
 
-// คอมโพเนนต์เมนูด้านล่าง (ปรับ Flex ให้สมมาตร และแก้จุดแดงไม่ให้ดัน Layout เบี้ยว)
+// คอมโพเนนต์เมนูด้านล่าง
 function NavItem({ icon, label, href, pathname }: { icon: string, label: string, href: string, pathname: string }) {
-  // ตรวจสอบว่าลิงก์นี้กำลังเปิดอยู่หรือไม่ (Active State)
-  const active = pathname === href;
+  // ✅ [Audit Fix] รองรับ Nested Routes (เช่น /profile/edit ก็ยังถือว่าแอคทีฟ)
+  const active = href === '/' ? pathname === '/' : pathname.startsWith(href);
 
   return (
     <Link 
@@ -31,7 +31,6 @@ function NavItem({ icon, label, href, pathname }: { icon: string, label: string,
         {label}
       </span>
       
-      {/* ใช้ absolute เพื่อให้จุดแดงลอยอยู่ด้านล่าง ไม่ไปดันไอคอนหรือตัวหนังสือให้เบี้ยว */}
       {active && (
         <div className="absolute -bottom-0.5 w-1.5 h-1.5 bg-[#EE4D2D] rounded-full shadow-sm"></div>
       )}
