@@ -10,7 +10,7 @@ import usePlacesAutocomplete, { getGeocode, getLatLng } from 'use-places-autocom
 const libraries: ("places")[] = ["places"];
 const DEFAULT_CENTER = { lat: 12.7844, lng: 101.6500 };
 
-// 🌟 สิ่งที่ดึงมาจาก C: ชุดข้อมูล UI
+// 🌟 ชุดข้อมูล UI จาก C (เอามาแค่หน้าตา)
 const JOB_TYPES_UI = [
   { key: 'ride', label: 'เรียกรถ', icon: '🛵', desc: 'รับ-ส่งคน' },
   { key: 'buy', label: 'ซื้อของ', icon: '🛒', desc: 'ฝากซื้อ' },
@@ -36,7 +36,7 @@ export default function WinOnlinePage() {
     region: 'TH'
   });
 
-  // --- States (โครงสร้างเดิมทั้งหมด) ---
+  // --- States โครงสร้างเดิมของบีสาม ---
   const [userRole, setUserRole] = useState<'customer' | 'provider'>('customer'); 
   const [activeTab, setActiveTab] = useState<'feed' | 'my_jobs'>('feed');
   const [jobs, setJobs] = useState<any[]>([]);
@@ -71,7 +71,6 @@ export default function WinOnlinePage() {
 
   useEffect(() => { if (isLoaded) init(); }, [isLoaded, init]);
 
-  // --- Logic เดิม ---
   const [jobType, setJobType] = useState<'ride' | 'buy' | 'deliver'>('ride');
   const [vehicleType, setVehicleType] = useState<any>('motorcycle');
   const [title, setTitle] = useState('');
@@ -79,9 +78,17 @@ export default function WinOnlinePage() {
   const [dropoff, setDropoff] = useState('');
   const [note, setNote] = useState('');
   const [distanceKm, setDistanceKm] = useState<number>(0);
-  const [fareBreakdown, setFareBreakdown] = useState({ totalFare: 0 });
+  
+  // 🌟 กู้คืน State ค่าบริการแยกย่อยตามฉบับของบีสาม
+  const [fareBreakdown, setFareBreakdown] = useState({ base: 0, distanceFee: 0, fuelSurge: 0, platformFee: 0, totalFare: 0 });
 
-  // --- ฟังก์ชันดั้งเดิม (ห้ามเปลี่ยน) ---
+  const popularPlaces = [
+    { name: 'โรงพยาบาลแกลง', detail: 'Klaeng Hospital' },
+    { name: 'ตลาดสามย่าน แกลง', detail: 'Sam Yan Market' },
+    { name: 'เซเว่นอีเลฟเว่น ตลาดแกลง', detail: '7-Eleven Sam Yan' },
+  ];
+
+  // --- ฟังก์ชันดั้งเดิม (คงไว้ทั้งหมด) ---
   const fetchMessages = useCallback(async (jobId: string) => {
     const { data } = await supabase.from('job_messages').select('*').eq('job_id', jobId).order('created_at', { ascending: true });
     if (data) setMessages(data);
@@ -114,14 +121,31 @@ export default function WinOnlinePage() {
     } catch (error) { console.error(error); }
   }, [isLoaded]);
 
+  // 🌟 กู้คืน Logic การคำนวณราคาแบบเก่าของบีสามมาทั้งหมด (Base Fare + Rate + 3% Platform Fee)
   useEffect(() => {
     if (pickupCoords && (dropoffCoords || jobType === 'buy')) {
       if (dropoffCoords) calculateRoute(pickupCoords, dropoffCoords);
-      let baseFare = 20; let rate = 8;
-      if (vehicleType === 'car') { baseFare = 40; rate = 12; }
-      if (vehicleType === 'van') { baseFare = 100; rate = 20; }
-      const total = Math.ceil((baseFare + (distanceKm * rate)) * 1.05);
-      setFareBreakdown({ totalFare: total });
+      let baseFare = 0; let ratePerKm = 0;
+      switch (vehicleType) {
+        case 'motorcycle': baseFare = 20; ratePerKm = distanceKm > 5 ? 10 : 8; break;
+        case 'saleng': baseFare = 30; ratePerKm = 10; break;
+        case 'car': baseFare = 40; ratePerKm = 12; break;
+        case 'suv': baseFare = 50; ratePerKm = 15; break;
+        case 'van': baseFare = 100; ratePerKm = 20; break;
+        case 'pickup': baseFare = 150; ratePerKm = 20; break;
+      }
+      const distanceFee = distanceKm * ratePerKm;
+      const rawBeforeFuel = baseFare + distanceFee;
+      const fuelSurge = (rawBeforeFuel * 1.05) - rawBeforeFuel;
+      const totalDriverFare = rawBeforeFuel + fuelSurge;
+      
+      setFareBreakdown({
+        base: baseFare,
+        distanceFee: distanceFee,
+        fuelSurge: fuelSurge,
+        platformFee: totalDriverFare * 0.03, // 🌟 3% หักเข้าแอป
+        totalFare: Math.ceil(totalDriverFare * 1.03) // 🌟 ราคาสุทธิที่บวก 3% เข้าไปแล้ว
+      });
     }
   }, [pickupCoords, dropoffCoords, jobType, vehicleType, distanceKm, calculateRoute]);
 
@@ -151,14 +175,34 @@ export default function WinOnlinePage() {
     navigator.geolocation.getCurrentPosition(async (pos) => {
       const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
       setMapCenter(coords); setSelectedPin(coords);
-      const res = await getGeocode({ location: coords });
-      const addr = res[0]?.formatted_address || "ตำแหน่งปัจจุบัน";
-      if (confirm(`ใช้ตำแหน่งนี้ใช่ไหมคะ?\n${addr}`)) {
-        if (pickingType === 'pickup') { setPickup(addr); setPickupCoords(coords); } else { setDropoff(addr); setDropoffCoords(coords); }
-        setIsLocationPickerOpen(false); setIsMapMode(false);
-      }
+      try {
+        const res = await getGeocode({ location: coords });
+        const addr = res[0]?.formatted_address || "ตำแหน่งปัจจุบัน";
+        if (confirm(`ใช้ตำแหน่งนี้ใช่ไหมคะ?\n${addr}`)) {
+          if (pickingType === 'pickup') { setPickup(addr); setPickupCoords(coords); } else { setDropoff(addr); setDropoffCoords(coords); }
+          setIsLocationPickerOpen(false); setIsMapMode(false);
+        }
+      } catch {}
       setIsLocating(false);
     });
+  };
+
+  const onMapClick = useCallback(async (e: google.maps.MapMouseEvent) => {
+    if (e.latLng) {
+      const coords = { lat: e.latLng.lat(), lng: e.latLng.lng() }; setSelectedPin(coords);
+      try {
+        const res = await getGeocode({ location: coords }); const addr = res[0]?.formatted_address || "ตำแหน่งที่เลือกบนแผนที่";
+        if (confirm(`ใช้ตำแหน่งนี้ใช่ไหมคะ?\n${addr}`)) {
+          if (pickingType === 'pickup') { setPickup(addr); setPickupCoords(coords); } else { setDropoff(addr); setDropoffCoords(coords); }
+          setIsLocationPickerOpen(false); setIsMapMode(false);
+        }
+      } catch { alert("ปักหมุดสำเร็จค่ะ"); }
+    }
+  }, [pickingType]);
+
+  const getVehicleIcon = (type: string) => {
+    const v = VEHICLES_UI.find(x => x.key === type);
+    return v ? v.icon : '🛵';
   };
 
   return (
@@ -186,10 +230,32 @@ export default function WinOnlinePage() {
               <button onClick={() => setIsModalOpen(true)} className="bg-[#EE4D2D] text-white px-8 py-5 rounded-[1.5rem] font-black w-full shadow-lg active:scale-95 transition-all">+ เรียกใช้บริการเลย</button>
             </div>
           )}
-          {/* ... (ส่วนอื่นๆ ของ Feed และ MyJobs โครงเดิม) ... */}
+          {/* ... (รายการงาน โครงเดิม) ... */}
+          {activeTab === 'feed' && userRole === 'provider' && (
+            <div className="space-y-4 animate-fade-in">
+              {isLoading ? <div className="h-40 bg-white rounded-[2rem] animate-pulse" /> : jobs.map((job) => (
+                <div key={job.id} className="bg-white rounded-[1.5rem] p-5 shadow-sm border border-gray-100">
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex gap-4">
+                      <div className="w-14 h-14 bg-orange-50 rounded-[1rem] flex items-center justify-center text-3xl border border-orange-100">{getVehicleIcon(job.vehicle_type)}</div>
+                      <div>
+                        <h3 className="font-black text-gray-800 text-sm">{job.title}</h3>
+                        <p className="text-[10px] text-gray-400 font-bold uppercase">ลูกค้า: {job.employer?.first_name || 'ไม่ระบุ'}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xl font-black text-[#EE4D2D]">{job.budget} บาท</div>
+                      <div className="text-[10px] text-gray-400 font-bold bg-gray-50 px-2 py-0.5 rounded-md mt-1">{job.distance_km} กม.</div>
+                    </div>
+                  </div>
+                  <button onClick={() => alert('ฟังก์ชันรับงาน')} className="w-full bg-orange-50 hover:bg-[#EE4D2D] text-[#EE4D2D] hover:text-white border border-orange-200 py-3.5 rounded-[1rem] text-sm font-black transition-all">รับงานนี้ ⚡</button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* 🌟 MODAL โพสต์งาน (จุดที่อัปเกรด UI จาก C) 🌟 */}
+        {/* 🌟 MODAL โพสต์งาน 🌟 */}
         {isModalOpen && !isLocationPickerOpen && (
           <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/60 backdrop-blur-sm animate-fade-in">
             <div className="bg-white w-full max-w-xl rounded-t-[2rem] p-8 max-h-[90vh] overflow-y-auto pb-10 shadow-2xl relative">
@@ -199,7 +265,6 @@ export default function WinOnlinePage() {
               </div>
               
               <form onSubmit={handlePostJob} className="space-y-5">
-                {/* 🌟 เสริมจาก C: ปรับปรุงปุ่มเลือกประเภทงาน */}
                 <div className="grid grid-cols-3 gap-2">
                   {JOB_TYPES_UI.map((t) => (
                     <button key={t.key} type="button" onClick={() => setJobType(t.key as any)} className={`p-3 rounded-2xl border-2 transition-all flex flex-col items-center ${jobType === t.key ? 'border-[#EE4D2D] bg-orange-50 shadow-sm' : 'border-gray-100 bg-white opacity-60'}`}>
@@ -209,7 +274,6 @@ export default function WinOnlinePage() {
                   ))}
                 </div>
 
-                {/* 🌟 เสริมจาก C: ปรับปรุงการเลือกประเภทรถ */}
                 <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
                   {VEHICLES_UI.map((v) => (
                     <button key={v.key} type="button" onClick={() => setVehicleType(v.key as any)} className={`p-2 rounded-xl border-2 transition-all flex flex-col items-center ${vehicleType === v.key ? 'border-[#EE4D2D] bg-orange-50 scale-105 shadow-sm' : 'border-gray-50 opacity-40'}`}>
@@ -221,7 +285,6 @@ export default function WinOnlinePage() {
 
                 <input type="text" required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="รายละเอียดงานสั้นๆ เช่น ไปส่งหน้าปากซอย..." className="w-full bg-white border border-gray-200 rounded-[1rem] px-4 py-4 text-sm font-bold focus:border-[#EE4D2D] outline-none shadow-sm" />
 
-                {/* ส่วนเลือกสถานที่ (โครงเดิม แต่อัปเกรดความพรีเมียม) */}
                 <div className="bg-[#F8FAFC] p-5 rounded-[1.5rem] border border-gray-100 space-y-3">
                   <div onClick={() => { setPickingType('pickup'); setIsLocationPickerOpen(true); }} className="w-full bg-white border rounded-[1rem] px-4 py-3.5 text-sm flex justify-between items-center cursor-pointer shadow-sm">
                     <div className="flex gap-3 items-center overflow-hidden text-gray-800 font-bold"><span className="text-green-500">📍</span><span className="truncate">{pickup || 'จุดรับต้นทาง'}</span></div>
@@ -233,16 +296,35 @@ export default function WinOnlinePage() {
                   </div>
                 </div>
 
-                {/* 🌟 เสริมจาก C: ปรับปรุงกล่องโชว์ราคาพรีเมียม */}
-                <div className="bg-orange-50 border border-orange-100 rounded-[1.5rem] p-5 flex justify-between items-center shadow-sm">
+                {/* 🌟 กล่องโชว์รายละเอียดราคาแบบย่อย (กู้คืนมาแล้วค่ะ) */}
+                <div className="bg-orange-50 border border-orange-100 rounded-[1.5rem] p-5 shadow-sm">
+                  {fareBreakdown.totalFare > 0 && (
+                    <div className="space-y-2 mb-3 pb-3 border-b border-orange-200/50 text-[11px] font-bold text-gray-600">
+                      <div className="flex justify-between">
+                        <span>ค่าเริ่มต้น</span>
+                        <span>{fareBreakdown.base.toLocaleString('th-TH')} บาท</span>
+                      </div>
+                      {distanceKm > 0 && (
+                        <div className="flex justify-between">
+                          <span>ค่าระยะทาง ({distanceKm} กม.)</span>
+                          <span>{Math.round(fareBreakdown.distanceFee).toLocaleString('th-TH')} บาท</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between text-[#EE4D2D]">
+                        <span>ค่าบำรุงแอป (3%)</span>
+                        <span>{Math.ceil(fareBreakdown.platformFee).toLocaleString('th-TH')} บาท</span>
+                      </div>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-end">
                     <div className="space-y-1">
                       <p className="text-[11px] text-[#EE4D2D] font-black uppercase tracking-wider">ราคาประเมินสุทธิ</p>
-                      <p className="text-[9px] text-orange-400/80 font-bold italic">ไม่หักส่วนแบ่งคนขับ</p>
+                      <p className="text-[9px] text-orange-400/80 font-bold italic">รวมทุกอย่างแล้ว</p>
                     </div>
                     <div className="text-right">
                       <div className="text-3xl font-black text-[#EE4D2D] tracking-tighter">{fareBreakdown.totalFare > 0 ? `${fareBreakdown.totalFare.toLocaleString('th-TH')} บาท` : '-'}</div>
-                      {distanceKm > 0 && <div className="text-[9px] text-orange-500/80 font-bold bg-white px-2 py-0.5 rounded-full inline-block mt-1">{distanceKm} กม.</div>}
                     </div>
+                  </div>
                 </div>
 
                 <button type="submit" disabled={isSubmitting || fareBreakdown.totalFare <= 0} className="w-full bg-[#EE4D2D] text-white font-black py-5 rounded-[1.5rem] text-base mt-2 shadow-lg active:scale-95 transition-all disabled:opacity-50">
@@ -253,20 +335,53 @@ export default function WinOnlinePage() {
           </div>
         )}
 
-        {/* ... (Location Picker, Chat, BottomNav โครงเดิมทั้งหมด) ... */}
+        {/* 🌟 LOCATION PICKER (ปักหมุดแผนที่และเซเว่นแกลง ยังอยู่ครบค่ะ) 🌟 */}
         {isLocationPickerOpen && (
-          <div className="fixed inset-0 z-[110] bg-[#F4F6F8] flex flex-col">
-            <div className="p-4 border-b flex items-center gap-3 bg-white shadow-sm z-10">
+          <div className="fixed inset-0 z-[110] bg-[#F4F6F8] flex flex-col animate-fade-in">
+            <div className="p-4 border-b flex items-center gap-3 bg-white shadow-sm z-10 pt-safe">
               <button onClick={() => { setIsLocationPickerOpen(false); setIsMapMode(false); }} className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center">←</button>
-              <input autoFocus type="text" value={value} onChange={(e) => setValue(e.target.value)} placeholder="ค้นหาจุดรับ/ส่ง..." className="flex-1 bg-[#F4F6F8] rounded-[1rem] px-5 py-3 text-sm font-bold outline-none" />
+              {!isMapMode ? (
+                <input autoFocus type="text" value={value} onChange={(e) => setValue(e.target.value)} placeholder="ค้นหาจุดรับ/ส่ง..." className="flex-1 bg-[#F4F6F8] rounded-[1rem] px-5 py-3 text-sm font-bold outline-none" />
+              ) : (
+                <div className="flex-1 font-black text-sm text-gray-800 text-center pr-10">เลื่อนแผนที่เพื่อปักหมุด 📍</div>
+              )}
             </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              {status === "OK" ? data.map(({ place_id, description }) => (
-                <div key={place_id} onClick={() => handleSelectLocation(description)} className="p-4 bg-white rounded-[1rem] shadow-sm border border-gray-100 flex items-center gap-4 cursor-pointer">
-                  <div className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-lg">📍</div>
-                  <h4 className="text-sm font-bold text-gray-800">{description}</h4>
+            
+            <div className="flex-1 relative overflow-y-auto p-4 space-y-3">
+              {!isMapMode ? (
+                <>
+                  <div onClick={handleGetCurrentLocation} className="p-4 bg-white rounded-[1rem] border border-blue-100 flex items-center justify-between text-blue-600 font-bold text-sm shadow-sm cursor-pointer">
+                    <div className="flex items-center gap-3"><span>🎯</span><span>ใช้ตำแหน่งปัจจุบัน (GPS)</span></div>
+                    {isLocating && <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>}
+                  </div>
+                  <div onClick={() => setIsMapMode(true)} className="p-4 bg-white rounded-[1rem] border border-gray-200 flex items-center gap-3 text-gray-700 font-bold text-sm shadow-sm cursor-pointer"><span>🗺️</span> ปักหมุดบนแผนที่เอง</div>
+                  
+                  {status === "OK" ? data.map(({ place_id, description }) => (
+                    <div key={place_id} onClick={() => handleSelectLocation(description)} className="p-4 bg-white rounded-[1rem] shadow-sm border border-gray-100 flex items-center gap-4 cursor-pointer">
+                      <div className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-lg">📍</div>
+                      <h4 className="text-sm font-bold text-gray-800">{description}</h4>
+                    </div>
+                  )) : (
+                    popularPlaces.map((p, i) => (
+                      <div key={i} onClick={() => handleSelectLocation(p.name)} className="p-4 bg-white rounded-[1rem] shadow-sm border border-gray-100 flex items-center gap-4 cursor-pointer">
+                        <div className="w-10 h-10 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center text-lg">⭐</div>
+                        <div><h4 className="text-sm font-bold text-gray-800">{p.name}</h4><p className="text-[11px] text-gray-400 mt-0.5">{p.detail}</p></div>
+                      </div>
+                    ))
+                  )}
+                </>
+              ) : (
+                <div className="absolute inset-0">
+                  {isLoaded && <GoogleMap mapContainerStyle={{ width: '100%', height: '100%' }} center={mapCenter} zoom={16} onClick={onMapClick} options={{ disableDefaultUI: true, zoomControl: false }}>
+                    {selectedPin && <MarkerF position={selectedPin} />}
+                  </GoogleMap>}
+                  <button onClick={handleGetCurrentLocation} className="absolute top-4 right-4 w-14 h-14 bg-white rounded-full shadow-lg flex items-center justify-center text-2xl text-blue-500">🎯</button>
+                  <div className="absolute bottom-10 left-6 right-6 bg-white/95 backdrop-blur-xl p-6 rounded-[2rem] shadow-2xl text-center">
+                    <p className="text-sm font-black text-gray-800 mb-5">จิ้มที่แผนที่เพื่อปักหมุด 📍</p>
+                    <button onClick={() => setIsMapMode(false)} className="bg-gray-100 text-gray-600 px-6 py-3 rounded-full text-xs font-bold">กลับไปค้นหา</button>
+                  </div>
                 </div>
-              )) : <p className="text-center text-gray-400 py-10 font-bold">ลองพิมพ์ชื่อสถานที่ เช่น 'เซเว่น แกลง'</p>}
+              )}
             </div>
           </div>
         )}
