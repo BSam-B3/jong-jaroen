@@ -24,7 +24,7 @@ export default function RiderRegisterPage() {
   // --- States ---
   const [isAgreed, setIsAgreed] = useState(false);
 
-  // 🌟 State ใหม่สำหรับจัดการใบขับขี่ (เลือกได้หลายแบบ)
+  // 🌟 State สำหรับจัดการใบขับขี่
   const [licenses, setLicenses] = useState({
     motorcycle: false,
     car: false,
@@ -46,7 +46,7 @@ export default function RiderRegisterPage() {
 
   const addVehicle = () => {
     if (vehicles.length >= 4) {
-      alert('จำกัดการเพิ่มยานพาหนะสูงสุด 4 คันต่อบัญชีครับ');
+      alert('จำกัดการเพิ่มยานพาหนะสูงสุด 4 คันต่อบัญชีค่ะ');
       return;
     }
     setVehicles([...vehicles, { id: Date.now(), type: 'car', brand: '', model: '', color: '', registration: '' }]);
@@ -64,7 +64,6 @@ export default function RiderRegisterPage() {
     setVehicles(updatedVehicles);
   };
 
-  // ฟังก์ชันสำหรับสลับสถานะปุ่มใบขับขี่
   const toggleLicense = (type: keyof typeof licenses) => {
     setLicenses(prev => ({ ...prev, [type]: !prev[type] }));
   };
@@ -113,7 +112,7 @@ export default function RiderRegisterPage() {
     <div className="min-h-screen bg-[#F4F6F8] flex justify-center font-sans pb-20">
       <div className="w-full max-w-6xl min-h-screen flex flex-col px-4 sm:px-6">
         
-        {/* Header ส้มจงเจริญ */}
+        {/* Header */}
         <div className="mt-8 p-8 sm:p-12 bg-gradient-to-r from-[#EE4D2D] to-[#FF7337] text-white rounded-[3rem] shadow-xl relative overflow-hidden">
           <div className="absolute top-0 right-0 p-10 opacity-10 text-9xl">🛵</div>
           <Link href="/profile" className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center text-2xl mb-8 hover:bg-white/30 transition-all active:scale-90 shadow-inner">←</Link>
@@ -124,9 +123,7 @@ export default function RiderRegisterPage() {
         <form onSubmit={handleSubmit} className="mt-8 flex-1">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
             
-            {/* ========================================== */}
-            {/* คอลัมน์ซ้าย: ข้อมูลตัวรถ (Garage) */}
-            {/* ========================================== */}
+            {/* คอลัมน์ซ้าย: ข้อมูลตัวรถ */}
             <div className="space-y-8">
               
               <div className="flex justify-between items-center bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
@@ -159,19 +156,20 @@ export default function RiderRegisterPage() {
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
-                    <InputField label="ยี่ห้อ (Brand)" placeholder="Honda, Toyota" value={v.brand} onChange={(e) => updateVehicle(index, 'brand', e.target.value)} />
-                    <InputField label="รุ่น (Model)" placeholder="Wave, Yaris" value={v.model} onChange={(e) => updateVehicle(index, 'model', e.target.value)} />
+                    {/* 🌟 แก้ไข: เติม (e: any) ลงใน onChange */}
+                    <InputField label="ยี่ห้อ (Brand)" placeholder="Honda, Toyota" value={v.brand} onChange={(e: any) => updateVehicle(index, 'brand', e.target.value)} />
+                    <InputField label="รุ่น (Model)" placeholder="Wave, Yaris" value={v.model} onChange={(e: any) => updateVehicle(index, 'model', e.target.value)} />
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
-                    <InputField label="สีรถ (Color)" placeholder="แดง-ดำ, ขาว" value={v.color} onChange={(e) => updateVehicle(index, 'color', e.target.value)} />
-                    <InputField label="ป้ายทะเบียน" placeholder="1กข 1234 ระยอง" value={v.registration} onChange={(e) => updateVehicle(index, 'registration', e.target.value)} highlight />
+                    {/* 🌟 แก้ไข: เติม (e: any) ลงใน onChange */}
+                    <InputField label="สีรถ (Color)" placeholder="แดง-ดำ, ขาว" value={v.color} onChange={(e: any) => updateVehicle(index, 'color', e.target.value)} />
+                    <InputField label="ป้ายทะเบียน" placeholder="1กข 1234 ระยอง" value={v.registration} onChange={(e: any) => updateVehicle(index, 'registration', e.target.value)} highlight />
                   </div>
 
                   <div className="pt-4 border-t border-gray-50">
                     <p className="text-[10px] font-black text-gray-400 uppercase mb-4 tracking-widest text-center">อัปโหลดรูปรถคันที่ {index + 1}</p>
                     
-                    {/* ย้ายป้ายภาษีมาไว้หมวดรถให้ตรงจุด */}
                     <div className="mb-3">
                       <UploadBox icon="📄" title="ป้ายภาษี / พ.ร.บ." desc="ต้องยังไม่หมดอายุและเห็นชัดเจน" />
                     </div>
@@ -187,60 +185,33 @@ export default function RiderRegisterPage() {
               ))}
             </div>
 
-            {/* ========================================== */}
-            {/* 🌟 คอลัมน์ขวา: เอกสารคนขับ (ปรับปรุงใหม่ตามสั่ง) */}
-            {/* ========================================== */}
+            {/* คอลัมน์ขวา: เอกสารคนขับ */}
             <div className="space-y-8 lg:sticky lg:top-8">
               
               <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-gray-100 space-y-8">
                 
-                {/* 1. หมวดรูปถ่ายบุคคล (แยกโปรไฟล์ กับ KYC) */}
                 <div>
                   <h2 className="text-lg font-black text-gray-800 mb-4 flex items-center gap-2 border-b border-gray-50 pb-4">
                     <span>👤</span> รูปถ่ายคนขับ
                   </h2>
                   <div className="grid grid-cols-2 gap-4">
-                    <UploadBox 
-                      icon="📸" 
-                      title="รูปโปรไฟล์ไรเดอร์" 
-                      desc="หน้าตรง สุภาพ (แสดงให้ลูกค้าเห็นในแอป)" 
-                      highlight 
-                    />
-                    <UploadBox 
-                      icon="🤳" 
-                      title="เซลฟี่คู่ใบขับขี่" 
-                      desc="ถือบัตรไว้ใต้คาง (แอดมินตรวจสอบเท่านั้น)" 
-                    />
+                    <UploadBox icon="📸" title="รูปโปรไฟล์ไรเดอร์" desc="หน้าตรง สุภาพ (แสดงให้ลูกค้าเห็นในแอป)" highlight />
+                    <UploadBox icon="🤳" title="เซลฟี่คู่ใบขับขี่" desc="ถือบัตรไว้ใต้คาง (แอดมินตรวจสอบเท่านั้น)" />
                   </div>
                 </div>
 
-                {/* 2. หมวดใบขับขี่ (Dynamic Selection) */}
                 <div>
                   <h2 className="text-lg font-black text-gray-800 mb-4 flex items-center gap-2 border-b border-gray-50 pb-4">
                     <span>🪪</span> เลือกและอัปโหลดใบขับขี่
                   </h2>
                   <p className="text-[10px] font-bold text-gray-400 mb-4">กดเลือกประเภทใบขับขี่ที่คุณมี (เลือกได้มากกว่า 1 ข้อ)</p>
                   
-                  {/* ปุ่มกดเลือกประเภท */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
-                    <LicenseButton 
-                      label="จักรยานยนต์" 
-                      active={licenses.motorcycle} 
-                      onClick={() => toggleLicense('motorcycle')} 
-                    />
-                    <LicenseButton 
-                      label="รถยนต์ส่วนบุคคล" 
-                      active={licenses.car} 
-                      onClick={() => toggleLicense('car')} 
-                    />
-                    <LicenseButton 
-                      label="ท.1 / ท.2 / ท.3" 
-                      active={licenses.transport} 
-                      onClick={() => toggleLicense('transport')} 
-                    />
+                    <LicenseButton label="จักรยานยนต์" active={licenses.motorcycle} onClick={() => toggleLicense('motorcycle')} />
+                    <LicenseButton label="รถยนต์ส่วนบุคคล" active={licenses.car} onClick={() => toggleLicense('car')} />
+                    <LicenseButton label="ท.1 / ท.2 / ท.3" active={licenses.transport} onClick={() => toggleLicense('transport')} />
                   </div>
 
-                  {/* 🌟 ช่องอัปโหลดที่จะโผล่มาตามการเลือก (Dynamic) */}
                   <div className="space-y-3">
                     {licenses.motorcycle && (
                       <div className="animate-in fade-in slide-in-from-top-2 duration-300">
@@ -257,7 +228,6 @@ export default function RiderRegisterPage() {
                         <UploadBox icon="🛻" title="รูปใบอนุญาต ท.1 / ท.2 / ท.3" desc="ถ่ายด้านหน้าให้เห็นข้อมูลและวันหมดอายุชัดเจน" horizontal />
                       </div>
                     )}
-                    
                     {!licenses.motorcycle && !licenses.car && !licenses.transport && (
                       <div className="text-center py-6 border-2 border-dashed border-gray-100 rounded-2xl bg-gray-50">
                         <p className="text-[10px] font-bold text-gray-400">กรุณาเลือกประเภทใบขับขี่ด้านบนก่อนค่ะ</p>
@@ -271,7 +241,8 @@ export default function RiderRegisterPage() {
               {/* ปุ่มกดยืนยัน */}
               <div className="bg-white p-8 rounded-[2.5rem] shadow-lg border border-orange-100 border-l-8 border-l-[#EE4D2D]">
                 <div className="flex items-start gap-4 mb-6">
-                  <input type="checkbox" checked={isAgreed} onChange={(e) => setIsAgreed(e.target.checked)} className="mt-1 w-6 h-6 accent-[#EE4D2D] shrink-0" />
+                  {/* 🌟 แก้ไข: เติม (e: any) ลงใน onChange */}
+                  <input type="checkbox" checked={isAgreed} onChange={(e: any) => setIsAgreed(e.target.checked)} className="mt-1 w-6 h-6 accent-[#EE4D2D] shrink-0" />
                   <p className="text-[11px] text-gray-500 font-bold leading-relaxed">
                     ข้าพเจ้าขอยืนยันว่าข้อมูลยานพาหนะทั้ง {vehicles.length} คัน และเอกสารทั้งหมดเป็นความจริง และยินยอมให้ระบบตรวจสอบเพื่อความปลอดภัย
                   </p>
@@ -289,7 +260,7 @@ export default function RiderRegisterPage() {
   );
 }
 
-// --- Component ย่อย: ช่องกรอกข้อมูล ---
+// --- Component ย่อย ---
 function InputField({ label, placeholder, value, onChange, highlight = false }: any) {
   return (
     <div>
@@ -299,7 +270,6 @@ function InputField({ label, placeholder, value, onChange, highlight = false }: 
   );
 }
 
-// --- Component ย่อย: ปุ่มเลือกใบขับขี่ ---
 function LicenseButton({ label, active, onClick }: { label: string, active: boolean, onClick: () => void }) {
   return (
     <button type="button" onClick={onClick} className={`p-3 rounded-2xl border-2 transition-all flex items-center justify-center gap-2 ${active ? 'border-[#EE4D2D] bg-orange-50 shadow-sm' : 'border-gray-50 hover:bg-gray-50'}`}>
@@ -311,7 +281,6 @@ function LicenseButton({ label, active, onClick }: { label: string, active: bool
   );
 }
 
-// --- Component ย่อย: ช่องอัปโหลดรูป (รองรับแบบแนวนอน) ---
 function UploadBox({ icon, title, desc, highlight = false, horizontal = false }: any) {
   if (horizontal) {
     return (
