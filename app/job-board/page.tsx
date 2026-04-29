@@ -23,7 +23,6 @@ interface PageProps {
   searchParams: Promise<{ filter?: string }>;
 }
 
-// หมวดหมู่สำหรับบอร์ดหางาน
 const CATEGORIES = [
   { key: "all", label: "ทั้งหมด", icon: "🗂️" },
   { key: "งานประจำ", label: "งานประจำ", icon: "🏢" },
@@ -54,10 +53,13 @@ function formatBudget(n: number | null): string {
 
 export default async function JobBoardPage({ searchParams }: PageProps) {
   const params = await searchParams;
-  const filter = params.filter || DEFAULT_FILTER;
+  
+  // ✅ [Audit Fix] กรอง (Validation) ว่าสิ่งที่ค้นหามีอยู่ใน CATEGORIES จริง ป้องกันการส่งคุกคามเข้า DB
+  const ALLOWED = new Set(CATEGORIES.map(c => c.key));
+  const raw = params.filter || DEFAULT_FILTER;
+  const filter = ALLOWED.has(raw) ? raw : DEFAULT_FILTER;
 
   const supabase = await createClient();
-  // ✅ ส่ง null ไปถ้าเลือก "all" เพื่อให้ฟังก์ชันใน DB ดึงงานทุกประเภทออกมา
   const { data, error } = await supabase.rpc("get_jobs_by_new_categories", {
     p_filter: filter === "all" ? null : filter,
   });
@@ -70,7 +72,6 @@ export default async function JobBoardPage({ searchParams }: PageProps) {
         
         <div className="flex-1 overflow-y-auto pb-6 scrollbar-hide">
           
-          {/* 🔵 Header สีฟ้าแบบเดียวกับที่บีสามชอบ */}
           <div className="bg-gradient-to-b from-[#0082FA] to-[#00A3FF] rounded-[2.5rem] pt-8 pb-6 px-6 shadow-md relative z-10 m-3 mt-4 overflow-hidden">
             <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-3xl pointer-events-none"></div>
             
@@ -90,7 +91,6 @@ export default async function JobBoardPage({ searchParams }: PageProps) {
               {jobs.length} งานที่เปิดรับในพื้นที่ของคุณ
             </p>
 
-            {/* 🔘 Filter Tabs แก้ไข Link ให้ทำงานได้จริง */}
             <div className="-mx-6 px-6 overflow-x-auto scrollbar-hide relative z-10">
               <div className="flex gap-2 w-max pb-2 pt-2">
                 {CATEGORIES.map((c) => {
@@ -213,8 +213,6 @@ export default async function JobBoardPage({ searchParams }: PageProps) {
             </div>
           </main>
         </div>
-
-        {/* ❌ ลบ Bottom Navigation ชุดเดิมออกทั้งหมดเพื่อให้ไม่ซ้อนกัน */}
       </div>
 
       <style dangerouslySetInnerHTML={{__html: `
