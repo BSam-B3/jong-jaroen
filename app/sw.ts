@@ -6,7 +6,8 @@ declare const self: ServiceWorkerGlobalScope;
 
 // เริ่มการทำงานของ Serwist สำหรับจัดการ Cache และ Service Worker
 const serwist = new Serwist({
-  precacheEntries: self.__SW_MANIFEST,
+  // 🌟 เติม (self as any) เพื่อบังคับให้ Vercel ยอมปล่อยผ่านบรรทัดนี้ค่ะ
+  precacheEntries: (self as any).__SW_MANIFEST,
   skipWaiting: true,
   clientsClaim: true,
   navigationPreload: true,
