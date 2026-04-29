@@ -1,7 +1,7 @@
 "use client";
 import { createClient } from "@/lib/supabase/client";
 
-// ฟังก์ชันแปลง VAPID Key ให้เป็นรูปแบบที่เบราว์เซอร์เข้าใจ (แก้ไขจุดที่ทำให้ Build Failed)
+// ฟังก์ชันแปลง VAPID Key ให้เป็นรูปแบบที่เบราว์เซอร์เข้าใจ
 const urlB64ToUint8 = (b64: string) => {
   const pad = "=".repeat((4 - (b64.length % 4)) % 4);
   const s = (b64 + pad).replace(/-/g, "+").replace(/_/g, "/");
