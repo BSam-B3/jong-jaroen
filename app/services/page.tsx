@@ -23,7 +23,6 @@ interface PageProps {
   searchParams: Promise<{ category?: string; q?: string }>;
 }
 
-// หมวดหมู่อาชีพใหม่สไตล์ชุมชน (อัปเดตเพิ่ม สัตว์เลี้ยง, เสริมสวย และ อื่นๆ)
 const CATEGORIES = [
   { key: "all", label: "ทั้งหมด", icon: "✨" },
   { key: "แม่บ้าน", label: "แม่บ้าน/ทำความสะอาด", icon: "🧹" },
@@ -56,13 +55,14 @@ export default async function ServicesPage({ searchParams }: PageProps) {
     p_search: search || null,
   });
 
-  const services: Service[] = (data || []) as Service[];
+  // ✅ [Audit Fix] Handle error ให้ปลอดภัยขึ้น
+  if (error) console.error("[services] rpc failed:", error.message);
+  const services: Service[] = error ? [] : ((data ?? []) as Service[]);
 
   return (
     <div className="min-h-screen bg-gray-100 flex justify-center pb-24 font-sans">
       <div className="w-full sm:max-w-2xl md:max-w-3xl bg-[#F4F6F8] min-h-screen relative flex flex-col shadow-xl overflow-x-hidden">
         
-        {/* 🟠 Header (สีส้มไล่สีสุดพรีเมียม) */}
         <div className="bg-gradient-to-b from-[#EE4D2D] to-[#FF7337] rounded-[2.5rem] p-6 pt-8 shadow-md relative z-20 m-3 mt-4">
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-white text-2xl font-black tracking-tight">ค้นหาช่าง / บริการ</h1>
@@ -75,7 +75,6 @@ export default async function ServicesPage({ searchParams }: PageProps) {
             </Link>
           </div>
 
-          {/* ช่องค้นหาสไตล์พรีเมียม */}
           <form action="/services" method="GET" className="relative bg-white rounded-2xl p-1.5 flex items-center shadow-lg shadow-black/5 mb-4">
             {category !== "all" && <input type="hidden" name="category" value={category} />}
             <div className="pl-3 pr-2 text-gray-400">🔍</div>
@@ -87,7 +86,6 @@ export default async function ServicesPage({ searchParams }: PageProps) {
             />
           </form>
 
-          {/* 🔘 Categories Pills แบบเลื่อนได้ */}
           <div className="-mx-6 px-6 overflow-x-auto scrollbar-hide">
             <div className="flex gap-2 w-max pb-2">
               {CATEGORIES.map((c) => {
@@ -115,7 +113,6 @@ export default async function ServicesPage({ searchParams }: PageProps) {
           </div>
         </div>
 
-        {/* จำนวนผลลัพธ์ */}
         <div className="px-6 pt-2 pb-1">
           <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">
             พบ <span className="text-[#EE4D2D]">{services.length}</span> บริการที่พร้อมดูแลคุณ
@@ -123,7 +120,6 @@ export default async function ServicesPage({ searchParams }: PageProps) {
           </p>
         </div>
 
-        {/* 🛍️ Grid รายการบริการ (2 คอลัมน์) */}
         <main className="px-4 py-3">
           {error && (
             <div className="bg-red-50 text-red-600 p-4 rounded-2xl text-xs font-bold text-center border border-red-100">เกิดข้อผิดพลาดในการดึงข้อมูล</div>
@@ -153,8 +149,6 @@ export default async function ServicesPage({ searchParams }: PageProps) {
   );
 }
 
-// ---------------- Components ---------------- //
-
 function ServiceCard({ service }: { service: Service }) {
   const isVerified = service.provider_kyc_status === "approved";
 
@@ -163,7 +157,6 @@ function ServiceCard({ service }: { service: Service }) {
       href={`/services/${service.id}`}
       className="flex flex-col bg-white rounded-[1.5rem] overflow-hidden border border-slate-100 shadow-sm hover:border-[#EE4D2D]/30 hover:shadow-md transition-all active:scale-[0.98] group"
     >
-      {/* Cover Image (4:3) */}
       <div className="relative w-full aspect-[4/3] bg-slate-200 overflow-hidden">
         {service.cover_image_url ? (
           <img src={service.cover_image_url} alt={service.title} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
@@ -173,7 +166,6 @@ function ServiceCard({ service }: { service: Service }) {
       </div>
 
       <div className="p-3.5 flex flex-col flex-1">
-        {/* Provider Row */}
         <div className="flex items-center gap-1.5 mb-2">
           <div className="w-5 h-5 rounded-full overflow-hidden bg-slate-200 shrink-0 border border-slate-50">
             {service.provider_avatar ? (
@@ -194,19 +186,16 @@ function ServiceCard({ service }: { service: Service }) {
           )}
         </div>
 
-        {/* Title */}
         <h3 className="text-[13px] font-black text-slate-800 line-clamp-2 leading-relaxed min-h-[38px] mb-2">
           {service.title}
         </h3>
 
-        {/* Rating Row */}
         <div className="flex items-center gap-1 mb-3">
           <span className="text-yellow-400 text-xs">⭐</span>
           <span className="text-[11px] font-black text-slate-700">{Number(service.rating || 0).toFixed(1)}</span>
           <span className="text-[10px] font-bold text-slate-400">({service.review_count || 0})</span>
         </div>
 
-        {/* Price Row */}
         <div className="mt-auto pt-2.5 border-t border-slate-50 flex flex-col">
           <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter mb-0.5">เริ่มต้นที่</span>
           <div className="flex items-baseline gap-0.5">
