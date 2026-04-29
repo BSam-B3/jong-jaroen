@@ -7,10 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 type Mode = 'hired' | 'received';
 type Status = 'open' | 'in_progress' | 'completed' | 'cancelled';
 
-const STATUS_META: Record<
-  Status,
-  { label: string; icon: string; bg: string; text: string; ring: string }
-> = {
+const STATUS_META: Record<Status, { label: string; icon: string; bg: string; text: string; ring: string }> = {
   open: { label: 'รอคนรับงาน', icon: '🟡', bg: 'bg-amber-50', text: 'text-amber-700', ring: 'ring-amber-200' },
   in_progress: { label: 'กำลังดำเนินการ', icon: '🛵', bg: 'bg-blue-50', text: 'text-blue-700', ring: 'ring-blue-200' },
   completed: { label: 'เสร็จสิ้น', icon: '✅', bg: 'bg-emerald-50', text: 'text-emerald-700', ring: 'ring-emerald-200' },
@@ -24,14 +21,17 @@ export default function MyJobsPage() {
   const [jobs, setJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // Review System
+  // 🕵️‍♀️ ตัวแปรสำหรับเก็บ Error มาโชว์หน้าจอ
+  const [debugLog, setDebugLog] = useState<string>('กำลังโหลด...');
+
   const [reviewJob, setReviewJob] = useState<any>(null);
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
 
   const fetchMyJobs = useCallback(async (uid: string) => {
     setLoading(true);
-    // 🌟 แก้ไขจุดที่พัง: ลบ full_name และ avatar_url ออก เหลือแค่ first_name กับ phone
+    setDebugLog('กำลังเริ่มดึงข้อมูล...');
+    
     const { data, error } = await supabase
       .from('jobs')
       .select(`
@@ -42,8 +42,13 @@ export default function MyJobsPage() {
       .or(`employer_id.eq.${uid},worker_id.eq.${uid}`)
       .order('created_at', { ascending: false });
 
-    if (error) console.error('Fetch Error:', error.message);
-    if (data) setJobs(data);
+    if (error) {
+      console.error('Fetch Error:', error.message);
+      setDebugLog(`❌ Error: ${error.message}`);
+    } else {
+      setDebugLog(`✅ สำเร็จ! ดึงข้อมูลมาได้ ${data?.length} รายการ`);
+      setJobs(data || []);
+    }
     setLoading(false);
   }, [supabase]);
 
@@ -53,6 +58,7 @@ export default function MyJobsPage() {
         setUserId(session.user.id);
         fetchMyJobs(session.user.id);
       } else {
+        setDebugLog('❌ ไม่พบ Session การล็อกอิน (คุณยังไม่ได้ล็อกอิน)');
         setLoading(false);
       }
     });
@@ -79,7 +85,14 @@ export default function MyJobsPage() {
           <h1 className="text-gray-900 text-3xl font-black italic">MY <span className="text-[#EE4D2D] not-italic">JOBS</span></h1>
         </header>
 
-        <div className="px-5 pt-6">
+        {/* 🚨 DEBUG BOX 🚨 */}
+        <div className="m-5 p-5 bg-red-50 border-2 border-red-500 rounded-2xl shadow-sm text-xs font-mono break-all">
+          <h3 className="text-red-700 font-black mb-3 text-sm">🕵️‍♀️ กล่องตรวจสอบ (ถ่ายรูปส่งให้เจมดู)</h3>
+          <p className="mb-2 text-gray-700"><b>1. UID ปัจจุบันของคุณ:</b> <br/><span className="text-blue-600 bg-blue-50 px-1">{userId || 'กำลังโหลด...'}</span></p>
+          <p className="mb-1 text-gray-700"><b>2. สถานะฐานข้อมูล:</b> <br/><span className={debugLog.includes('Error') ? 'text-red-600 font-bold' : 'text-green-600 font-bold'}>{debugLog}</span></p>
+        </div>
+
+        <div className="px-5">
           <div className="relative bg-white rounded-2xl p-1.5 flex shadow-sm border border-gray-100">
             <span className={`absolute top-1.5 bottom-1.5 w-[calc(50%-0.375rem)] rounded-xl bg-gradient-to-r ${accent.grad} shadow-md transition-all duration-300 ${isHired ? 'left-1.5' : 'left-[calc(50%+0rem)]'}`} />
             <button onClick={() => setMode('hired')} className={`relative z-10 flex-1 py-3 text-sm font-black transition-colors ${isHired ? 'text-white' : 'text-gray-500'}`}>💼 งานที่ฉันจ้าง</button>
@@ -111,24 +124,17 @@ export default function MyJobsPage() {
                       <p className={`font-black text-xl ${accent.text}`}>{job.budget?.toLocaleString()} บาท</p>
                     </div>
                     <div className="flex gap-2">
-                      {/* ปุ่มยกเลิกสำหรับงานที่เพิ่งเปิด */}
                       {isHired && job.status === 'open' && (
                         <button onClick={() => handleUpdateStatus(job.id, 'cancelled')} className="bg-gray-100 text-gray-500 px-4 py-2 rounded-xl text-[11px] font-black">ยกเลิก</button>
                       )}
-                      
-                      {/* 🌟 ปุ่มแชท สำหรับงานที่กำลังดำเนินการ */}
                       {job.status === 'in_progress' && (
                         <Link href={`/chat/${job.id}`} className="bg-blue-50 text-blue-600 px-5 py-2 rounded-xl text-[11px] font-black border border-blue-100 flex items-center justify-center shadow-sm active:scale-95 transition-transform">
                           💬 แชท
                         </Link>
                       )}
-
-                      {/* ปุ่มให้คะแนนสำหรับคนจ้าง เมื่องานเสร็จ */}
                       {isHired && job.status === 'completed' && (
                         <button onClick={() => setReviewJob(job)} className="bg-orange-50 text-[#EE4D2D] px-4 py-2 rounded-xl text-[11px] font-black border border-orange-100">⭐ ให้คะแนน</button>
                       )}
-                      
-                      {/* ปุ่มจบงานสำหรับคนรับงาน */}
                       {!isHired && job.status === 'in_progress' && (
                         <button onClick={() => handleUpdateStatus(job.id, 'completed')} className="bg-emerald-500 text-white px-5 py-2 rounded-xl text-[11px] font-black shadow-md active:scale-95 transition-transform">✅ จบงาน</button>
                       )}
@@ -139,28 +145,6 @@ export default function MyJobsPage() {
             })
           )}
         </main>
-        
-        {/* Review Modal */}
-        {reviewJob && (
-          <div className="fixed inset-0 z-[200] bg-black/60 flex items-center justify-center p-5 backdrop-blur-sm">
-            <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl relative">
-              <button onClick={() => setReviewJob(null)} className="absolute top-6 right-6 text-gray-300 hover:text-gray-500 text-xl font-bold">✕</button>
-              <h3 className="text-center font-black text-xl mb-6">ให้คะแนนความประทับใจ ⭐</h3>
-              <div className="flex justify-center gap-2 mb-6">
-                {[1,2,3,4,5].map(s => (
-                  <button key={s} onClick={() => setRating(s)} className={`text-4xl ${rating >= s ? 'text-yellow-400' : 'text-gray-100'}`}>★</button>
-                ))}
-              </div>
-              <textarea 
-                className="w-full bg-gray-50 rounded-2xl p-4 text-sm font-bold border border-gray-100 outline-none focus:border-[#EE4D2D] h-24 mb-6" 
-                placeholder="บอกความรู้สึกของคุณ..." 
-                value={comment}
-                onChange={e => setComment(e.target.value)}
-              />
-              <button onClick={() => { alert('ขอบคุณค่ะ! ⭐'); setReviewJob(null); }} className="w-full bg-[#EE4D2D] text-white font-black py-4 rounded-2xl shadow-lg">ยืนยัน 🚀</button>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
