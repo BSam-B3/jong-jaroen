@@ -1,16 +1,26 @@
 "use client";
 import { createClient } from "@/lib/supabase/client";
 
+// ฟังก์ชันแปลง VAPID Key ให้เป็นรูปแบบที่เบราว์เซอร์เข้าใจ
 const urlB64ToUint8 = (b64: string) => {
   const pad = "=".repeat((4 - (b64.length % 4)) % 4);
   const s = (b64 + pad).replace(/-/g, "+").replace(/_/g, "/");
   const raw = atob(s);
-  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+  
+  // ✅ ใช้ Loop แทนการใช้ Spread Operator [...] เพื่อเลี่ยง Error ใน Vercel
+  const outputArray = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; ++i) {
+    outputArray[i] = raw.charCodeAt(i);
+  }
+  return outputArray;
 };
 
 export async function enablePush() {
-  if (!("serviceWorker" in navigator) || !("PushManager" in window))
+  if (typeof window === "undefined") return;
+  
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
     throw new Error("เบราว์เซอร์นี้ไม่รองรับการแจ้งเตือนค่ะ");
+  }
 
   const perm = await Notification.requestPermission();
   if (perm !== "granted") throw new Error("คุณปฏิเสธการแจ้งเตือน");
@@ -48,6 +58,7 @@ export async function disablePush() {
   const reg = await navigator.serviceWorker.ready;
   const sub = await reg.pushManager.getSubscription();
   if (!sub) return;
+  
   const supabase = createClient();
   await supabase.from("push_subscriptions").delete().eq("endpoint", sub.endpoint);
   await sub.unsubscribe();
