@@ -32,21 +32,19 @@ export default function MyJobsPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [jobs, setJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // 🌟 State สำหรับระบบให้คะแนนรีวิว
   const [reviewJob, setReviewJob] = useState<any>(null);
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
-  const [submittingReview, setSubmittingReview] = useState(false);
 
   const fetchMyJobs = useCallback(async (uid: string) => {
     setLoading(true);
+    // 🌟 แก้ไข: ลบ phone_number ออก เพราะในฐานข้อมูลชื่อคอลัมน์คือ phone
     const { data } = await supabase
       .from('jobs')
       .select(`
         *,
-        employer:profiles!employer_id (first_name, full_name, phone_number, phone, avatar_url),
-        worker:profiles!worker_id (first_name, full_name, phone_number, phone, avatar_url)
+        employer:profiles!employer_id (first_name, full_name, phone, avatar_url),
+        worker:profiles!worker_id (first_name, full_name, phone, avatar_url)
       `)
       .or(`employer_id.eq.${uid},worker_id.eq.${uid}`)
       .order('created_at', { ascending: false });
@@ -68,35 +66,11 @@ export default function MyJobsPage() {
 
   const handleUpdateStatus = async (jobId: string, newStatus: Status) => {
     if (!confirm(`ยืนยันการเปลี่ยนสถานะเป็น ${newStatus === 'completed' ? 'เสร็จสิ้น' : 'ยกเลิกงาน'} ใช่หรือไม่?`)) return;
-    
     const { error } = await supabase.from('jobs').update({ status: newStatus }).eq('id', jobId);
     if (!error && userId) {
       alert('อัปเดตสถานะเรียบร้อยค่ะ ✅');
       fetchMyJobs(userId);
-    } else {
-      alert('เกิดข้อผิดพลาด กรุณาลองใหม่ค่ะ');
     }
-  };
-
-  // 🌟 ฟังก์ชันส่งคะแนนรีวิวลงฐานข้อมูล
-  const handleSubmitReview = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmittingReview(true);
-    
-    // บันทึกรีวิว (ถ้ายังไม่ได้สร้างตาราง reviews ระบบจะโชว์ error ใน console แต่แอปไม่พังค่ะ)
-    const { error } = await supabase.from('reviews').insert({
-      job_id: reviewJob.id,
-      reviewer_id: userId,
-      reviewee_id: reviewJob.worker_id,
-      rating: rating,
-      comment: comment
-    });
-
-    if (error) console.warn('Review Alert:', error.message);
-    
-    alert('ขอบคุณสำหรับคะแนนรีวิวค่ะ! ⭐');
-    setSubmittingReview(false);
-    setReviewJob(null);
   };
 
   const hiredJobs = jobs.filter((j) => j.employer_id === userId);
@@ -111,14 +85,12 @@ export default function MyJobsPage() {
   return (
     <div className="min-h-screen bg-[#F4F6F8] flex justify-center font-sans">
       <div className="w-full sm:max-w-2xl md:max-w-3xl min-h-screen flex flex-col pb-6">
-        
         <header className="px-5 pt-12 pb-6 bg-white border-b border-gray-100 sticky top-0 z-20">
           <div className="flex items-center justify-between">
             <div>
               <Link href="/win-online" className="text-[#EE4D2D] font-black text-xs mb-1 inline-block">← กลับหน้าหลัก</Link>
               <h1 className="text-gray-900 text-3xl font-black tracking-tight italic">MY <span className="text-[#EE4D2D] not-italic">JOBS</span></h1>
             </div>
-            <Link href="/notifications" className="w-12 h-12 rounded-full bg-gray-50 flex items-center justify-center text-xl shadow-sm border border-gray-100 active:scale-95 transition">🔔</Link>
           </div>
         </header>
 
@@ -141,56 +113,24 @@ export default function MyJobsPage() {
           ) : (
             displayJobs.map((job) => {
               const s = STATUS_META[job.status as Status] || STATUS_META.open;
-              const isHiredMode = mode === 'hired';
-              const counterpartyName = isHiredMode ? (job.worker?.full_name || job.worker?.first_name || 'กำลังค้นหาไรเดอร์...') : (job.employer?.full_name || job.employer?.first_name || 'ลูกค้า');
-
               return (
                 <article key={job.id} className={`bg-white rounded-[2rem] p-5 shadow-sm border ${accent.border}`}>
                   <div className="flex items-center justify-between mb-4">
                     <span className={`text-[10px] font-black px-3 py-1.5 rounded-full ${accent.soft} ${accent.text} uppercase tracking-wider`}>{getCategoryMeta(job.job_type)}</span>
                     <span className={`text-[10px] font-black px-3 py-1.5 rounded-full ${s.bg} ${s.text} border ${s.ring}`}><span className="mr-1">{s.icon}</span>{s.label}</span>
                   </div>
-
-                  <h3 className="font-black text-gray-900 text-base leading-snug mb-3">{job.title || `บริการ ${getCategoryMeta(job.job_type)}`}</h3>
-
-                  <div className="flex items-center gap-3 mb-4 bg-gray-50 p-3 rounded-2xl border border-gray-100">
-                    <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-lg border border-gray-100 shadow-sm overflow-hidden">
-                      {isHiredMode && job.worker?.avatar_url ? <img src={job.worker.avatar_url} className="w-full h-full object-cover" alt="avatar" /> : (isHiredMode ? '🛵' : '👤')}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-black text-gray-800 truncate">{isHiredMode ? 'ไรเดอร์: ' : 'ลูกค้า: '}{counterpartyName}</p>
-                      <p className="text-[10px] text-gray-400 font-bold mt-0.5">{new Date(job.created_at).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' })}</p>
-                    </div>
-                  </div>
-
-                  {isHiredMode && job.status === 'in_progress' && (
-                    <div className="mb-4 flex items-center gap-2">
-                       <span className="text-[10px] font-black bg-yellow-300 text-gray-900 px-3 py-1 rounded-md tracking-widest border border-yellow-400 shadow-sm">ป้ายทะเบียน: ติดต่อสอบถามในแชท</span>
-                    </div>
-                  )}
-
+                  <h3 className="font-black text-gray-900 text-base mb-3">{job.title || `บริการ ${getCategoryMeta(job.job_type)}`}</h3>
                   <div className="flex items-center justify-between pt-4 border-t border-gray-100">
                     <div>
-                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">ค่าบริการสุทธิ</p>
-                      {/* 🌟 ปรับสกุลเงินให้เป็น "บาท" 100% ตาม Audit */}
+                      <p className="text-[10px] text-gray-400 font-bold uppercase">ค่าบริการสุทธิ</p>
                       <p className={`font-black text-xl ${accent.text}`}>{(job.budget || 0).toLocaleString('th-TH')} บาท</p>
                     </div>
-                    
                     <div className="flex gap-2">
-                      {isHiredMode && job.status === 'open' && (
-                        <button onClick={() => handleUpdateStatus(job.id, 'cancelled')} className="bg-gray-100 text-gray-500 px-5 py-3 rounded-2xl text-[11px] font-black hover:bg-red-50 hover:text-red-600 transition-colors">ยกเลิกคำขอ</button>
+                      {isHired && job.status === 'open' && (
+                        <button onClick={() => handleUpdateStatus(job.id, 'cancelled')} className="bg-gray-100 text-gray-500 px-5 py-3 rounded-2xl text-[11px] font-black">ยกเลิกคำขอ</button>
                       )}
-                      {isHiredMode && job.status === 'in_progress' && (
-                        <button className="bg-blue-50 text-blue-600 border border-blue-100 px-5 py-3 rounded-2xl text-[11px] font-black hover:bg-blue-100 transition-colors">💬 แชท</button>
-                      )}
-                      
-                      {/* 🌟 ปุ่มให้คะแนน สำหรับลูกค้าเมื่องานเสร็จ */}
-                      {isHiredMode && job.status === 'completed' && (
-                        <button onClick={() => { setReviewJob(job); setRating(5); setComment(''); }} className="bg-orange-50 text-[#EE4D2D] border border-orange-100 px-5 py-3 rounded-2xl text-[11px] font-black hover:bg-orange-100 transition-colors">⭐ ให้คะแนนไรเดอร์</button>
-                      )}
-
-                      {!isHiredMode && job.status === 'in_progress' && (
-                        <button onClick={() => handleUpdateStatus(job.id, 'completed')} className="bg-emerald-500 text-white shadow-md px-6 py-3 rounded-2xl text-[11px] font-black hover:bg-emerald-600 transition-transform active:scale-95">✅ จบงานเรียบร้อย</button>
+                      {!isHired && job.status === 'in_progress' && (
+                        <button onClick={() => handleUpdateStatus(job.id, 'completed')} className="bg-emerald-500 text-white px-6 py-3 rounded-2xl text-[11px] font-black">✅ จบงาน</button>
                       )}
                     </div>
                   </div>
@@ -199,50 +139,6 @@ export default function MyJobsPage() {
             })
           )}
         </main>
-
-        {/* 🌟 MODAL: Popup ให้คะแนนรีวิวไรเดอร์ */}
-        {reviewJob && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-5 animate-fade-in">
-            <div className="bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl relative">
-              <button onClick={() => setReviewJob(null)} className="absolute top-4 right-4 w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-500 font-bold active:scale-95">✕</button>
-              
-              <div className="text-center mb-6">
-                <div className="w-16 h-16 bg-gray-100 rounded-full mx-auto mb-3 flex items-center justify-center text-3xl overflow-hidden border-2 border-gray-100 shadow-sm">
-                  {reviewJob.worker?.avatar_url ? <img src={reviewJob.worker.avatar_url} className="w-full h-full object-cover" alt="rider" /> : '👤'}
-                </div>
-                <h3 className="text-lg font-black text-gray-900">รีวิวไรเดอร์</h3>
-                <p className="text-xs font-bold text-gray-500 mt-1">{reviewJob.worker?.full_name || reviewJob.worker?.first_name || 'ไม่ระบุชื่อ'}</p>
-              </div>
-
-              <form onSubmit={handleSubmitReview} className="space-y-5">
-                <div className="flex justify-center gap-2">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <button
-                      key={star}
-                      type="button"
-                      onClick={() => setRating(star)}
-                      className={`text-4xl transition-transform active:scale-90 ${rating >= star ? 'text-yellow-400' : 'text-gray-200'}`}
-                    >
-                      ★
-                    </button>
-                  ))}
-                </div>
-                
-                <textarea
-                  value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                  placeholder="ความประทับใจ หรือข้อเสนอแนะ..."
-                  className="w-full bg-gray-50 border border-gray-200 rounded-[1rem] p-4 text-sm font-bold outline-none focus:border-[#EE4D2D] resize-none h-24"
-                />
-                
-                <button type="submit" disabled={submittingReview} className="w-full bg-[#EE4D2D] text-white font-black py-4 rounded-[1rem] shadow-lg active:scale-95 transition-transform disabled:opacity-50">
-                  {submittingReview ? 'กำลังส่งข้อมูล...' : 'ส่งคะแนนรีวิว 🚀'}
-                </button>
-              </form>
-            </div>
-          </div>
-        )}
-
       </div>
     </div>
   );
