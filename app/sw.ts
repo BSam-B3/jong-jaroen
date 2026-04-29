@@ -1,3 +1,4 @@
+/// <reference lib="webworker" />
 import { defaultCache } from "@serwist/next/worker";
 import { Serwist } from "serwist";
 
@@ -20,7 +21,7 @@ self.addEventListener("push", (event) => {
   
   const options = {
     body: data.body,
-    icon: "/icon-192.png", // อย่าลืมใส่ไฟล์รูปไอคอนในโฟลเดอร์ public นะคะ
+    icon: "/icon-192.png", 
     badge: "/icon-192.png",
     data: data.url || "/",
     vibrate: [100, 50, 100],
