@@ -14,6 +14,16 @@ interface Vehicle {
   registration: string;
 }
 
+// 🌟 สร้างชุดข้อมูลประเภทรถ เพื่อให้มีทั้ง Icon และ Label ข้อความ
+const VEHICLE_TYPES = [
+  { id: 'motorcycle', label: 'มอเตอร์ไซค์', icon: '🛵' },
+  { id: 'saleng', label: 'ซาเล้ง', icon: '🛺' },
+  { id: 'car', label: 'รถเก๋ง', icon: '🚗' },
+  { id: 'suv', label: '7 ที่นั่ง', icon: '🚙' },
+  { id: 'van', label: 'รถตู้', icon: '🚐' },
+  { id: 'pickup', label: 'กระบะ', icon: '🛻' }
+];
+
 export default function RiderRegisterPage() {
   const router = useRouter();
   const supabase = createClient();
@@ -21,10 +31,8 @@ export default function RiderRegisterPage() {
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState<any>(null);
 
-  // --- States ---
   const [isAgreed, setIsAgreed] = useState(false);
 
-  // 🌟 State สำหรับจัดการใบขับขี่
   const [licenses, setLicenses] = useState({
     motorcycle: false,
     car: false,
@@ -123,57 +131,63 @@ export default function RiderRegisterPage() {
         <form onSubmit={handleSubmit} className="mt-8 flex-1">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
             
+            {/* ========================================== */}
             {/* คอลัมน์ซ้าย: ข้อมูลตัวรถ */}
-            <div className="space-y-8">
+            {/* ========================================== */}
+            <div className="space-y-6">
               
-              <div className="flex justify-between items-center bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
-                <div>
-                  <h2 className="text-lg font-black text-gray-800">อู่รถของฉัน (Garage)</h2>
-                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{vehicles.length} / 4 ยานพาหนะ</p>
-                </div>
-                {vehicles.length < 4 && (
-                  <button type="button" onClick={addVehicle} className="bg-[#EE4D2D] text-white px-5 py-2.5 rounded-full text-xs font-black shadow-md active:scale-95 transition-all">
-                    + เพิ่มรถคันใหม่
-                  </button>
-                )}
+              <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
+                <h2 className="text-lg font-black text-gray-800">อู่รถของฉัน (Garage)</h2>
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">
+                  กำลังลงทะเบียน {vehicles.length} / 4 ยานพาหนะ
+                </p>
               </div>
 
               {vehicles.map((v, index) => (
                 <div key={v.id} className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-gray-100 space-y-6 relative group transition-all hover:shadow-md">
                   <div className="flex justify-between items-center mb-2">
-                    <span className="bg-gray-900 text-white text-[10px] font-black px-4 py-1.5 rounded-full uppercase italic">ยานพาหนะที่ {index + 1}</span>
+                    <span className="bg-gray-900 text-white text-[10px] font-black px-4 py-1.5 rounded-full uppercase italic">
+                      ยานพาหนะที่ {index + 1}
+                    </span>
                     {vehicles.length > 1 && (
-                      <button type="button" onClick={() => removeVehicle(v.id)} className="text-red-500 text-[10px] font-black hover:underline">✕ ลบออก</button>
+                      <button type="button" onClick={() => removeVehicle(v.id)} className="text-red-500 text-[10px] font-black hover:underline">
+                        ✕ ลบออก
+                      </button>
                     )}
                   </div>
 
+                  {/* 🌟 จุดที่แก้ไข: ดึงข้อมูลจาก VEHICLE_TYPES มาแสดงทั้ง Icon และ Label */}
                   <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-                    {['motorcycle', 'saleng', 'car', 'suv', 'van', 'pickup'].map((type) => (
-                      <button key={type} type="button" onClick={() => updateVehicle(index, 'type', type)} className={`p-3 rounded-2xl border-2 transition-all flex flex-col items-center ${v.type === type ? 'border-[#EE4D2D] bg-orange-50 shadow-inner scale-105' : 'border-gray-50 opacity-60 hover:opacity-100'}`}>
-                        <div className="text-xl mb-1">{getIcon(type)}</div>
+                    {VEHICLE_TYPES.map((vType) => (
+                      <button 
+                        key={vType.id} 
+                        type="button" 
+                        onClick={() => updateVehicle(index, 'type', vType.id)} 
+                        className={`p-3 rounded-2xl border-2 transition-all flex flex-col items-center justify-center gap-1 ${v.type === vType.id ? 'border-[#EE4D2D] bg-orange-50 shadow-inner scale-105' : 'border-gray-50 opacity-60 hover:opacity-100'}`}
+                      >
+                        <div className="text-2xl">{vType.icon}</div>
+                        <div className={`text-[9px] font-black ${v.type === vType.id ? 'text-[#EE4D2D]' : 'text-gray-500'}`}>
+                          {vType.label}
+                        </div>
                       </button>
                     ))}
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
-                    {/* 🌟 แก้ไข: เติม (e: any) ลงใน onChange */}
                     <InputField label="ยี่ห้อ (Brand)" placeholder="Honda, Toyota" value={v.brand} onChange={(e: any) => updateVehicle(index, 'brand', e.target.value)} />
                     <InputField label="รุ่น (Model)" placeholder="Wave, Yaris" value={v.model} onChange={(e: any) => updateVehicle(index, 'model', e.target.value)} />
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
-                    {/* 🌟 แก้ไข: เติม (e: any) ลงใน onChange */}
                     <InputField label="สีรถ (Color)" placeholder="แดง-ดำ, ขาว" value={v.color} onChange={(e: any) => updateVehicle(index, 'color', e.target.value)} />
                     <InputField label="ป้ายทะเบียน" placeholder="1กข 1234 ระยอง" value={v.registration} onChange={(e: any) => updateVehicle(index, 'registration', e.target.value)} highlight />
                   </div>
 
                   <div className="pt-4 border-t border-gray-50">
                     <p className="text-[10px] font-black text-gray-400 uppercase mb-4 tracking-widest text-center">อัปโหลดรูปรถคันที่ {index + 1}</p>
-                    
                     <div className="mb-3">
                       <UploadBox icon="📄" title="ป้ายภาษี / พ.ร.บ." desc="ต้องยังไม่หมดอายุและเห็นชัดเจน" />
                     </div>
-
                     <div className="grid grid-cols-2 gap-3">
                       <UploadBox icon="🚘" title="หน้าตรง" />
                       <UploadBox icon="🚙" title="หลัง (ทะเบียน)" />
@@ -183,13 +197,25 @@ export default function RiderRegisterPage() {
                   </div>
                 </div>
               ))}
+
+              {vehicles.length < 4 && (
+                <button 
+                  type="button" 
+                  onClick={addVehicle} 
+                  className="w-full border-2 border-dashed border-[#EE4D2D] bg-orange-50/50 hover:bg-orange-50 text-[#EE4D2D] py-6 rounded-[2.5rem] font-black shadow-sm active:scale-95 transition-all flex flex-col items-center justify-center gap-1 group"
+                >
+                  <span className="text-3xl group-hover:scale-125 transition-transform">+</span>
+                  <span className="text-sm">เพิ่มรถลงทะเบียน (คันที่ {vehicles.length + 1})</span>
+                </button>
+              )}
             </div>
 
+            {/* ========================================== */}
             {/* คอลัมน์ขวา: เอกสารคนขับ */}
+            {/* ========================================== */}
             <div className="space-y-8 lg:sticky lg:top-8">
               
               <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-gray-100 space-y-8">
-                
                 <div>
                   <h2 className="text-lg font-black text-gray-800 mb-4 flex items-center gap-2 border-b border-gray-50 pb-4">
                     <span>👤</span> รูปถ่ายคนขับ
@@ -235,13 +261,11 @@ export default function RiderRegisterPage() {
                     )}
                   </div>
                 </div>
-
               </div>
 
               {/* ปุ่มกดยืนยัน */}
               <div className="bg-white p-8 rounded-[2.5rem] shadow-lg border border-orange-100 border-l-8 border-l-[#EE4D2D]">
                 <div className="flex items-start gap-4 mb-6">
-                  {/* 🌟 แก้ไข: เติม (e: any) ลงใน onChange */}
                   <input type="checkbox" checked={isAgreed} onChange={(e: any) => setIsAgreed(e.target.checked)} className="mt-1 w-6 h-6 accent-[#EE4D2D] shrink-0" />
                   <p className="text-[11px] text-gray-500 font-bold leading-relaxed">
                     ข้าพเจ้าขอยืนยันว่าข้อมูลยานพาหนะทั้ง {vehicles.length} คัน และเอกสารทั้งหมดเป็นความจริง และยินยอมให้ระบบตรวจสอบเพื่อความปลอดภัย
@@ -260,7 +284,6 @@ export default function RiderRegisterPage() {
   );
 }
 
-// --- Component ย่อย ---
 function InputField({ label, placeholder, value, onChange, highlight = false }: any) {
   return (
     <div>
@@ -303,16 +326,4 @@ function UploadBox({ icon, title, desc, highlight = false, horizontal = false }:
       <input type="file" className="hidden" />
     </div>
   );
-}
-
-function getIcon(type: string) {
-  switch (type) {
-    case 'motorcycle': return '🛵';
-    case 'saleng': return '🛺';
-    case 'car': return '🚗';
-    case 'suv': return '🚙';
-    case 'van': return '🚐';
-    case 'pickup': return '🛻';
-    default: return '🚲';
-  }
 }
