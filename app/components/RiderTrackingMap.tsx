@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef } from "react";
-import { useRiderLocation } from "@/hooks/useRiderLocation";
+import { useRiderLocation } from "../hooks/useRiderLocation";
 import MapPinPicker from "@/app/components/MapPinPicker";
 
 export default function RiderTrackingMap({ jobId, dropoff }: {
