@@ -1,94 +1,62 @@
-'use client';
-import { useEffect, useRef, useState } from 'react';
-import { Loader } from '@googlemaps/js-api-loader';
+"use client";
+import React, { useState, useCallback, useImperativeHandle, forwardRef } from "react";
+import { GoogleMap, useJsApiLoader, Marker } from "@react-google-maps/api";
 
-interface MapPinPickerProps {
-  label: string;
-  placeholder: string;
-  onLocationSelect: (address: string, lat: number, lng: number) => void;
-  value?: string;
-}
+const containerStyle = { width: "100%", height: "100%" };
 
-let loaderInstance: Loader | null = null;
+const MapPinPicker = forwardRef((props: any, ref) => {
+  const { isLoaded } = useJsApiLoader({
+    id: "google-map-script",
+    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "",
+  });
 
-function getLoader(): Loader {
-  if (!loaderInstance) {
-    loaderInstance = new Loader({
-      apiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!,
-      version: 'weekly',
-      libraries: ['places'],
-      language: 'th',
-      region: 'TH',
-    });
-  }
-  return loaderInstance;
-}
+  const [map, setMap] = useState<google.maps.Map | null>(null);
+  const [markers, setMarkers] = useState<any[]>(props.initialMarkers || []);
 
-export default function MapPinPicker({ label, placeholder, onLocationSelect, value }: MapPinPickerProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
-  const [inputValue, setInputValue] = useState(value || '');
-  const [isLoaded, setIsLoaded] = useState(false);
+  const onUnmount = useCallback(function callback() { setMap(null); }, []);
 
-  useEffect(() => {
-    if (value !== undefined) setInputValue(value);
-  }, [value]);
+  // 🌟 เปิดช่องทางให้ RiderTrackingMap ส่งคำสั่งเข้ามาควบคุมแผนที่ได้
+  useImperativeHandle(ref, () => ({
+    panTo: (latLng: { lat: number; lng: number }) => {
+      if (map) map.panTo(latLng);
+    },
+    setMarker: (id: string, data: any) => {
+      setMarkers((prev) => {
+        const others = prev.filter((m) => m.id !== id);
+        return [...others, { id, ...data }];
+      });
+    },
+  }));
 
-  useEffect(() => {
-    let isMounted = true;
-    getLoader()
-      .load()
-      .then(() => {
-        if (!isMounted || !inputRef.current) return;
-        setIsLoaded(true);
-        const autocomplete = new google.maps.places.Autocomplete(inputRef.current, {
-          componentRestrictions: { country: 'TH' },
-          fields: ['formatted_address', 'geometry', 'name'],
-        });
-        autocompleteRef.current = autocomplete;
-        autocomplete.addListener('place_changed', () => {
-          const place = autocomplete.getPlace();
-          if (!place.geometry?.location) return;
-          const address = place.name || place.formatted_address || '';
-          const lat = place.geometry.location.lat();
-          const lng = place.geometry.location.lng();
-          setInputValue(address);
-          onLocationSelect(address, lat, lng);
-        });
-      })
-      .catch((err) => console.error('Maps load error:', err));
-    return () => { isMounted = false; };
-  }, [onLocationSelect]);
+  if (!isLoaded) return <div className="w-full h-full bg-gray-100 animate-pulse rounded-2xl" />;
 
   return (
-    <div className="space-y-1.5">
-      <label className="text-[11px] font-bold text-gray-600 pl-1 flex items-center gap-1">
-        <span className="text-base">📍</span> {label}
-      </label>
-      <div className="relative">
-        <input
-          ref={inputRef}
-          type="text"
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          placeholder={isLoaded ? placeholder : 'กำลังโหลด Maps...'}
-          disabled={!isLoaded}
-          className="w-full border border-gray-200 rounded-[1.25rem] px-4 py-3 text-sm focus:border-[#EE4D2D] focus:ring-2 focus:ring-[#EE4D2D]/20 outline-none transition-all disabled:opacity-50 disabled:bg-gray-50"
+    <GoogleMap
+      mapContainerStyle={containerStyle}
+      center={props.initialMarkers?.[0] || { lat: 13.7563, lng: 100.5018 }}
+      zoom={15}
+      onLoad={(m) => setMap(m)}
+      onUnmount={onUnmount}
+      options={{
+        disableDefaultUI: true,
+        zoomControl: false,
+        gestureHandling: props.readOnly ? "none" : "greedy",
+      }}
+    >
+      {markers.map((m) => (
+        <Marker
+          key={m.id}
+          position={{ lat: m.lat, lng: m.lng }}
+          icon={m.icon === "rider" ? {
+            url: "https://cdn-icons-png.flaticon.com/512/713/713437.png", // รูปมอเตอร์ไซค์
+            scaledSize: new google.maps.Size(40, 40),
+            rotation: m.rotation || 0,
+          } : undefined}
         />
-        {inputValue && (
-          <button
-            type="button"
-            onClick={() => {
-              setInputValue('');
-              onLocationSelect('', 0, 0);
-              inputRef.current?.focus();
-            }}
-            className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 bg-gray-200 rounded-full flex items-center justify-center text-gray-500 text-xs hover:bg-gray-300"
-          >
-            ✕
-          </button>
-        )}
-      </div>
-    </div>
+      ))}
+    </GoogleMap>
   );
-}
+});
+
+MapPinPicker.displayName = "MapPinPicker";
+export default MapPinPicker;
