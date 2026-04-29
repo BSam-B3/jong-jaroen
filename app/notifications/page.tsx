@@ -3,7 +3,6 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 // 🌟 นำเข้า BottomNav ของเรามาใช้
-import BottomNav from '@/app/components/BottomNav';
 
 type NotifType = 'system' | 'job' | 'promo';
 type Tab = 'all' | 'unread';
