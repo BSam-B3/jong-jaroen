@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
-// 🌟 นำเข้า Component อัปโหลดรูปที่ C สร้างให้
 import ImageUpload from '@/app/components/ImageUpload'; 
 
 interface Vehicle {
@@ -40,7 +39,6 @@ export default function RiderRegisterPage() {
   const [user, setUser] = useState<any>(null);
   const [isAgreed, setIsAgreed] = useState(false);
 
-  // --- Driver Documents State ---
   const [licenses, setLicenses] = useState({
     motorcycle: false,
     car: false,
@@ -55,7 +53,6 @@ export default function RiderRegisterPage() {
     license_transport: null as File | null,
   });
 
-  // --- Garage State ---
   const [vehicles, setVehicles] = useState<Vehicle[]>([
     { 
       id: Date.now(), type: 'motorcycle', brand: '', model: '', color: '', registration: '',
@@ -105,7 +102,6 @@ export default function RiderRegisterPage() {
     setLicenses(prev => ({ ...prev, [type]: !prev[type] }));
   };
 
-  // 🌟 Helper สำหรับอัปโหลดไฟล์จริง
   const uploadFile = async (file: File | null, bucket: string, path: string) => {
     if (!file || !user) return null;
     const fileName = `${user.id}/${path}_${Date.now()}.${file.name.split('.').pop()}`;
@@ -121,13 +117,11 @@ export default function RiderRegisterPage() {
     setLoading(true);
 
     try {
-      // 1. อัปโหลดเอกสาร KYC
       const profileUrl = await uploadFile(driverDocs.profile_photo, 'kyc-documents', 'profile');
       const selfieUrl = await uploadFile(driverDocs.selfie_license, 'kyc-documents', 'selfie');
       const motoLicUrl = licenses.motorcycle ? await uploadFile(driverDocs.license_moto, 'kyc-documents', 'lic_moto') : null;
       const carLicUrl = licenses.car ? await uploadFile(driverDocs.license_car, 'kyc-documents', 'lic_car') : null;
 
-      // 2. อัปเดตตาราง profiles
       await supabase.from('profiles').update({
         is_rider: true,
         rider_status: 'pending',
@@ -137,11 +131,12 @@ export default function RiderRegisterPage() {
         car_license_url: carLicUrl
       }).eq('id', user.id);
 
-      // 3. อัปโหลดและบันทึกรถทุกคัน
       for (const v of vehicles) {
         const taxUrl = await uploadFile(v.photos.tax, 'vehicle-photos', `tax_${v.id}`);
         const fPhoto = await uploadFile(v.photos.front, 'vehicle-photos', `front_${v.id}`);
         const bPhoto = await uploadFile(v.photos.back, 'vehicle-photos', `back_${v.id}`);
+        const lPhoto = await uploadFile(v.photos.left, 'vehicle-photos', `left_${v.id}`);
+        const rPhoto = await uploadFile(v.photos.right, 'vehicle-photos', `right_${v.id}`);
 
         await supabase.from('rider_vehicles').insert({
           rider_id: user.id,
@@ -152,7 +147,10 @@ export default function RiderRegisterPage() {
           registration: v.registration,
           tax_act_url: taxUrl,
           front_photo_url: fPhoto,
-          back_photo_url: bPhoto
+          back_photo_url: bPhoto,
+          left_photo_url: lPhoto,
+          right_photo_url: rPhoto,
+          status: 'pending'
         });
       }
 
@@ -169,7 +167,6 @@ export default function RiderRegisterPage() {
     <div className="min-h-screen bg-[#F4F6F8] flex justify-center font-sans pb-20">
       <div className="w-full max-w-6xl min-h-screen flex flex-col px-4 sm:px-6">
         
-        {/* Header (Stay the same) */}
         <div className="mt-8 p-8 sm:p-12 bg-gradient-to-r from-[#EE4D2D] to-[#FF7337] text-white rounded-[3rem] shadow-xl relative overflow-hidden">
           <div className="absolute top-0 right-0 p-10 opacity-10 text-9xl">🛵</div>
           <Link href="/profile" className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center text-2xl mb-8 shadow-inner hover:bg-white/30 transition-all">←</Link>
@@ -180,7 +177,6 @@ export default function RiderRegisterPage() {
         <form onSubmit={handleSubmit} className="mt-8 flex-1">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
             
-            {/* คอลัมน์ซ้าย: อู่รถ (Garage) */}
             <div className="space-y-6">
               <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
                 <h2 className="text-lg font-black text-gray-800">อู่รถของฉัน (Garage)</h2>
@@ -194,7 +190,6 @@ export default function RiderRegisterPage() {
                     {vehicles.length > 1 && <button type="button" onClick={() => removeVehicle(v.id)} className="text-red-500 text-[10px] font-black">✕ ลบออก</button>}
                   </div>
 
-                  {/* Icon พร้อม Label (แก้แล้ว) */}
                   <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
                     {VEHICLE_TYPES.map((vType) => (
                       <button key={vType.id} type="button" onClick={() => updateVehicle(index, 'type', vType.id)} className={`p-3 rounded-2xl border-2 transition-all flex flex-col items-center justify-center gap-1 ${v.type === vType.id ? 'border-[#EE4D2D] bg-orange-50 scale-105' : 'border-gray-50 opacity-60'}`}>
@@ -219,12 +214,13 @@ export default function RiderRegisterPage() {
                     <div className="grid grid-cols-2 gap-3">
                       <ImageUpload label="📸 หน้าตรง" value={v.photos.front} onChange={(f) => updateVehiclePhoto(index, 'front', f)} />
                       <ImageUpload label="📸 หลัง (ทะเบียน)" value={v.photos.back} onChange={(f) => updateVehiclePhoto(index, 'back', f)} />
+                      <ImageUpload label="📸 ด้านซ้าย" value={v.photos.left} onChange={(f) => updateVehiclePhoto(index, 'left', f)} />
+                      <ImageUpload label="📸 ด้านขวา" value={v.photos.right} onChange={(f) => updateVehiclePhoto(index, 'right', f)} />
                     </div>
                   </div>
                 </div>
               ))}
 
-              {/* ปุ่มเพิ่มรถ (ย้ายมาล่างสุดแล้ว) */}
               {vehicles.length < 4 && (
                 <button type="button" onClick={addVehicle} className="w-full border-2 border-dashed border-[#EE4D2D] bg-orange-50/50 hover:bg-orange-50 text-[#EE4D2D] py-6 rounded-[2.5rem] font-black active:scale-95 transition-all flex flex-col items-center justify-center gap-1 group">
                   <span className="text-3xl group-hover:scale-125 transition-transform">+</span>
@@ -233,13 +229,13 @@ export default function RiderRegisterPage() {
               )}
             </div>
 
-            {/* คอลัมน์ขวา: เอกสารคนขับ (Dynamic) */}
             <div className="space-y-8 lg:sticky lg:top-8">
               <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-gray-100 space-y-8">
                 <div>
                   <h2 className="text-lg font-black text-gray-800 mb-4 flex items-center gap-2 border-b border-gray-50 pb-4"><span>👤</span> รูปถ่ายคนขับ</h2>
                   <div className="grid grid-cols-2 gap-4">
-                    <ImageUpload label="📸 รูปโปรไฟล์" hint="หน้าตรง สุภาพ" value={driverDocs.profile_photo} onChange={(f) => setDriverDocs({...driverDocs, profile_photo: f})} highlight />
+                    {/* 🌟 ถอด highlight ออก แล้วใช้ className แทน */}
+                    <ImageUpload label="📸 รูปโปรไฟล์" hint="หน้าตรง สุภาพ" value={driverDocs.profile_photo} onChange={(f) => setDriverDocs({...driverDocs, profile_photo: f})} className="border-blue-300 bg-blue-50/50" />
                     <ImageUpload label="🤳 เซลฟี่คู่ใบขับขี่" hint="ถือบัตรใต้คาง" value={driverDocs.selfie_license} onChange={(f) => setDriverDocs({...driverDocs, selfie_license: f})} />
                   </div>
                 </div>
@@ -253,14 +249,14 @@ export default function RiderRegisterPage() {
                   </div>
 
                   <div className="space-y-4">
-                    {licenses.motorcycle && <ImageUpload label="🛵 ใบขับขี่จักรยานยนต์" value={driverDocs.license_moto} onChange={(f) => setDriverDocs({...driverDocs, license_moto: f})} horizontal />}
-                    {licenses.car && <ImageUpload label="🚗 ใบขับขี่รถยนต์" value={driverDocs.license_car} onChange={(f) => setDriverDocs({...driverDocs, license_car: f})} horizontal />}
-                    {licenses.transport && <ImageUpload label="🛻 ใบอนุญาต ท." value={driverDocs.license_transport} onChange={(f) => setDriverDocs({...driverDocs, license_transport: f})} horizontal />}
+                    {/* 🌟 ถอด horizontal ออก */}
+                    {licenses.motorcycle && <ImageUpload label="🛵 ใบขับขี่จักรยานยนต์" hint="ถ่ายด้านหน้าให้ชัดเจน" value={driverDocs.license_moto} onChange={(f) => setDriverDocs({...driverDocs, license_moto: f})} />}
+                    {licenses.car && <ImageUpload label="🚗 ใบขับขี่รถยนต์" hint="ถ่ายด้านหน้าให้ชัดเจน" value={driverDocs.license_car} onChange={(f) => setDriverDocs({...driverDocs, license_car: f})} />}
+                    {licenses.transport && <ImageUpload label="🛻 ใบอนุญาต ท." hint="ถ่ายด้านหน้าให้ชัดเจน" value={driverDocs.license_transport} onChange={(f) => setDriverDocs({...driverDocs, license_transport: f})} />}
                   </div>
                 </div>
               </div>
 
-              {/* ปุ่ม Submit (Stay the same) */}
               <div className="bg-white p-8 rounded-[2.5rem] shadow-lg border border-orange-100 border-l-8 border-l-[#EE4D2D]">
                 <div className="flex items-start gap-4 mb-6">
                   <input type="checkbox" checked={isAgreed} onChange={(e: any) => setIsAgreed(e.target.checked)} className="mt-1 w-6 h-6 accent-[#EE4D2D] shrink-0" />
@@ -278,7 +274,6 @@ export default function RiderRegisterPage() {
   );
 }
 
-// --- Helper Components ---
 function InputField({ label, placeholder, value, onChange, highlight = false }: any) {
   return (
     <div>
@@ -297,16 +292,4 @@ function LicenseButton({ label, active, onClick }: { label: string, active: bool
       <div className={`text-[10px] font-black ${active ? 'text-[#EE4D2D]' : 'text-gray-600'}`}>{label}</div>
     </button>
   );
-}
-
-function getIcon(type: string) {
-  switch (type) {
-    case 'motorcycle': return '🛵';
-    case 'saleng': return '🛺';
-    case 'car': return '🚗';
-    case 'suv': return '🚙';
-    case 'van': return '🚐';
-    case 'pickup': return '🛻';
-    default: return '🚲';
-  }
 }
