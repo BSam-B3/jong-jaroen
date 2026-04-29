@@ -31,13 +31,13 @@ export default function MyJobsPage() {
 
   const fetchMyJobs = useCallback(async (uid: string) => {
     setLoading(true);
-    // 🌟 DATABASE SYNC: เปลี่ยน phone_number เป็น phone
+    // 🌟 แก้ไขจุดที่พัง: ลบ full_name และ avatar_url ออก เหลือแค่ first_name กับ phone
     const { data, error } = await supabase
       .from('jobs')
       .select(`
         *,
-        employer:profiles!employer_id (first_name, full_name, phone, avatar_url),
-        worker:profiles!worker_id (first_name, full_name, phone, avatar_url)
+        employer:profiles!employer_id (first_name, phone),
+        worker:profiles!worker_id (first_name, phone)
       `)
       .or(`employer_id.eq.${uid},worker_id.eq.${uid}`)
       .order('created_at', { ascending: false });
@@ -101,7 +101,7 @@ export default function MyJobsPage() {
               return (
                 <article key={job.id} className={`bg-white rounded-[2rem] p-5 shadow-sm border ${accent.border}`}>
                   <div className="flex justify-between items-center mb-4">
-                    <span className="text-[10px] font-black uppercase tracking-wider bg-gray-50 px-3 py-1.5 rounded-full">{job.job_type}</span>
+                    <span className="text-[10px] font-black uppercase tracking-wider bg-gray-50 px-3 py-1.5 rounded-full">{job.job_type || 'บริการ'}</span>
                     <span className={`text-[10px] font-black px-3 py-1.5 rounded-full ${s.bg} ${s.text} border ${s.ring}`}>{s.icon} {s.label}</span>
                   </div>
                   <h3 className="font-black text-gray-900 text-base mb-3 leading-snug">{job.title || 'บริการรับ-ส่งด่วน'}</h3>
@@ -111,13 +111,12 @@ export default function MyJobsPage() {
                       <p className={`font-black text-xl ${accent.text}`}>{job.budget?.toLocaleString()} บาท</p>
                     </div>
                     <div className="flex gap-2">
-                      
                       {/* ปุ่มยกเลิกสำหรับงานที่เพิ่งเปิด */}
                       {isHired && job.status === 'open' && (
                         <button onClick={() => handleUpdateStatus(job.id, 'cancelled')} className="bg-gray-100 text-gray-500 px-4 py-2 rounded-xl text-[11px] font-black">ยกเลิก</button>
                       )}
                       
-                      {/* 🌟 ปุ่มแชท สำหรับงานที่กำลังดำเนินการ (เชื่อมลิงก์ไปหน้า /chat/id แล้วค่ะ) */}
+                      {/* 🌟 ปุ่มแชท สำหรับงานที่กำลังดำเนินการ */}
                       {job.status === 'in_progress' && (
                         <Link href={`/chat/${job.id}`} className="bg-blue-50 text-blue-600 px-5 py-2 rounded-xl text-[11px] font-black border border-blue-100 flex items-center justify-center shadow-sm active:scale-95 transition-transform">
                           💬 แชท
@@ -133,7 +132,6 @@ export default function MyJobsPage() {
                       {!isHired && job.status === 'in_progress' && (
                         <button onClick={() => handleUpdateStatus(job.id, 'completed')} className="bg-emerald-500 text-white px-5 py-2 rounded-xl text-[11px] font-black shadow-md active:scale-95 transition-transform">✅ จบงาน</button>
                       )}
-
                     </div>
                   </div>
                 </article>
