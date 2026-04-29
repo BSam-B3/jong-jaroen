@@ -218,7 +218,7 @@ export default function NotificationsPage() {
         </main>
 
         {/* 🌟 เสียบ BottomNav ของเรา */}
-        <BottomNav />
+        
       </div>
     </div>
   );
