@@ -5,6 +5,15 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 
+interface Vehicle {
+  id: number;
+  type: string;
+  brand: string;
+  model: string;
+  color: string;
+  registration: string;
+}
+
 export default function RiderRegisterPage() {
   const router = useRouter();
   const supabase = createClient();
@@ -13,15 +22,18 @@ export default function RiderRegisterPage() {
   const [user, setUser] = useState<any>(null);
 
   // --- States ---
-  const [licenseType, setLicenseType] = useState('motorcycle');
-  const [vehicle, setVehicle] = useState({
-    type: 'motorcycle',
-    brand: '',
-    model: '',
-    color: '',
-    registration: ''
-  });
   const [isAgreed, setIsAgreed] = useState(false);
+
+  // 🌟 State ใหม่สำหรับจัดการใบขับขี่ (เลือกได้หลายแบบ)
+  const [licenses, setLicenses] = useState({
+    motorcycle: false,
+    car: false,
+    transport: false,
+  });
+
+  const [vehicles, setVehicles] = useState<Vehicle[]>([
+    { id: Date.now(), type: 'motorcycle', brand: '', model: '', color: '', registration: '' }
+  ]);
 
   useEffect(() => {
     const checkUser = async () => {
@@ -32,37 +44,62 @@ export default function RiderRegisterPage() {
     checkUser();
   }, [router, supabase]);
 
+  const addVehicle = () => {
+    if (vehicles.length >= 4) {
+      alert('จำกัดการเพิ่มยานพาหนะสูงสุด 4 คันต่อบัญชีครับ');
+      return;
+    }
+    setVehicles([...vehicles, { id: Date.now(), type: 'car', brand: '', model: '', color: '', registration: '' }]);
+  };
+
+  const removeVehicle = (id: number) => {
+    if (vehicles.length > 1) {
+      setVehicles(vehicles.filter(v => v.id !== id));
+    }
+  };
+
+  const updateVehicle = (index: number, field: keyof Vehicle, value: string) => {
+    const updatedVehicles = [...vehicles];
+    updatedVehicles[index] = { ...updatedVehicles[index], [field]: value };
+    setVehicles(updatedVehicles);
+  };
+
+  // ฟังก์ชันสำหรับสลับสถานะปุ่มใบขับขี่
+  const toggleLicense = (type: keyof typeof licenses) => {
+    setLicenses(prev => ({ ...prev, [type]: !prev[type] }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isAgreed) return alert('กรุณายอมรับเงื่อนไขการให้บริการค่ะ');
+    if (!licenses.motorcycle && !licenses.car && !licenses.transport) {
+      return alert('กรุณาเลือกและอัปโหลดใบอนุญาตขับขี่อย่างน้อย 1 ประเภทค่ะ');
+    }
     setLoading(true);
 
     try {
-      // 1. อัปเดตสถานะในโปรไฟล์หลัก
       const { error: profileError } = await supabase
         .from('profiles')
-        .update({
-          is_rider: true,
-          rider_status: 'pending'
-        })
+        .update({ is_rider: true, rider_status: 'pending' })
         .eq('id', user.id);
       if (profileError) throw profileError;
 
-      // 2. บันทึกข้อมูลรถลงตารางใหม่ (rider_vehicles)
+      const vehiclesToInsert = vehicles.map(v => ({
+        rider_id: user.id,
+        vehicle_type: v.type,
+        brand: v.brand,
+        model: v.model,
+        color: v.color,
+        registration: v.registration,
+        status: 'pending'
+      }));
+
       const { error: vehicleError } = await supabase
         .from('rider_vehicles')
-        .insert({
-          rider_id: user.id,
-          vehicle_type: vehicle.type,
-          brand: vehicle.brand,
-          model: vehicle.model,
-          color: vehicle.color,
-          registration: vehicle.registration,
-          status: 'pending'
-        });
+        .insert(vehiclesToInsert);
       if (vehicleError) throw vehicleError;
 
-      alert('ส่งใบสมัครและข้อมูลรถเรียบร้อย! 🎉 รอแอดมินตรวจสอบนะคะ');
+      alert('ส่งใบสมัครและข้อมูลรถ ' + vehicles.length + ' คันเรียบร้อยแล้ว! 🎉');
       router.push('/profile');
 
     } catch (error: any) {
@@ -74,155 +111,227 @@ export default function RiderRegisterPage() {
 
   return (
     <div className="min-h-screen bg-[#F4F6F8] flex justify-center font-sans pb-20">
-      {/* 🌟 ขยายความกว้างเป็น max-w-5xl สำหรับ 2 คอลัมน์ */}
-      <div className="w-full max-w-5xl bg-[#F4F6F8] min-h-screen flex flex-col">
+      <div className="w-full max-w-6xl min-h-screen flex flex-col px-4 sm:px-6">
         
-        {/* Header */}
-        <div className="p-8 pt-12 bg-gradient-to-r from-[#EE4D2D] to-[#FF7337] text-white rounded-b-[3rem] shadow-md relative z-20 mx-4 sm:mx-0">
-          <Link href="/profile" className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center text-xl mb-6 hover:bg-white/30 transition-colors">←</Link>
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-3xl shadow-lg">🛵</div>
-            <div>
-              <h1 className="text-3xl sm:text-4xl font-black tracking-tight">ลงทะเบียนคนขับ</h1>
-              <p className="text-white/90 text-sm font-bold mt-2">Driver Onboarding & Vehicle Registration</p>
-            </div>
-          </div>
+        {/* Header ส้มจงเจริญ */}
+        <div className="mt-8 p-8 sm:p-12 bg-gradient-to-r from-[#EE4D2D] to-[#FF7337] text-white rounded-[3rem] shadow-xl relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-10 opacity-10 text-9xl">🛵</div>
+          <Link href="/profile" className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center text-2xl mb-8 hover:bg-white/30 transition-all active:scale-90 shadow-inner">←</Link>
+          <h1 className="text-4xl sm:text-5xl font-black tracking-tighter italic uppercase">Rider <span className="text-white not-italic">Registration</span></h1>
+          <p className="text-orange-100 text-sm font-bold mt-3 tracking-wide">ร่วมเป็นพาร์ทเนอร์คนขับกับจงเจริญ และจัดการอู่รถของคุณได้สูงสุด 4 คัน</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-4 sm:p-6 mt-4 flex-1">
-          {/* 🌟 Grid 2 คอลัมน์ (จอคอมแบ่งซ้าย-ขวา / จอมือถือเรียงบน-ล่าง) */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <form onSubmit={handleSubmit} className="mt-8 flex-1">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
             
-            {/* ============================== */}
-            {/* คอลัมน์ซ้าย: กรอกข้อมูล (Text)  */}
-            {/* ============================== */}
-            <div className="space-y-6">
+            {/* ========================================== */}
+            {/* คอลัมน์ซ้าย: ข้อมูลตัวรถ (Garage) */}
+            {/* ========================================== */}
+            <div className="space-y-8">
               
-              {/* 1. ข้อมูลรถยนต์ */}
-              <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100">
-                <h2 className="text-lg font-black text-gray-800 mb-4 border-b pb-3 flex items-center gap-2">
-                  <span>🚗</span> ข้อมูลยานพาหนะ
-                </h2>
-                
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-[11px] font-black text-gray-500 uppercase mb-2 block">ประเภทรถ</label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {['motorcycle', 'saleng', 'car', 'suv', 'van', 'pickup'].map((type) => (
-                        <button key={type} type="button" onClick={() => setVehicle({...vehicle, type})} className={`p-3 rounded-xl border-2 text-center transition-all ${vehicle.type === type ? 'border-[#EE4D2D] bg-orange-50' : 'border-gray-50'}`}>
-                          <div className="text-xl">{getIcon(type)}</div>
-                        </button>
-                      ))}
-                    </div>
+              <div className="flex justify-between items-center bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
+                <div>
+                  <h2 className="text-lg font-black text-gray-800">อู่รถของฉัน (Garage)</h2>
+                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{vehicles.length} / 4 ยานพาหนะ</p>
+                </div>
+                {vehicles.length < 4 && (
+                  <button type="button" onClick={addVehicle} className="bg-[#EE4D2D] text-white px-5 py-2.5 rounded-full text-xs font-black shadow-md active:scale-95 transition-all">
+                    + เพิ่มรถคันใหม่
+                  </button>
+                )}
+              </div>
+
+              {vehicles.map((v, index) => (
+                <div key={v.id} className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-gray-100 space-y-6 relative group transition-all hover:shadow-md">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="bg-gray-900 text-white text-[10px] font-black px-4 py-1.5 rounded-full uppercase italic">ยานพาหนะที่ {index + 1}</span>
+                    {vehicles.length > 1 && (
+                      <button type="button" onClick={() => removeVehicle(v.id)} className="text-red-500 text-[10px] font-black hover:underline">✕ ลบออก</button>
+                    )}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-[11px] font-black text-gray-500 uppercase mb-2 block">ยี่ห้อ (Brand)</label>
-                      <input required placeholder="เช่น Honda, Toyota" value={vehicle.brand} onChange={(e) => setVehicle({...vehicle, brand: e.target.value})} className="w-full p-3.5 rounded-xl bg-gray-50 border border-gray-100 text-sm font-bold outline-none focus:ring-2 focus:ring-[#EE4D2D]" />
-                    </div>
-                    <div>
-                      <label className="text-[11px] font-black text-gray-500 uppercase mb-2 block">รุ่น (Model)</label>
-                      <input required placeholder="เช่น Wave 110i, Yaris" value={vehicle.model} onChange={(e) => setVehicle({...vehicle, model: e.target.value})} className="w-full p-3.5 rounded-xl bg-gray-50 border border-gray-100 text-sm font-bold outline-none focus:ring-2 focus:ring-[#EE4D2D]" />
-                    </div>
+                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                    {['motorcycle', 'saleng', 'car', 'suv', 'van', 'pickup'].map((type) => (
+                      <button key={type} type="button" onClick={() => updateVehicle(index, 'type', type)} className={`p-3 rounded-2xl border-2 transition-all flex flex-col items-center ${v.type === type ? 'border-[#EE4D2D] bg-orange-50 shadow-inner scale-105' : 'border-gray-50 opacity-60 hover:opacity-100'}`}>
+                        <div className="text-xl mb-1">{getIcon(type)}</div>
+                      </button>
+                    ))}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-[11px] font-black text-gray-500 uppercase mb-2 block">สีรถ (Color)</label>
-                      <input required placeholder="เช่น แดง-ดำ, ขาว" value={vehicle.color} onChange={(e) => setVehicle({...vehicle, color: e.target.value})} className="w-full p-3.5 rounded-xl bg-gray-50 border border-gray-100 text-sm font-bold outline-none focus:ring-2 focus:ring-[#EE4D2D]" />
+                  <div className="grid grid-cols-2 gap-4">
+                    <InputField label="ยี่ห้อ (Brand)" placeholder="Honda, Toyota" value={v.brand} onChange={(e) => updateVehicle(index, 'brand', e.target.value)} />
+                    <InputField label="รุ่น (Model)" placeholder="Wave, Yaris" value={v.model} onChange={(e) => updateVehicle(index, 'model', e.target.value)} />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <InputField label="สีรถ (Color)" placeholder="แดง-ดำ, ขาว" value={v.color} onChange={(e) => updateVehicle(index, 'color', e.target.value)} />
+                    <InputField label="ป้ายทะเบียน" placeholder="1กข 1234 ระยอง" value={v.registration} onChange={(e) => updateVehicle(index, 'registration', e.target.value)} highlight />
+                  </div>
+
+                  <div className="pt-4 border-t border-gray-50">
+                    <p className="text-[10px] font-black text-gray-400 uppercase mb-4 tracking-widest text-center">อัปโหลดรูปรถคันที่ {index + 1}</p>
+                    
+                    {/* ย้ายป้ายภาษีมาไว้หมวดรถให้ตรงจุด */}
+                    <div className="mb-3">
+                      <UploadBox icon="📄" title="ป้ายภาษี / พ.ร.บ." desc="ต้องยังไม่หมดอายุและเห็นชัดเจน" />
                     </div>
-                    <div>
-                      <label className="text-[11px] font-black text-gray-500 uppercase mb-2 block">ป้ายทะเบียน (Plate)</label>
-                      <input required placeholder="เช่น 1กข 1234 ระยอง" value={vehicle.registration} onChange={(e) => setVehicle({...vehicle, registration: e.target.value})} className="w-full p-3.5 rounded-xl bg-gray-50 border border-gray-100 text-sm font-black outline-none focus:ring-2 focus:ring-[#EE4D2D] text-[#EE4D2D]" />
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <UploadBox icon="🚘" title="หน้าตรง" />
+                      <UploadBox icon="🚙" title="หลัง (ทะเบียน)" />
+                      <UploadBox icon="🚗" title="ด้านซ้าย" />
+                      <UploadBox icon="🚗" title="ด้านขวา" />
                     </div>
                   </div>
                 </div>
-              </div>
+              ))}
+            </div>
 
-              {/* 2. ประเภทใบขับขี่ */}
-              <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100">
-                <h2 className="text-lg font-black text-gray-800 mb-4 border-b pb-3 flex items-center gap-2">
-                  <span>🪪</span> ประเภทใบอนุญาตขับขี่
-                </h2>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {[
-                    { id: 'motorcycle', label: 'รถจักรยานยนต์' },
-                    { id: 'car', label: 'รถยนต์ส่วนบุคคล' },
-                    { id: 'transport', label: 'ท.1 / ท.2 (รับจ้าง)' }
-                  ].map((lic) => (
-                    <button key={lic.id} type="button" onClick={() => setLicenseType(lic.id)} className={`p-4 rounded-xl border-2 text-left transition-all ${licenseType === lic.id ? 'border-[#EE4D2D] bg-orange-50' : 'border-gray-50'}`}>
-                      <div className={`w-4 h-4 rounded-full border-2 mb-2 flex items-center justify-center ${licenseType === lic.id ? 'border-[#EE4D2D] bg-[#EE4D2D]' : 'border-gray-300'}`}>
-                         {licenseType === lic.id && <span className="text-[8px] text-white">✓</span>}
+            {/* ========================================== */}
+            {/* 🌟 คอลัมน์ขวา: เอกสารคนขับ (ปรับปรุงใหม่ตามสั่ง) */}
+            {/* ========================================== */}
+            <div className="space-y-8 lg:sticky lg:top-8">
+              
+              <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-gray-100 space-y-8">
+                
+                {/* 1. หมวดรูปถ่ายบุคคล (แยกโปรไฟล์ กับ KYC) */}
+                <div>
+                  <h2 className="text-lg font-black text-gray-800 mb-4 flex items-center gap-2 border-b border-gray-50 pb-4">
+                    <span>👤</span> รูปถ่ายคนขับ
+                  </h2>
+                  <div className="grid grid-cols-2 gap-4">
+                    <UploadBox 
+                      icon="📸" 
+                      title="รูปโปรไฟล์ไรเดอร์" 
+                      desc="หน้าตรง สุภาพ (แสดงให้ลูกค้าเห็นในแอป)" 
+                      highlight 
+                    />
+                    <UploadBox 
+                      icon="🤳" 
+                      title="เซลฟี่คู่ใบขับขี่" 
+                      desc="ถือบัตรไว้ใต้คาง (แอดมินตรวจสอบเท่านั้น)" 
+                    />
+                  </div>
+                </div>
+
+                {/* 2. หมวดใบขับขี่ (Dynamic Selection) */}
+                <div>
+                  <h2 className="text-lg font-black text-gray-800 mb-4 flex items-center gap-2 border-b border-gray-50 pb-4">
+                    <span>🪪</span> เลือกและอัปโหลดใบขับขี่
+                  </h2>
+                  <p className="text-[10px] font-bold text-gray-400 mb-4">กดเลือกประเภทใบขับขี่ที่คุณมี (เลือกได้มากกว่า 1 ข้อ)</p>
+                  
+                  {/* ปุ่มกดเลือกประเภท */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+                    <LicenseButton 
+                      label="จักรยานยนต์" 
+                      active={licenses.motorcycle} 
+                      onClick={() => toggleLicense('motorcycle')} 
+                    />
+                    <LicenseButton 
+                      label="รถยนต์ส่วนบุคคล" 
+                      active={licenses.car} 
+                      onClick={() => toggleLicense('car')} 
+                    />
+                    <LicenseButton 
+                      label="ท.1 / ท.2 / ท.3" 
+                      active={licenses.transport} 
+                      onClick={() => toggleLicense('transport')} 
+                    />
+                  </div>
+
+                  {/* 🌟 ช่องอัปโหลดที่จะโผล่มาตามการเลือก (Dynamic) */}
+                  <div className="space-y-3">
+                    {licenses.motorcycle && (
+                      <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                        <UploadBox icon="🛵" title="รูปใบขับขี่จักรยานยนต์" desc="ถ่ายด้านหน้าให้เห็นข้อมูลและวันหมดอายุชัดเจน" horizontal />
                       </div>
-                      <div className="text-[10px] font-black">{lic.label}</div>
-                    </button>
-                  ))}
+                    )}
+                    {licenses.car && (
+                      <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                        <UploadBox icon="🚗" title="รูปใบขับขี่รถยนต์ส่วนบุคคล" desc="ถ่ายด้านหน้าให้เห็นข้อมูลและวันหมดอายุชัดเจน" horizontal />
+                      </div>
+                    )}
+                    {licenses.transport && (
+                      <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                        <UploadBox icon="🛻" title="รูปใบอนุญาต ท.1 / ท.2 / ท.3" desc="ถ่ายด้านหน้าให้เห็นข้อมูลและวันหมดอายุชัดเจน" horizontal />
+                      </div>
+                    )}
+                    
+                    {!licenses.motorcycle && !licenses.car && !licenses.transport && (
+                      <div className="text-center py-6 border-2 border-dashed border-gray-100 rounded-2xl bg-gray-50">
+                        <p className="text-[10px] font-bold text-gray-400">กรุณาเลือกประเภทใบขับขี่ด้านบนก่อนค่ะ</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
+
               </div>
 
-            </div>
-
-            {/* ============================== */}
-            {/* คอลัมน์ขวา: อัปโหลดเอกสาร (Photos) */}
-            {/* ============================== */}
-            <div className="space-y-6">
-              
-              {/* ยืนยันตัวตนคนขับ */}
-              <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100">
-                <h2 className="text-lg font-black text-gray-800 mb-4 border-b pb-3">👤 เอกสารคนขับ (Driver Docs)</h2>
-                <div className="grid grid-cols-2 gap-4">
-                  <UploadBox icon="🪪" title="รูปถ่ายใบขับขี่" desc="ด้านหน้าชัดเจน" />
-                  <UploadBox icon="🤳" title="เซลฟี่คู่ใบขับขี่" desc="ถือบัตรไว้ใต้คาง" />
+              {/* ปุ่มกดยืนยัน */}
+              <div className="bg-white p-8 rounded-[2.5rem] shadow-lg border border-orange-100 border-l-8 border-l-[#EE4D2D]">
+                <div className="flex items-start gap-4 mb-6">
+                  <input type="checkbox" checked={isAgreed} onChange={(e) => setIsAgreed(e.target.checked)} className="mt-1 w-6 h-6 accent-[#EE4D2D] shrink-0" />
+                  <p className="text-[11px] text-gray-500 font-bold leading-relaxed">
+                    ข้าพเจ้าขอยืนยันว่าข้อมูลยานพาหนะทั้ง {vehicles.length} คัน และเอกสารทั้งหมดเป็นความจริง และยินยอมให้ระบบตรวจสอบเพื่อความปลอดภัย
+                  </p>
                 </div>
-              </div>
-
-              {/* รูปรถและป้ายภาษี */}
-              <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100">
-                <h2 className="text-lg font-black text-gray-800 mb-4 border-b pb-3">📸 รูปรถยนต์ (Vehicle Photos)</h2>
-                
-                <div className="mb-4">
-                  <UploadBox icon="📄" title="ป้ายภาษีรถยนต์ / พ.ร.บ." desc="ต้องยังไม่หมดอายุ" />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <UploadBox icon="🚘" title="รูปรถด้านหน้า" desc="เห็นหน้ารถเต็มคัน" />
-                  <UploadBox icon="🚙" title="รูปรถด้านหลัง" desc="เห็นป้ายทะเบียนชัดเจน" />
-                  <UploadBox icon="🚗" title="รูปรถด้านซ้าย" desc="ด้านข้างเต็มคัน" />
-                  <UploadBox icon="🚗" title="รูปรถด้านขวา" desc="ด้านข้างเต็มคัน" />
-                </div>
+                <button disabled={loading} className="w-full bg-[#EE4D2D] text-white py-5 rounded-[1.5rem] font-black shadow-xl active:scale-95 transition-all disabled:opacity-50 text-base uppercase tracking-tighter italic">
+                  {loading ? 'Processing...' : 'Submit Application 🚀'}
+                </button>
               </div>
 
             </div>
           </div>
-
-          {/* Footer Submit */}
-          <div className="mt-8 bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-start gap-3 flex-1">
-              <input type="checkbox" checked={isAgreed} onChange={(e) => setIsAgreed(e.target.checked)} className="mt-1 w-5 h-5 accent-[#EE4D2D]" />
-              <p className="text-xs text-gray-500 font-bold leading-relaxed">
-                ฉันขอยืนยันว่าเอกสารและข้อมูลทั้งหมดเป็นความจริง และยินยอมให้บริษัทตรวจสอบประวัติเพื่อความปลอดภัยในการให้บริการ
-              </p>
-            </div>
-            <button disabled={loading} className="w-full sm:w-auto px-10 py-4 bg-[#EE4D2D] text-white rounded-2xl font-black shadow-lg active:scale-95 transition-transform disabled:opacity-50 whitespace-nowrap">
-              {loading ? 'กำลังส่งข้อมูล...' : 'ส่งใบสมัคร 🚀'}
-            </button>
-          </div>
-
         </form>
       </div>
     </div>
   );
 }
 
-// Component เสริมสำหรับทำปุ่มอัปโหลดรูปให้ดูสวยงาม
-function UploadBox({ icon, title, desc }: { icon: string, title: string, desc: string }) {
+// --- Component ย่อย: ช่องกรอกข้อมูล ---
+function InputField({ label, placeholder, value, onChange, highlight = false }: any) {
   return (
-    <div className="border-2 border-dashed border-gray-200 rounded-2xl p-4 text-center bg-gray-50 hover:bg-orange-50 hover:border-[#EE4D2D] transition-colors cursor-pointer group flex flex-col items-center justify-center gap-1 min-h-[120px]">
-      <span className="text-3xl mb-1 group-hover:scale-110 transition-transform">{icon}</span>
-      <p className="text-[11px] font-black text-gray-700">{title}</p>
-      <p className="text-[9px] font-bold text-gray-400">{desc}</p>
-      <input type="file" className="hidden" /> {/* ซ่อน Input จริงไว้ รอเชื่อม Storage */}
+    <div>
+      <label className="text-[10px] font-black text-gray-400 uppercase mb-2 block tracking-widest">{label}</label>
+      <input required placeholder={placeholder} value={value} onChange={onChange} className={`w-full p-4 rounded-xl bg-gray-50 border border-gray-100 text-sm font-bold outline-none focus:ring-2 focus:ring-[#EE4D2D] transition-all ${highlight ? 'text-[#EE4D2D] border-orange-100' : 'text-gray-800'}`} />
+    </div>
+  );
+}
+
+// --- Component ย่อย: ปุ่มเลือกใบขับขี่ ---
+function LicenseButton({ label, active, onClick }: { label: string, active: boolean, onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} className={`p-3 rounded-2xl border-2 transition-all flex items-center justify-center gap-2 ${active ? 'border-[#EE4D2D] bg-orange-50 shadow-sm' : 'border-gray-50 hover:bg-gray-50'}`}>
+      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${active ? 'border-[#EE4D2D] bg-[#EE4D2D]' : 'border-gray-300'}`}>
+         {active && <span className="text-[8px] text-white">✓</span>}
+      </div>
+      <div className={`text-[10px] font-black ${active ? 'text-[#EE4D2D]' : 'text-gray-600'}`}>{label}</div>
+    </button>
+  );
+}
+
+// --- Component ย่อย: ช่องอัปโหลดรูป (รองรับแบบแนวนอน) ---
+function UploadBox({ icon, title, desc, highlight = false, horizontal = false }: any) {
+  if (horizontal) {
+    return (
+      <div className={`border-2 border-dashed rounded-[1.5rem] p-4 text-left transition-all cursor-pointer group flex items-center gap-4 ${highlight ? 'border-[#0082FA] bg-blue-50/30' : 'border-gray-200 bg-gray-50/50 hover:bg-orange-50 hover:border-orange-200'}`}>
+        <span className="text-3xl bg-white w-12 h-12 rounded-xl flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform shrink-0">{icon}</span>
+        <div>
+          <p className={`text-xs font-black ${highlight ? 'text-[#0082FA]' : 'text-gray-800'}`}>{title}</p>
+          {desc && <p className="text-[9px] font-bold text-gray-500 mt-0.5">{desc}</p>}
+        </div>
+        <input type="file" className="hidden" />
+      </div>
+    );
+  }
+
+  return (
+    <div className={`border-2 border-dashed rounded-[1.5rem] p-5 text-center transition-all cursor-pointer group flex flex-col items-center justify-center gap-1 min-h-[140px] ${highlight ? 'border-[#0082FA] bg-blue-50/30 shadow-inner' : 'border-gray-100 bg-gray-50/50 hover:bg-orange-50 hover:border-orange-200 shadow-inner'}`}>
+      <span className="text-4xl mb-2 group-hover:scale-110 transition-transform">{icon}</span>
+      <p className={`text-[11px] font-black ${highlight ? 'text-[#0082FA]' : 'text-gray-700'}`}>{title}</p>
+      {desc && <p className="text-[8px] font-bold text-gray-400">{desc}</p>}
+      <input type="file" className="hidden" />
     </div>
   );
 }
