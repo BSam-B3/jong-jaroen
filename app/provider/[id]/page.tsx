@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+// ✅ แก้ไข: เปลี่ยนกุญแจเป็น sbServer
+import { sbServer } from "@/lib/supabase/server";
 import StickyActionBar from "./StickyActionBar";
 import type { Metadata } from "next";
 
@@ -15,7 +16,8 @@ interface PageProps {
 // ----- SEO Metadata -----
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { id } = await params;
-  const supabase = await createClient();
+  // ✅ แก้ไข: เรียกใช้ sbServer() โดยไม่ต้องมี await
+  const supabase = sbServer();
   const { data: profile } = await supabase.rpc("get_public_provider_profile", { p_id: id });
 
   if (!profile) return { title: "ไม่พบโปรไฟล์ | จงเจริญ" };
@@ -28,7 +30,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 // ----- Page -----
 export default async function ProviderProfilePage({ params }: PageProps) {
   const { id } = await params;
-  const supabase = await createClient();
+  // ✅ แก้ไข: เรียกใช้ sbServer() โดยไม่ต้องมี await
+  const supabase = sbServer();
 
   // ใช้ RPC ที่เราสร้าง เพื่อความปลอดภัยสูงสุด
   const { data: profile, error } = await supabase.rpc("get_public_provider_profile", { p_id: id });
