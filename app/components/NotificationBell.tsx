@@ -56,7 +56,9 @@ function NotificationItem({
 export function NotificationBell({ userId }: { userId: string }) {
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const { notifications, unreadCount, loading, markRead, markAllRead } = useNotifications(userId);
+  
+  // ✅ แก้ไข: ดึงชื่อฟังก์ชันให้ตรงกับที่ export มาจาก useNotifications
+  const { notifications, unreadCount, loading, markAsRead, markAllAsRead } = useNotifications(userId);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -109,7 +111,7 @@ export function NotificationBell({ userId }: { userId: string }) {
             </h3>
             {unreadCount > 0 && (
               <button
-                onClick={markAllRead}
+                onClick={markAllAsRead} // ✅ แก้ไข: เรียกใช้ชื่อใหม่
                 className="text-xs text-blue-600 hover:text-blue-800 font-medium"
               >
                 อ่านทั้งหมด
@@ -131,7 +133,7 @@ export function NotificationBell({ userId }: { userId: string }) {
                 <NotificationItem
                   key={notif.id}
                   notification={notif}
-                  onRead={markRead}
+                  onRead={markAsRead} // ✅ แก้ไข: เรียกใช้ชื่อใหม่
                 />
               ))
             )}
