@@ -1,7 +1,8 @@
 'use client';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
+// ✅ เปลี่ยนมาใช้กุญแจตัวใหม่
+import { createClient } from '@/lib/supabase/client';
 
 // ── Soft Shopee Palette ───────────────────────────────────────────────────────────────────────────────────────
 const themePalette = {
@@ -10,6 +11,8 @@ const themePalette = {
 };
 
 export default function NewServicePage() {
+  // ✅ สร้างตัวแปรเชื่อมต่อฐานข้อมูล
+  const supabase = useMemo(() => createClient(), []);
   const [title, setTitle] = useState('');
   const [desc, setDesc] = useState('');
   const [price, setPrice] = useState('');
