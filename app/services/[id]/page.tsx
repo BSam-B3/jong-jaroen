@@ -1,7 +1,8 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
+// ✅ เปลี่ยนมาใช้กุญแจตัวใหม่
+import { createClient } from '@/lib/supabase/client';
 
 // ── Soft Shopee Palette ───────────────────────────────────────────────────────
 const themePalette = {
@@ -27,6 +28,8 @@ type ServiceDetail = {
 };
 
 export default function ServiceDetailPage() {
+  // ✅ สร้างตัวแปรเชื่อมต่อฐานข้อมูล
+  const supabase = createClient();
   const router = useRouter();
   const params = useParams();
   const [service, setService] = useState<ServiceDetail | null>(null);
@@ -47,7 +50,7 @@ export default function ServiceDetailPage() {
     };
 
     if (params.id) fetchService();
-  }, [params.id]);
+  }, [params.id, supabase]);
 
   const handleChatClick = () => {
     setLoadingChat(true);
