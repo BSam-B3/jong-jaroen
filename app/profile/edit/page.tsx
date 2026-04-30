@@ -1,150 +1,181 @@
-'use client';
-import { useRouter } from 'next/navigation';
+import { redirect } from 'next/navigation';
+import Link from 'next/link';
+import { sbServer } from '@/lib/supabase/server';
 
-export default function ProfileEditHubPage() {
-  const router = useRouter();
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
-  // จำลองข้อมูลผู้ใช้
-  const user = {
-    name: 'สุรพงษ์ วีรวัฒน์พงศ์',
-    initial: 'ส',
-    phone: '081-234-5678',
-    role: 'ผู้ให้บริการยืนยันตัวตนแล้ว',
-    kyc_status: 'approved', 
-  };
-
-  return (
-    <div className="min-h-screen bg-gray-100 flex justify-center">
-      {/* 🧩 ตัวแอป Container */}
-      <div className="w-full sm:max-w-2xl md:max-w-3xl bg-[#F4F6F8] min-h-screen pb-10 shadow-xl relative flex flex-col">
-        
-        {/* 🟠 Header (โทนส้มทอง Shopee) */}
-        <div className="bg-gradient-to-b from-[#EE4D2D] to-[#FF7337] rounded-b-[2.5rem] p-6 pt-12 shadow-md relative z-10">
-          <button 
-            onClick={() => router.back()} 
-            className="text-white text-sm font-bold flex items-center gap-1 mb-4"
-          >
-            ← ย้อนกลับ
-          </button>
-
-          <div className="flex items-center gap-4">
-             {/* รูปโปรไฟล์ */}
-            <div className="w-16 h-16 bg-white rounded-full border-2 border-white/20 shadow-md flex items-center justify-center text-2xl font-black text-[#EE4D2D] relative flex-shrink-0">
-              {user.initial}
-              <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-1 shadow-sm">
-                <span className="text-[8px] text-gray-600 block leading-none">✏️</span>
-              </div>
-            </div>
-            
-            <div className="text-white">
-              <h1 className="text-xl font-black tracking-tight leading-tight">{user.name}</h1>
-              <p className="text-white/80 text-xs mt-0.5">{user.phone}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* 📋 ส่วนเนื้อหาหลัก (Hub เมนูเอกสาร) */}
-        <div className="p-5 space-y-5 -mt-2 relative z-20">
-          
-          <div className="bg-orange-50 border border-[#EE4D2D]/20 rounded-2xl p-4 flex items-start gap-3 shadow-sm">
-             <span className="text-xl">💡</span>
-             <p className="text-[10px] text-gray-700 leading-relaxed font-medium">
-               หน้าต่างนี้สำหรับจัดการข้อมูลส่วนตัว ตั้งค่าช่องทางรับเงิน และเรียกดูประวัติผลงานของคุณค่ะ
-             </p>
-          </div>
-
-          {/* 👤 หมวด: แก้ไขข้อมูลส่วนตัว (จัดใหม่ให้คลีน) */}
-          <div className="bg-white rounded-[1.5rem] shadow-sm border border-gray-100 overflow-hidden">
-            <div className="px-5 py-3 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
-              <span className="text-[#EE4D2D] text-sm">👤</span>
-              <h3 className="font-bold text-gray-800 text-xs">แก้ไขข้อมูลส่วนตัว</h3>
-            </div>
-            
-            {/* ✅ เก็อปุ่มแก้ไขข้อมูลโปรไฟล์หลักไว้ที่นี่ เพื่อให้ชัดเจน */}
-            <div className="p-4 text-center border-t border-gray-50">
-               <button className="text-xs font-bold text-[#EE4D2D] bg-orange-50 px-6 py-2.5 rounded-full border border-orange-100 active:scale-95 transition-transform shadow-sm">
-                 แก้ไข ชื่อ-นามสกุล / เบอร์โทร
-               </button>
-            </div>
-          </div>
-
-          {/* 🛡️ หมวด: ยืนยันตัวตนและแฟ้มเอกสาร (จัดใหม่) */}
-          <div className="bg-white rounded-[1.5rem] shadow-sm border border-gray-100 overflow-hidden">
-            <div className="px-5 py-3 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
-              <span className="text-[#EE4D2D] text-sm">🛡️</span>
-              <h3 className="font-bold text-gray-800 text-xs">ยืนยันตัวตนและแฟ้มเอกสาร</h3>
-            </div>
-            
-            <MenuRow 
-              icon="🔍" 
-              title="ยืนยันตัวตน (KYC)" 
-              subtitle="ยืนยันเบอร์โทรศัพท์และประวัติ" // ปรับคำอธิบาย
-              status={user.kyc_status === 'approved' ? '✅ ผ่านแล้ว' : '⏳ รอยืนยัน'}
-              onClick={() => router.push('/profile/kyc')} 
-            />
-            <MenuRow 
-              icon="🪪" 
-              title="แฟ้มเอกสารส่วนตัว" 
-              subtitle="วุฒิการศึกษา, ใบขับขี่, ใบอนุญาต" // ปรับคำอธิบาย
-              onClick={() => router.push('/profile/licenses')} 
-            />
-            
-            {/* ✅ ย้ายเมนูบัญชีรับเงินมาไว้ที่นี่ (ตามลูกศรชี้) */}
-            <MenuRow 
-              icon="🏦" 
-              title="บัญชีรับเงิน (Bank Account)" 
-              subtitle="ตั้งค่าช่องทางรับเงินสำหรับผู้รับงาน"
-              onClick={() => router.push('/profile/bank')} 
-            />
-          </div>
-
-          {/* 🏆 หมวด: ผลงานและใบรับรอง (จัดใหม่) */}
-          <div className="bg-white rounded-[1.5rem] shadow-sm border border-gray-100 overflow-hidden">
-            <div className="px-5 py-3 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
-              <span className="text-[#EE4D2D] text-sm">🏆</span>
-              <h3 className="font-bold text-gray-800 text-xs">ผลงานและใบรับรอง</h3>
-            </div>
-            
-            <MenuRow 
-              icon="🖼️" 
-              title="คลังใบประกาศ (Certificates)" 
-              subtitle="อัปโหลดใบประกาศ / ใบผ่านงาน" // ปรับคำอธิบาย
-              onClick={() => router.push('/profile/certificate')} 
-            />
-            <MenuRow 
-              icon="📋" 
-              title="เรซูเม่และประวัติงาน (Portfolio)" 
-              subtitle="ดาวน์โหลดประวัติการทำงาน (PDF)"
-              onClick={() => router.push('/profile/portfolio')} 
-            />
-          </div>
-
-        </div>
-      </div>
-    </div>
-  );
+// 🟢 คอมโพเนนต์สำหรับแสดงป้ายสถานะ (Status Badge)
+function StatusBadge({ status }: { status: string }) {
+  switch (status) {
+    case 'approved':
+      return <span className="px-2 py-1 bg-green-50 text-green-600 text-[10px] font-bold rounded-lg flex items-center gap-1 border border-green-200">✅ ผ่านแล้ว</span>;
+    case 'pending':
+      return <span className="px-2 py-1 bg-orange-50 text-orange-600 text-[10px] font-bold rounded-lg flex items-center gap-1 border border-orange-200">⏳ รอตรวจสอบ</span>;
+    case 'rejected':
+      return <span className="px-2 py-1 bg-red-50 text-red-600 text-[10px] font-bold rounded-lg flex items-center gap-1 border border-red-200">❌ ต้องแก้ไข</span>;
+    default:
+      return <span className="px-2 py-1 bg-gray-50 text-gray-400 text-[10px] font-bold rounded-lg flex items-center gap-1 border border-gray-200">⚪ ยังไม่ระบุ</span>;
+  }
 }
 
-// คอมโพเนนต์ย่อยสำหรับแถวเมนู
-function MenuRow({ icon, title, subtitle, onClick, status }: any) {
+export default async function ProfileEditPage() {
+  const supabase = sbServer();
+  
+  // ตรวจสอบ Session
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect('/auth/login?next=/profile/edit');
+
+  // ดึงข้อมูล Profile เพื่อเช็คสถานะต่างๆ
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', user.id)
+    .single();
+
+  // ดึงค่าสถานะ (ถ้าใน Database ยังไม่มีคอลัมน์นี้ ให้มองเป็น 'none' ไปก่อน)
+  const kycStatus = profile?.kyc_status || 'none';
+  const bankStatus = profile?.bank_status || 'none'; 
+  const docStatus = profile?.doc_status || 'none';
+  const certStatus = profile?.cert_status || 'none';
+
   return (
-    <div 
-      onClick={onClick}
-      className="flex items-center justify-between p-4 border-b border-gray-50 last:border-0 cursor-pointer hover:bg-gray-50 active:bg-gray-100 transition-colors"
-    >
-      <div className="flex items-center gap-4">
-        <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center text-xl shadow-inner border border-gray-100 shrink-0">
-          {icon}
-        </div>
-        <div>
-          <h4 className="text-sm font-bold text-gray-800 leading-tight">{title}</h4>
-          {subtitle && <p className="text-[10px] text-gray-500 mt-0.5 leading-tight">{subtitle}</p>}
+    <div className="min-h-screen bg-[#F8FAFC] pb-24 font-sans">
+      {/* Header */}
+      <div className="bg-white px-6 pt-16 pb-8 rounded-b-[3rem] shadow-sm border-b border-gray-100">
+        <Link href="/profile" className="text-gray-500 font-bold text-sm mb-6 inline-block">← ย้อนกลับ</Link>
+        <div className="flex items-center gap-4">
+          <div className="w-16 h-16 rounded-2xl bg-orange-100 flex items-center justify-center text-2xl shadow-inner">
+            ✏️
+          </div>
+          <div>
+            <h1 className="text-xl font-black text-gray-900">{profile?.full_name || 'ตั้งค่าข้อมูลส่วนตัว'}</h1>
+            <p className="text-sm text-gray-500 font-medium">{profile?.phone || 'ยังไม่ได้เพิ่มเบอร์โทรศัพท์'}</p>
+          </div>
         </div>
       </div>
-      <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-        {status && <span className="text-[9px] font-bold bg-gray-100 px-2 py-1 rounded-md text-gray-600 shadow-inner">{status}</span>}
-        <span className="text-gray-300 text-xl leading-none">›</span>
-      </div>
+
+      <main className="px-6 mt-6 space-y-6">
+        
+        {/* Banner แจ้งเตือน */}
+        <div className="bg-orange-50 border border-orange-100 rounded-2xl p-4 flex gap-3">
+          <span className="text-xl">💡</span>
+          <p className="text-xs font-medium text-orange-800 leading-relaxed">
+            หน้าต่างนี้สำหรับจัดการข้อมูลส่วนตัว ตั้งค่าช่องทางรับเงิน และเรียกดูประวัติผลงานของคุณค่ะ หากมีการแก้ไขข้อมูลสำคัญ จะต้องเข้าสู่กระบวนการรอตรวจสอบใหม่อีกครั้ง
+          </p>
+        </div>
+
+        {/* Section 1: ข้อมูลพื้นฐาน */}
+        <section className="space-y-3">
+          <h2 className="text-sm font-black text-gray-800 flex items-center gap-2">
+            <span>👤</span> แก้ไขข้อมูลส่วนตัว
+          </h2>
+          <div className="bg-white rounded-3xl p-2 shadow-sm border border-gray-100">
+            {/* อันนี้กดได้ตลอด ไม่ต้องมีสถานะ */}
+            <Link href="/profile/edit/basic" className="flex items-center justify-between p-4 hover:bg-gray-50 rounded-2xl transition-colors">
+              <div>
+                <h3 className="font-bold text-gray-800 text-sm">แก้ไข ชื่อ-นามสกุล / เบอร์โทร</h3>
+              </div>
+              <span className="text-gray-300">→</span>
+            </Link>
+          </div>
+        </section>
+
+        {/* Section 2: ยืนยันตัวตน (KYC) */}
+        <section className="space-y-3">
+          <h2 className="text-sm font-black text-gray-800 flex items-center gap-2">
+            <span>🛡️</span> ยืนยันตัวตนและบัญชีรับเงิน
+          </h2>
+          <div className="bg-white rounded-3xl p-2 shadow-sm border border-gray-100">
+            
+            <Link href="/profile/kyc" className="flex items-center justify-between p-4 hover:bg-gray-50 rounded-2xl transition-colors">
+              <div className="flex gap-4 items-center">
+                <span className="text-2xl">🔍</span>
+                <div>
+                  <h3 className="font-bold text-gray-800 text-sm">ยืนยันตัวตน (KYC)</h3>
+                  <p className="text-[10px] text-gray-500">ถ่ายรูปคู่บัตรประชาชน</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <StatusBadge status={kycStatus} />
+                <span className="text-gray-300">→</span>
+              </div>
+            </Link>
+
+            <div className="h-[1px] bg-gray-50 mx-4" />
+
+            <Link href="/profile/bank" className="flex items-center justify-between p-4 hover:bg-gray-50 rounded-2xl transition-colors">
+              <div className="flex gap-4 items-center">
+                <span className="text-2xl">🏦</span>
+                <div>
+                  <h3 className="font-bold text-gray-800 text-sm">บัญชีรับเงิน (Bank Account)</h3>
+                  <p className="text-[10px] text-gray-500">ตั้งค่าพร้อมเพย์ / บัญชีธนาคาร</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <StatusBadge status={bankStatus} />
+                <span className="text-gray-300">→</span>
+              </div>
+            </Link>
+
+            <div className="h-[1px] bg-gray-50 mx-4" />
+
+            <Link href="/profile/documents" className="flex items-center justify-between p-4 hover:bg-gray-50 rounded-2xl transition-colors">
+              <div className="flex gap-4 items-center">
+                <span className="text-2xl">🪪</span>
+                <div>
+                  <h3 className="font-bold text-gray-800 text-sm">แฟ้มเอกสารส่วนตัว</h3>
+                  <p className="text-[10px] text-gray-500">ใบขับขี่ / ใบอนุญาตวิชาชีพ</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <StatusBadge status={docStatus} />
+                <span className="text-gray-300">→</span>
+              </div>
+            </Link>
+
+          </div>
+        </section>
+
+        {/* Section 3: Portfolio */}
+        <section className="space-y-3">
+          <h2 className="text-sm font-black text-gray-800 flex items-center gap-2">
+            <span>🏆</span> ผลงานและใบรับรอง
+          </h2>
+          <div className="bg-white rounded-3xl p-2 shadow-sm border border-gray-100">
+            
+            <Link href="/profile/certificates" className="flex items-center justify-between p-4 hover:bg-gray-50 rounded-2xl transition-colors">
+              <div className="flex gap-4 items-center">
+                <span className="text-2xl">🖼️</span>
+                <div>
+                  <h3 className="font-bold text-gray-800 text-sm">คลังใบประกาศ (Certificates)</h3>
+                  <p className="text-[10px] text-gray-500">อัปโหลดใบผ่านงาน / อบรม</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <StatusBadge status={certStatus} />
+                <span className="text-gray-300">→</span>
+              </div>
+            </Link>
+
+            <div className="h-[1px] bg-gray-50 mx-4" />
+
+            {/* Resume มักจะเป็นแค่การดาวน์โหลด ไม่ต้องมีสถานะ */}
+            <Link href="/profile/resume" className="flex items-center justify-between p-4 hover:bg-gray-50 rounded-2xl transition-colors">
+              <div className="flex gap-4 items-center">
+                <span className="text-2xl">📋</span>
+                <div>
+                  <h3 className="font-bold text-gray-800 text-sm">เรซูเม่และประวัติงาน</h3>
+                  <p className="text-[10px] text-gray-500">ดาวน์โหลดประวัติการทำงาน (PDF)</p>
+                </div>
+              </div>
+              <span className="text-gray-300">→</span>
+            </Link>
+
+          </div>
+        </section>
+
+      </main>
     </div>
   );
 }
