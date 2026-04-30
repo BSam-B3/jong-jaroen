@@ -1,17 +1,23 @@
 import { requireAdmin } from '../../_lib/requireAdmin';
 import KycReviewClient from './KycReviewClient';
+import { sbServer } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export default async function AdminKycReviewPage({ params }: any) {
   const { id } = await params;
-  const { sb } = await requireAdmin(`/admin/kyc/${id}`);
+  
+  // 1. ตรวจสอบสิทธิ์แอดมิน
+  await requireAdmin(`/admin/kyc/${id}`);
 
-  // เรียกใช้ RPC ดึงข้อมูล
+  // 2. เรียกเครื่องมือเชื่อมต่อฐานข้อมูลโดยตรง
+  const sb = sbServer();
+
+  // 3. เรียกใช้ RPC ดึงข้อมูล
   const { data, error } = await sb.rpc('admin_get_kyc_data', { p_target_user_id: id });
 
-  // 🚨 แก้ไขจุดนี้: ถ้า Error ให้ "ฟ้องขึ้นหน้าจอ" แทนที่จะไปหน้า 404
+  // 🚨 ถ้า Error ให้ "ฟ้องขึ้นหน้าจอ"
   if (error) {
     throw new Error(`ฐานข้อมูลเกิดปัญหา: ${error.message}`);
   }
