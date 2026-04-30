@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+// ✅ แก้ไข: เปลี่ยนกุญแจเป็น sbServer
+import { sbServer } from "@/lib/supabase/server";
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -49,7 +50,8 @@ export default async function ServicesPage({ searchParams }: PageProps) {
   const category = params.category || "all";
   const search = params.q || "";
 
-  const supabase = await createClient();
+  // ✅ แก้ไข: เรียกใช้ sbServer() โดยไม่ต้องมี await
+  const supabase = sbServer();
   const { data, error } = await supabase.rpc("get_active_services", {
     p_category: category === "all" ? null : category,
     p_search: search || null,
