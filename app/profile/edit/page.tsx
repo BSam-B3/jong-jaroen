@@ -40,12 +40,11 @@ export default async function ProfileEditPage() {
   const certStatus = profile?.cert_status || 'none';
 
   return (
-    /* ✅ ครอบด้วย Wrapper แบบเดียวกับหน้า Profile/Home เป๊ะๆ */
     <div className="min-h-screen bg-[#F4F6F8] flex justify-center font-sans pb-10">
       <div className="w-full sm:max-w-2xl md:max-w-3xl bg-[#F4F6F8] min-h-screen relative flex flex-col shadow-xl overflow-x-hidden">
         
-        {/* 🟠 Header ส้มจงเจริญ (มีปุ่มย้อนกลับ) */}
-        <div className="bg-gradient-to-b from-[#EE4D2D] to-[#FF7337] p-6 pt-12 pb-8 shadow-sm relative z-20 flex items-center gap-4">
+        {/* 🟠 Header ส้มจงเจริญ (✅ ปรับขอบมนและมีระยะร่นแบบหน้า Services) */}
+        <div className="bg-gradient-to-b from-[#EE4D2D] to-[#FF7337] rounded-[2.5rem] p-6 pt-8 pb-8 shadow-md relative z-20 m-3 mt-4 flex items-center gap-4">
           <Link href="/profile" className="w-11 h-11 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm shadow-inner border border-white/30 text-white text-xl active:scale-95 transition-transform shrink-0">
             ←
           </Link>
@@ -57,7 +56,7 @@ export default async function ProfileEditPage() {
           </div>
         </div>
 
-        <main className="flex-1 relative z-10 space-y-5 mt-4 px-4 pb-8">
+        <main className="flex-1 relative z-10 space-y-5 mt-2 px-4 pb-8">
           
           {/* Banner แจ้งเตือน */}
           <div className="bg-orange-50/80 border border-orange-100 rounded-[1.2rem] p-4 flex gap-3 shadow-sm">
