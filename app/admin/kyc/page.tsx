@@ -1,5 +1,6 @@
 import { requireAdmin } from '../_lib/requireAdmin';
 import KycListClient, { type KycListResponse } from './KycListClient';
+import { sbServer } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -7,12 +8,17 @@ export const revalidate = 0;
 const PAGE_SIZE = 20;
 
 export default async function AdminKYCPage({ searchParams }: any) {
-  const { sb } = await requireAdmin('/admin/kyc');
-  const { page } = await searchParams;
+  // 1. ตรวจสอบสิทธิ์แอดมิน
+  await requireAdmin('/admin/kyc');
+  
+  // 2. เรียกเครื่องมือเชื่อมต่อฐานข้อมูลโดยตรง
+  const sb = sbServer();
 
+  const { page } = await searchParams;
   const pageNum = Math.max(1, Number.parseInt(page ?? '1', 10) || 1);
   const offset = (pageNum - 1) * PAGE_SIZE;
 
+  // 3. เรียกใช้ RPC ดึงรายการคนรอตรวจ KYC
   const { data, error } = await sb.rpc('admin_list_pending_kyc', {
     p_limit: PAGE_SIZE,
     p_offset: offset,
