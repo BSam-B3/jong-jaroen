@@ -1,10 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { useEffect, useState, useMemo } from 'react';
+// ✅ เปลี่ยนมาใช้กุญแจตัวใหม่
+import { createClient } from '@/lib/supabase/client';
 import { useParams, useRouter } from 'next/navigation';
 
 export default function AdminJobDetailsPage() {
+  // ✅ สร้างตัวแปรเชื่อมต่อฐานข้อมูล
+  const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const params = useParams();
   const jobId = params.id as string;
@@ -15,7 +18,7 @@ export default function AdminJobDetailsPage() {
 
   useEffect(() => {
     if (jobId) fetchJobDetails();
-  }, [jobId]);
+  }, [jobId, supabase]); // ใส่ dependency เพื่อความถูกต้อง
 
   async function fetchJobDetails() {
     setLoading(true);
