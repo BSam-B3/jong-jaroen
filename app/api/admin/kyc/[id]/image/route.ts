@@ -1,31 +1,32 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
-import { createClient } from '@/lib/supabase/server';
+import { NextResponse, type NextRequest } from 'next/server';
+// ✅ เปลี่ยนมาใช้ sbAdmin ตามที่เราตั้งชื่อไว้ใน lib/supabase/admin.ts
+import { sbAdmin } from '@/lib/supabase/admin';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  request: NextRequest,
+  { params }: { params: { id: string } }
 ) {
-  const { id } = await params;
-  const supabase = await createClient();
-  const admin = createAdminClient();
+  try {
+    // ใช้กุญแจ Admin (Service Role) ดึงรูปจาก Storage โดยตรง
+    const { data, error } = await sbAdmin
+      .storage
+      .from('kyc-documents')
+      .download(params.id);
 
-  // 1. เช็คว่าเป็นแอดมินจริงไหม
-  const { data: isAdmin } = await supabase.rpc('is_admin');
-  if (!isAdmin) return new NextResponse('Unauthorized', { status: 403 });
+    if (error) {
+      console.error('Storage error:', error.message);
+      return NextResponse.json({ error: 'ไม่สามารถโหลดรูปภาพได้' }, { status: 404 });
+    }
 
-  // 2. ไปหยิบรูปลับมาจาก Storage
-  const { data: files } = await admin.storage.from('kyc_documents').list(id);
-  const imageFile = files?.find(f => /\.(jpe?g|png|webp)$/i.test(f.name));
-
-  if (!imageFile) return new NextResponse('Not Found', { status: 404 });
-
-  const { data, error } = await admin.storage
-    .from('kyc_documents')
-    .createSignedUrl(`${id}/${imageFile.name}`, 60);
-
-  if (error || !data.signedUrl) return new NextResponse('Error', { status: 500 });
-
-  // 3. ส่งแอดมินไปที่ลิงก์ลับนั้น
-  return NextResponse.redirect(data.signedUrl);
+    return new NextResponse(data, {
+      headers: {
+        'Content-Type': data.type || 'image/jpeg',
+        'Cache-Control': 'public, max-age=31536000, immutable',
+      },
+    });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 }
