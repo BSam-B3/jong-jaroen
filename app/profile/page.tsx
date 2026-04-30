@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
@@ -9,7 +9,8 @@ import PushToggle from '@/app/components/PushToggle';
 
 export default function ProfilePage() {
   const router = useRouter();
-  const supabase = createClient();
+  // ✅ ใช้ useMemo เพื่อป้องกันการ render ซ้ำซ้อน
+  const supabase = useMemo(() => createClient(), []);
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -102,16 +103,8 @@ export default function ProfilePage() {
           ออกจากระบบ 🚪
         </button>
       </main>
-
-      {/* Navigation Bar ด้านล่าง (ถ้ามี) */}
-      <nav className="fixed bottom-6 left-6 right-6 bg-gray-900/90 backdrop-blur-lg rounded-[2.5rem] py-4 px-8 flex justify-between items-center shadow-2xl border border-white/10">
-         <Link href="/win-online" className="text-gray-400 text-xl">🏠</Link>
-         <Link href="/my-jobs" className="text-gray-400 text-xl">💼</Link>
-         <Link href="/profile" className="text-white text-xl relative">
-            👤
-            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-[#EE4D2D] rounded-full" />
-         </Link>
-      </nav>
+      
+      {/* ✂️ เจมลบ Navigation Bar ส่วนเกินตรงนี้ออกให้แล้วค่ะ */}
     </div>
   );
 }
