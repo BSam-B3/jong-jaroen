@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+// ✅ แก้ไข: เปลี่ยนมาใช้ sbServer ตามมาตรฐานใหม่ของเรา
+import { sbServer } from "@/lib/supabase/server";
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -56,7 +57,8 @@ export default async function JobsPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const filter = params.filter || DEFAULT_FILTER;
 
-  const supabase = await createClient();
+  // ✅ แก้ไข: เรียกใช้ sbServer() โดยไม่ต้อง await
+  const supabase = sbServer();
   const { data, error } = await supabase.rpc("get_jobs_by_new_categories", {
     p_filter: filter,
   });
@@ -220,7 +222,7 @@ export default async function JobsPage({ searchParams }: PageProps) {
           </main>
         </div>
 
-        {/* ✅ Bottom Navigation (ใช้เมนูเดิมที่สวยงามของบีสาม) */}
+        {/* ✅ Bottom Navigation */}
         <div className="fixed bottom-0 w-full sm:max-w-2xl md:max-w-3xl bg-white/95 backdrop-blur-md border-t border-gray-100 px-1 py-4 flex justify-between items-center shadow-[0_-4px_25px_rgba(0,0,0,0.06)] rounded-t-[2.5rem] z-50">
           <NavItem icon="🏠" label="หน้าแรก" active={false} href="/" />
           <NavItem icon="🛠️" label="บริการ" active={false} href="/services" />
