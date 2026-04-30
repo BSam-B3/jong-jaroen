@@ -1,12 +1,14 @@
 import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server'; // หรือ path ที่บีสามใช้เก็บ supabase server
+// ✅ แก้ไข: เปลี่ยนกุญแจเป็น sbServer
+import { sbServer } from '@/lib/supabase/server'; 
 import KycUploadClient from './KycUploadClient';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export default async function KycUploadPage() {
-  const supabase = await createClient();
+  // ✅ แก้ไข: เรียกใช้ sbServer() โดยไม่ต้องมี await
+  const supabase = sbServer();
   
   // เช็ค Login
   const { data: { user }, error: authError } = await supabase.auth.getUser();
