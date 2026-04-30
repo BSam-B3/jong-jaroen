@@ -1,9 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { useEffect, useState, useMemo } from 'react';
+// ✅ เปลี่ยนมาใช้กุญแจตัวใหม่
+import { createClient } from '@/lib/supabase/client';
 
 export default function AdminFinancePage() {
+  // ✅ สร้างตัวแปรเชื่อมต่อฐานข้อมูลเตรียมไว้สำหรับอนาคต
+  const supabase = useMemo(() => createClient(), []);
   const [stats, setStats] = useState({ totalRevenue: 0, pendingPayouts: 0, completedPayouts: 0 });
   const [loading, setLoading] = useState(true);
 
