@@ -2,16 +2,16 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  const supabase = createClient();
   const router = useRouter();
   const pathname = usePathname();
   const [loading, setLoading] = useState(true);
   const [adminData, setAdminData] = useState<any>(null);
 
-  // ✅ รายการเมนู (ย้ายมาไว้ตรงนี้เพื่อให้ Sidebar มองเห็นและใช้งานได้ค่ะ)
   const menus = [
     { name: 'ภาพรวม (Dashboard)', path: '/admin', icon: '📊', key: 'all' },
     { name: 'ยืนยันตัวตน (KYC)', path: '/admin/kyc', icon: '🪪', key: 'can_view_kyc' },
@@ -20,29 +20,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: 'การเงิน (Finance)', path: '/admin/finance', icon: '💰', key: 'can_view_finance' },
   ];
 
-  useEffect(() => {
-    checkAdminAccess();
-  }, []);
+  useEffect(() => { checkAdminAccess(); }, []);
 
   async function checkAdminAccess() {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      router.push('/auth/login');
-      return;
-    }
-
+    if (!user) { router.push('/auth/login'); return; }
     const { data: profile } = await supabase.from('profiles')
       .select('full_name, role, admin_permissions')
       .eq('id', user.id)
       .single();
-
-    // 🔒 ด่านตรวจความปลอดภัย
     if (profile?.role !== 'super_admin' && profile?.role !== 'admin') {
       alert('คุณไม่มีสิทธิ์เข้าถึงพื้นที่ของ Admin ค่ะ');
       router.push('/');
       return;
     }
-
     setAdminData(profile);
     setLoading(false);
   }
@@ -58,28 +49,23 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] flex overflow-hidden">
-      {/* --- Sidebar --- */}
       <aside className="w-72 bg-white border-r border-gray-200 shadow-xl flex flex-col z-30 relative">
         <div className="p-8 border-b border-gray-100">
           <h1 className="text-2xl font-black text-[#EE4D2D] tracking-tighter leading-none">JONG-JAROEN</h1>
           <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mt-2">Central Control Panel</p>
         </div>
-        
         <nav className="flex-1 p-6 space-y-2 overflow-y-auto">
           {menus.map(menu => {
             const isSuperAdmin = adminData.role === 'super_admin';
             const hasPermission = adminData.admin_permissions?.[menu.key];
-
-            // กรองสิทธิ์: ถ้าไม่ใช่ Super Admin และไม่มีสิทธิ์เฉพาะทาง จะมองไม่เห็นเมนูนั้นค่ะ
             if (menu.key !== 'all' && !isSuperAdmin && !hasPermission) return null;
-
             const isActive = pathname === menu.path || pathname.startsWith(`${menu.path}/`);
             return (
-              <Link key={menu.path} href={menu.path} 
+              <Link key={menu.path} href={menu.path}
                 className={`flex items-center gap-4 px-5 py-4 rounded-[1.5rem] font-bold transition-all duration-300 ${
-                  isActive 
-                  ? 'bg-[#EE4D2D] text-white shadow-lg shadow-orange-500/30 translate-x-2' 
-                  : 'text-gray-500 hover:bg-orange-50 hover:text-[#EE4D2D] hover:translate-x-1'
+                  isActive
+                    ? 'bg-[#EE4D2D] text-white shadow-lg shadow-orange-500/30 translate-x-2'
+                    : 'text-gray-500 hover:bg-orange-50 hover:text-[#EE4D2D] hover:translate-x-1'
                 }`}>
                 <span className="text-2xl">{menu.icon}</span>
                 <span className="text-sm tracking-tight">{menu.name}</span>
@@ -87,8 +73,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             );
           })}
         </nav>
-
-        {/* User Badge ด้านล่าง */}
         <div className="p-6 bg-gray-50 m-6 rounded-[2rem] border border-gray-100 shadow-inner">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-white rounded-2xl shadow-sm flex items-center justify-center text-lg font-black text-[#EE4D2D]">
@@ -103,12 +87,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
         </div>
       </aside>
-
-      {/* --- Main Content --- */}
       <main className="flex-1 h-screen overflow-y-auto p-10 relative bg-[#F8F9FA] text-black">
-        <div className="max-w-6xl mx-auto">
-          {children}
-        </div>
+        <div className="max-w-6xl mx-auto">{children}</div>
       </main>
     </div>
   );
