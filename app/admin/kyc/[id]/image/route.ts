@@ -1,32 +1,32 @@
 import { NextResponse, type NextRequest } from 'next/server';
-// ✅ แก้ไขจาก createClient เป็น sbServer
-import { sbServer } from '@/lib/supabase/server';
+// ✅ เปลี่ยนมาใช้ sbAdmin ตามที่เราตั้งชื่อไว้ใน lib/supabase/admin.ts
+import { sbAdmin } from '@/lib/supabase/admin';
 
 export const dynamic = 'force-dynamic';
-export const revalidate = 0;
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const supabase = sbServer(); // ✅ เรียกใช้ชื่อใหม่
-    
-    // ดึงข้อมูลรูปภาพจาก Storage
-    const { data, error } = await supabase
+    // ใช้กุญแจ Admin (Service Role) ดึงรูปจาก Storage โดยตรง
+    const { data, error } = await sbAdmin
       .storage
       .from('kyc-documents')
       .download(params.id);
 
-    if (error) throw error;
+    if (error) {
+      console.error('Storage error:', error.message);
+      return NextResponse.json({ error: 'ไม่สามารถโหลดรูปภาพได้' }, { status: 404 });
+    }
 
     return new NextResponse(data, {
       headers: {
-        'Content-Type': data.type,
+        'Content-Type': data.type || 'image/jpeg',
         'Cache-Control': 'public, max-age=31536000, immutable',
       },
     });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
