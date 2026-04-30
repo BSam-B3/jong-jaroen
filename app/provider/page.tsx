@@ -1,12 +1,12 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
-
-import { User } from '@supabase/supabase-js';
+import { createClient } from '@/lib/supabase/client';
+import type { User } from '@supabase/supabase-js';
 
 export default function ProviderDashboardPage() {
   const router = useRouter();
+  const supabase = useMemo(() => createClient(), []);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isOnline, setIsOnline] = useState(false);
   const [kycStatus, setKycStatus] = useState('none');
@@ -17,16 +17,15 @@ export default function ProviderDashboardPage() {
   });
 
   useEffect(() => {
-    supabase.auth.getSession().then((result) => {
-      const session = result.data.session;
-      if (!session) {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) {
         router.push('/auth/login');
       } else {
-        setCurrentUser(session.user);
+        setCurrentUser(user);
         setKycStatus('none');
       }
     });
-  }, [router]);
+  }, [router, supabase]);
 
   return (
     <div className="min-h-screen bg-gray-100 flex justify-center pb-24">
@@ -146,7 +145,6 @@ export default function ProviderDashboardPage() {
             )}
           </div>
         </div>
-        
         <style dangerouslySetInnerHTML={{__html: `.scrollbar-hide::-webkit-scrollbar{display:none}.scrollbar-hide{-ms-overflow-style:none;scrollbar-width:none}`}} />
       </div>
     </div>
