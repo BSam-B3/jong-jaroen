@@ -1,9 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { useState, useEffect, useMemo } from 'react';
+// ✅ เปลี่ยนมาใช้กุญแจตัวใหม่
+import { createClient } from '@/lib/supabase/client';
 
 export default function AdminCouponsPage() {
+  // ✅ สร้างตัวแปรเชื่อมต่อฐานข้อมูล
+  const supabase = useMemo(() => createClient(), []);
   const [activeTab, setActiveTab] = useState<'lottery' | 'promo'>('lottery');
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -11,7 +14,7 @@ export default function AdminCouponsPage() {
   // ดึงข้อมูลแคมเปญปองเจริญ และนับจำนวนตั๋วที่มีคนได้ไป
   useEffect(() => {
     fetchCampaigns();
-  }, []);
+  }, [supabase]); // ใส่ dependency เพื่อความถูกต้อง
 
   async function fetchCampaigns() {
     setLoading(true);
