@@ -1,10 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { useEffect, useState, useMemo } from 'react';
+// ✅ เปลี่ยนมาใช้กุญแจตัวใหม่
+import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation'; // 👈 นำเข้าระบบเปลี่ยนหน้าของ Next.js
 
 export default function AdminJobsPage() {
+  // ✅ สร้างตัวแปรเชื่อมต่อฐานข้อมูล
+  const supabase = useMemo(() => createClient(), []);
   const router = useRouter(); // 👈 เปิดใช้งาน router
   const [jobs, setJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -12,7 +15,7 @@ export default function AdminJobsPage() {
 
   useEffect(() => {
     fetchJobs();
-  }, []);
+  }, [supabase]); // ใส่ dependency เพื่อความถูกต้อง
 
   async function fetchJobs() {
     setLoading(true);
