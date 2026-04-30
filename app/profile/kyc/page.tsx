@@ -73,8 +73,7 @@ export default async function KycStatusPage() {
             </p>
           </div>
 
-         {(status === 'none' || status === 'rejected') && (
-            {/* 👇 แก้ไขตรง href ตรงนี้จุดเดียวเลยค่ะ 👇 */}
+          {(status === 'none' || status === 'rejected') && (
             <Link 
               href="/profile/kyc/upload" 
               className="w-full bg-[#EE4D2D] text-white py-4 rounded-2xl font-black text-sm shadow-lg shadow-orange-200 active:scale-95 transition-all"
