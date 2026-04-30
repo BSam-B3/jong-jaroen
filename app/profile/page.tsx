@@ -49,6 +49,15 @@ export default function ProfilePage() {
         
         {/* 🟠 Header ส้มจงเจริญ */}
         <div className="bg-gradient-to-b from-[#EE4D2D] to-[#FF7337] p-6 pt-12 pb-8 shadow-sm relative z-20 flex items-center gap-4">
+          
+          {/* 🚪 ปุ่มออกจากระบบ ย้ายมาอยู่มุมขวาบนแบบสวยๆ */}
+          <button 
+            onClick={handleSignOut}
+            className="absolute top-6 right-6 text-white/90 hover:text-white flex items-center gap-1.5 active:scale-95 transition-all text-[10px] font-bold bg-white/20 border border-white/30 px-3 py-1.5 rounded-full backdrop-blur-sm shadow-sm"
+          >
+            ออกจากระบบ 🚪
+          </button>
+
           <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm shadow-inner border border-white/30 overflow-hidden shrink-0">
             <div className="w-full h-full bg-white rounded-full flex items-center justify-center text-3xl overflow-hidden">
               {profile?.avatar_url ? (
@@ -57,7 +66,7 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          <div className="flex flex-col">
+          <div className="flex flex-col pr-24"> {/* ใส่ pr-24 เพื่อไม่ให้ชื่อยาวๆ ไปทับปุ่มมุมขวา */}
             <h1 className="text-white text-lg font-black tracking-tight line-clamp-1">
               {profile?.full_name || 'สมาชิกจงเจริญ'}
             </h1>
@@ -72,19 +81,18 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        <main className="flex-1 relative z-10 space-y-3 mt-3">
+        <main className="flex-1 relative z-10 space-y-3 mt-3 pb-8">
           
-          {/* 🌟 Section 1: ระบบแจ้งเตือน (ขยับขึ้นบนสุด และลดขนาดลง) */}
+          {/* 🌟 Section 1: ระบบแจ้งเตือน */}
           <section className="px-4 py-1">
              <div className="bg-white rounded-[1.2rem] shadow-sm border border-gray-100 overflow-hidden transform scale-[0.95] origin-top">
                <PushToggle />
              </div>
           </section>
 
-          {/* 🌟 Section 2: เมนูการจัดการ (List Style ทั้งหมด) */}
+          {/* 🌟 Section 2: เมนูการจัดการ (List Style) */}
           <section className="bg-white shadow-sm border-y border-gray-100">
             
-            {/* ✅ งานของฉัน (ปรับเป็นแถวเดียว รูปกระเป๋า 💼) */}
             <Link href="/my-jobs" className="flex items-center justify-between p-3.5 hover:bg-gray-50 transition-colors active:bg-gray-100 border-b border-gray-50">
               <div className="flex items-center gap-3">
                 <span className="text-[22px]">💼</span>
@@ -117,16 +125,6 @@ export default function ProfilePage() {
               <span className="text-gray-400 text-lg font-bold">›</span>
             </Link>
           </section>
-
-          {/* 🌟 Section 3: ปุ่มออกจากระบบ */}
-          <div className="px-4 pt-4 pb-8">
-            <button 
-              onClick={handleSignOut}
-              className="w-full py-3 bg-white border border-gray-200 text-gray-500 font-bold text-sm rounded-xl shadow-sm active:scale-95 transition-all hover:bg-red-50 hover:text-red-500 hover:border-red-100 flex items-center justify-center gap-2"
-            >
-              ออกจากระบบ 🚪
-            </button>
-          </div>
 
         </main>
       </div>
