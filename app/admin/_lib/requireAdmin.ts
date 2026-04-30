@@ -1,28 +1,47 @@
 import 'server-only';
 import { redirect } from 'next/navigation';
-// ✅ แก้ไขการ Import ให้ตรงกับชื่อใหม่ที่เราเปลี่ยนใน server.ts
 import { sbServer } from '@/lib/supabase/server';
 
+/**
+ * Server-side admin gate.
+ * - Validates the session against Supabase Auth (getUser → /auth/v1/user)
+ * so a forged/expired cookie cannot pass.
+ * - Verifies admin role via RPC `is_admin` (preferred) with profiles.role fallback.
+ *
+ * Returns the authenticated `user` so callers don't have to re-fetch it.
+ * Callers should obtain a Supabase client separately:
+ * const user = await requireAdmin('/admin');
+ * const sb = sbServer();
+ */
 export async function requireAdmin(currentPath: string) {
-  // ✅ เปลี่ยนจาก createClient() เป็น sbServer()
   const supabase = sbServer();
-  
-  const { data: { session } } = await supabase.auth.getSession();
 
-  if (!session) {
+  // 1) Network-validated user (replaces getSession)
+  const {
+    data: { user },
+    error: userErr,
+  } = await supabase.auth.getUser();
+
+  if (userErr || !user) {
     redirect(`/auth/login?next=${encodeURIComponent(currentPath)}`);
   }
 
-  // ตรวจสอบสิทธิ์ Admin
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', session.user.id)
-    .single();
+  // 2) Authorize via RPC, fallback to profiles.role
+  const { data: isAdminRpc, error: rpcErr } = await supabase.rpc('is_admin');
 
-  if (profile?.role !== 'admin') {
+  let isAdmin = isAdminRpc === true;
+  if (rpcErr || isAdminRpc === null || isAdminRpc === undefined) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+    isAdmin = profile?.role === 'admin';
+  }
+
+  if (!isAdmin) {
     redirect('/');
   }
 
-  return session;
+  return user;
 }
