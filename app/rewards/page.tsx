@@ -1,10 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+// ✅ เปลี่ยนมาใช้กุญแจตัวใหม่
+import { createClient } from '@/lib/supabase/client';
 import BottomNav from '@/app/components/BottomNav';
 
 export default function RewardsPage() {
+  // ✅ สร้างตัวแปรเชื่อมต่อฐานข้อมูล
+  const supabase = createClient();
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [activeCampaign, setActiveCampaign] = useState<any>(null);
   const [myTickets, setMyTickets] = useState<any[]>([]);
