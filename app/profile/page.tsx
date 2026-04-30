@@ -1,110 +1,181 @@
-'use client';
-
-import { useState, useEffect, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/client';
-// ✅ Import ปุ่ม PushToggle มาใช้งาน
-import PushToggle from '@/app/components/PushToggle';
+import { sbServer } from '@/lib/supabase/server';
 
-export default function ProfilePage() {
-  const router = useRouter();
-  // ✅ ใช้ useMemo เพื่อป้องกันการ render ซ้ำซ้อน
-  const supabase = useMemo(() => createClient(), []);
-  const [profile, setProfile] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
-  useEffect(() => {
-    async function getProfile() {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        router.push('/auth/login');
-        return;
-      }
+// 🟢 คอมโพเนนต์สำหรับแสดงป้ายสถานะ (Status Badge)
+function StatusBadge({ status }: { status: string }) {
+  switch (status) {
+    case 'approved':
+      return <span className="px-2 py-1 bg-green-50 text-green-600 text-[10px] font-bold rounded-lg flex items-center gap-1 border border-green-200">✅ ผ่านแล้ว</span>;
+    case 'pending':
+      return <span className="px-2 py-1 bg-orange-50 text-orange-600 text-[10px] font-bold rounded-lg flex items-center gap-1 border border-orange-200">⏳ รอตรวจสอบ</span>;
+    case 'rejected':
+      return <span className="px-2 py-1 bg-red-50 text-red-600 text-[10px] font-bold rounded-lg flex items-center gap-1 border border-red-200">❌ ต้องแก้ไข</span>;
+    default:
+      return <span className="px-2 py-1 bg-gray-50 text-gray-400 text-[10px] font-bold rounded-lg flex items-center gap-1 border border-gray-200">⚪ ยังไม่ระบุ</span>;
+  }
+}
 
-      const { data } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', session.user.id)
-        .single();
-      
-      setProfile(data);
-      setLoading(false);
-    }
-    getProfile();
-  }, [router, supabase]);
+export default async function ProfileEditPage() {
+  const supabase = sbServer();
+  
+  // ตรวจสอบ Session
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect('/auth/login?next=/profile/edit');
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    router.push('/auth/login');
-  };
+  // ดึงข้อมูล Profile เพื่อเช็คสถานะต่างๆ
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', user.id)
+    .single();
 
-  if (loading) return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="w-12 h-12 border-4 border-[#EE4D2D] border-t-transparent rounded-full animate-spin" />
-    </div>
-  );
+  // ดึงค่าสถานะ (ถ้าใน Database ยังไม่มีคอลัมน์นี้ ให้มองเป็น 'none' ไปก่อน)
+  const kycStatus = profile?.kyc_status || 'none';
+  const bankStatus = profile?.bank_status || 'none'; 
+  const docStatus = profile?.doc_status || 'none';
+  const certStatus = profile?.cert_status || 'none';
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-24 font-sans">
-      {/* Header สวยๆ */}
-      <div className="bg-white px-6 pt-16 pb-12 rounded-b-[3rem] shadow-sm border-b border-gray-100 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-40 h-40 bg-orange-50 rounded-full -mr-20 -mt-20 blur-3xl" />
-        
-        <div className="flex flex-col items-center relative z-10">
-          <div className="w-28 h-28 rounded-[2.5rem] bg-gradient-to-tr from-[#EE4D2D] to-[#FF7337] p-1 shadow-2xl mb-5">
-            <div className="w-full h-full rounded-[2.3rem] bg-white flex items-center justify-center text-4xl overflow-hidden border-4 border-white">
-              {profile?.avatar_url ? (
-                <img src={profile.avatar_url} className="w-full h-full object-cover" alt="profile" />
-              ) : '👤'}
-            </div>
+      {/* Header */}
+      <div className="bg-white px-6 pt-16 pb-8 rounded-b-[3rem] shadow-sm border-b border-gray-100">
+        <Link href="/profile" className="text-gray-500 font-bold text-sm mb-6 inline-block">← ย้อนกลับ</Link>
+        <div className="flex items-center gap-4">
+          <div className="w-16 h-16 rounded-2xl bg-orange-100 flex items-center justify-center text-2xl shadow-inner">
+            ✏️
           </div>
-          <h1 className="text-2xl font-black text-gray-900 mb-1 italic">
-            {profile?.full_name || 'สมาชิกจงเจริญ'}
-          </h1>
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em]">
-            ID: {profile?.id?.slice(0, 8)}
-          </p>
+          <div>
+            <h1 className="text-xl font-black text-gray-900">{profile?.full_name || 'ตั้งค่าข้อมูลส่วนตัว'}</h1>
+            <p className="text-sm text-gray-500 font-medium">{profile?.phone || 'ยังไม่ได้เพิ่มเบอร์โทรศัพท์'}</p>
+          </div>
         </div>
       </div>
 
-      <main className="px-6 -mt-8 space-y-4">
-        {/* 🌟 ส่วนการตั้งค่าแจ้งเตือน (ที่เราเพิ่งทำ) */}
-        <section>
-           <PushToggle />
+      <main className="px-6 mt-6 space-y-6">
+        
+        {/* Banner แจ้งเตือน */}
+        <div className="bg-orange-50 border border-orange-100 rounded-2xl p-4 flex gap-3">
+          <span className="text-xl">💡</span>
+          <p className="text-xs font-medium text-orange-800 leading-relaxed">
+            หน้าต่างนี้สำหรับจัดการข้อมูลส่วนตัว ตั้งค่าช่องทางรับเงิน และเรียกดูประวัติผลงานของคุณค่ะ หากมีการแก้ไขข้อมูลสำคัญ จะต้องเข้าสู่กระบวนการรอตรวจสอบใหม่อีกครั้ง
+          </p>
+        </div>
+
+        {/* Section 1: ข้อมูลพื้นฐาน */}
+        <section className="space-y-3">
+          <h2 className="text-sm font-black text-gray-800 flex items-center gap-2">
+            <span>👤</span> แก้ไขข้อมูลส่วนตัว
+          </h2>
+          <div className="bg-white rounded-3xl p-2 shadow-sm border border-gray-100">
+            {/* อันนี้กดได้ตลอด ไม่ต้องมีสถานะ */}
+            <Link href="/profile/edit/basic" className="flex items-center justify-between p-4 hover:bg-gray-50 rounded-2xl transition-colors">
+              <div>
+                <h3 className="font-bold text-gray-800 text-sm">แก้ไข ชื่อ-นามสกุล / เบอร์โทร</h3>
+              </div>
+              <span className="text-gray-300">→</span>
+            </Link>
+          </div>
         </section>
 
-        {/* เมนูอื่นๆ */}
-        <section className="bg-white rounded-[2rem] p-2 shadow-sm border border-gray-50">
-          <Link href="/profile/edit" className="flex items-center justify-between p-4 hover:bg-gray-50 rounded-2xl transition-colors">
-            <div className="flex items-center gap-4">
-              <span className="text-xl">📝</span>
-              <span className="font-bold text-gray-700 text-sm">แก้ไขข้อมูลส่วนตัว</span>
-            </div>
-            <span className="text-gray-300">→</span>
-          </Link>
-          
-          <div className="h-[1px] bg-gray-50 mx-4" />
-          
-          <Link href="/my-jobs" className="flex items-center justify-between p-4 hover:bg-gray-50 rounded-2xl transition-colors">
-            <div className="flex items-center gap-4">
-              <span className="text-xl">📋</span>
-              <span className="font-bold text-gray-700 text-sm">ประวัติงานของฉัน</span>
-            </div>
-            <span className="text-gray-300">→</span>
-          </Link>
+        {/* Section 2: ยืนยันตัวตน (KYC) */}
+        <section className="space-y-3">
+          <h2 className="text-sm font-black text-gray-800 flex items-center gap-2">
+            <span>🛡️</span> ยืนยันตัวตนและบัญชีรับเงิน
+          </h2>
+          <div className="bg-white rounded-3xl p-2 shadow-sm border border-gray-100">
+            
+            <Link href="/profile/kyc" className="flex items-center justify-between p-4 hover:bg-gray-50 rounded-2xl transition-colors">
+              <div className="flex gap-4 items-center">
+                <span className="text-2xl">🔍</span>
+                <div>
+                  <h3 className="font-bold text-gray-800 text-sm">ยืนยันตัวตน (KYC)</h3>
+                  <p className="text-[10px] text-gray-500">ถ่ายรูปคู่บัตรประชาชน</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <StatusBadge status={kycStatus} />
+                <span className="text-gray-300">→</span>
+              </div>
+            </Link>
+
+            <div className="h-[1px] bg-gray-50 mx-4" />
+
+            <Link href="/profile/bank" className="flex items-center justify-between p-4 hover:bg-gray-50 rounded-2xl transition-colors">
+              <div className="flex gap-4 items-center">
+                <span className="text-2xl">🏦</span>
+                <div>
+                  <h3 className="font-bold text-gray-800 text-sm">บัญชีรับเงิน (Bank Account)</h3>
+                  <p className="text-[10px] text-gray-500">ตั้งค่าพร้อมเพย์ / บัญชีธนาคาร</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <StatusBadge status={bankStatus} />
+                <span className="text-gray-300">→</span>
+              </div>
+            </Link>
+
+            <div className="h-[1px] bg-gray-50 mx-4" />
+
+            <Link href="/profile/documents" className="flex items-center justify-between p-4 hover:bg-gray-50 rounded-2xl transition-colors">
+              <div className="flex gap-4 items-center">
+                <span className="text-2xl">🪪</span>
+                <div>
+                  <h3 className="font-bold text-gray-800 text-sm">แฟ้มเอกสารส่วนตัว</h3>
+                  <p className="text-[10px] text-gray-500">ใบขับขี่ / ใบอนุญาตวิชาชีพ</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <StatusBadge status={docStatus} />
+                <span className="text-gray-300">→</span>
+              </div>
+            </Link>
+
+          </div>
         </section>
 
-        {/* ปุ่มออกจากระบบ */}
-        <button 
-          onClick={handleSignOut}
-          className="w-full py-5 bg-white border border-red-100 text-red-500 font-black rounded-[2rem] shadow-sm active:scale-95 transition-transform hover:bg-red-50"
-        >
-          ออกจากระบบ 🚪
-        </button>
+        {/* Section 3: Portfolio */}
+        <section className="space-y-3">
+          <h2 className="text-sm font-black text-gray-800 flex items-center gap-2">
+            <span>🏆</span> ผลงานและใบรับรอง
+          </h2>
+          <div className="bg-white rounded-3xl p-2 shadow-sm border border-gray-100">
+            
+            <Link href="/profile/certificates" className="flex items-center justify-between p-4 hover:bg-gray-50 rounded-2xl transition-colors">
+              <div className="flex gap-4 items-center">
+                <span className="text-2xl">🖼️</span>
+                <div>
+                  <h3 className="font-bold text-gray-800 text-sm">คลังใบประกาศ (Certificates)</h3>
+                  <p className="text-[10px] text-gray-500">อัปโหลดใบผ่านงาน / อบรม</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <StatusBadge status={certStatus} />
+                <span className="text-gray-300">→</span>
+              </div>
+            </Link>
+
+            <div className="h-[1px] bg-gray-50 mx-4" />
+
+            {/* Resume มักจะเป็นแค่การดาวน์โหลด ไม่ต้องมีสถานะ */}
+            <Link href="/profile/resume" className="flex items-center justify-between p-4 hover:bg-gray-50 rounded-2xl transition-colors">
+              <div className="flex gap-4 items-center">
+                <span className="text-2xl">📋</span>
+                <div>
+                  <h3 className="font-bold text-gray-800 text-sm">เรซูเม่และประวัติงาน</h3>
+                  <p className="text-[10px] text-gray-500">ดาวน์โหลดประวัติการทำงาน (PDF)</p>
+                </div>
+              </div>
+              <span className="text-gray-300">→</span>
+            </Link>
+
+          </div>
+        </section>
+
       </main>
-      
-      {/* ✂️ เจมลบ Navigation Bar ส่วนเกินตรงนี้ออกให้แล้วค่ะ */}
     </div>
   );
 }
