@@ -47,10 +47,10 @@ export default function ProfilePage() {
     <div className="min-h-screen bg-[#F4F6F8] flex justify-center font-sans pb-10">
       <div className="w-full sm:max-w-2xl md:max-w-3xl bg-[#F4F6F8] min-h-screen relative flex flex-col shadow-xl overflow-x-hidden">
         
-        {/* 🟠 Header ส้มจงเจริญ */}
-        <div className="bg-gradient-to-b from-[#EE4D2D] to-[#FF7337] p-6 pt-12 pb-8 shadow-sm relative z-20 flex items-center gap-4">
+        {/* 🟠 Header ส้มจงเจริญ (✅ ปรับขอบมนและมีระยะร่นแบบหน้า Services) */}
+        <div className="bg-gradient-to-b from-[#EE4D2D] to-[#FF7337] rounded-[2.5rem] p-6 pt-8 pb-8 shadow-md relative z-20 m-3 mt-4 flex items-center gap-4">
           
-          {/* 🚪 ปุ่มออกจากระบบ ย้ายมาอยู่มุมขวาบนแบบสวยๆ */}
+          {/* 🚪 ปุ่มออกจากระบบ */}
           <button 
             onClick={handleSignOut}
             className="absolute top-6 right-6 text-white/90 hover:text-white flex items-center gap-1.5 active:scale-95 transition-all text-[10px] font-bold bg-white/20 border border-white/30 px-3 py-1.5 rounded-full backdrop-blur-sm shadow-sm"
@@ -66,7 +66,7 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          <div className="flex flex-col pr-24"> {/* ใส่ pr-24 เพื่อไม่ให้ชื่อยาวๆ ไปทับปุ่มมุมขวา */}
+          <div className="flex flex-col pr-24">
             <h1 className="text-white text-lg font-black tracking-tight line-clamp-1">
               {profile?.full_name || 'สมาชิกจงเจริญ'}
             </h1>
@@ -81,7 +81,7 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        <main className="flex-1 relative z-10 space-y-3 mt-3 pb-8">
+        <main className="flex-1 relative z-10 space-y-3 mt-1 pb-8">
           
           {/* 🌟 Section 1: ระบบแจ้งเตือน */}
           <section className="px-4 py-1">
@@ -90,7 +90,7 @@ export default function ProfilePage() {
              </div>
           </section>
 
-          {/* 🌟 Section 2: เมนูการจัดการ (List Style) */}
+          {/* 🌟 Section 2: เมนูการจัดการ */}
           <section className="bg-white shadow-sm border-y border-gray-100">
             
             <Link href="/my-jobs" className="flex items-center justify-between p-3.5 hover:bg-gray-50 transition-colors active:bg-gray-100 border-b border-gray-50">
