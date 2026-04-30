@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "next lint"
   },
-  "dependencies": {
+ "dependencies": {
+    "crc": "^4.3.2",
+    "qrcode": "^1.5.3",
     "@googlemaps/js-api-loader": "^1.16.8",
     "@react-google-maps/api": "^2.19.3",
     "@serwist/next": "^9.0.9",
@@ -22,6 +24,7 @@
     "tesseract.js": "^5.0.0",
     "use-places-autocomplete": "^4.0.1",
     "web-push": "^3.6.7"
+  },
   },
   "devDependencies": {
     "@types/google.maps": "^3.58.1",
