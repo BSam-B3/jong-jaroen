@@ -44,11 +44,10 @@ export default function ProfilePage() {
   );
 
   return (
-    /* ✅ ครอบด้วย Wrapper แบบเดียวกับหน้าหลักเป๊ะๆ (จัดให้อยู่ตรงกลางจอ) */
     <div className="min-h-screen bg-[#F4F6F8] flex justify-center font-sans pb-24">
       <div className="w-full sm:max-w-2xl md:max-w-3xl bg-[#F4F6F8] min-h-screen relative flex flex-col shadow-xl overflow-x-hidden">
         
-        {/* 🟠 Header ส้มจงเจริญ (ดีไซน์เดียวกับหน้าหลักเป๊ะ) */}
+        {/* 🟠 Header ส้มจงเจริญ */}
         <div className="bg-gradient-to-b from-[#EE4D2D] to-[#FF7337] rounded-b-[2.5rem] p-6 pt-12 pb-10 shadow-md relative z-20 flex flex-col items-center">
           
           <div className="w-24 h-24 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm shadow-inner border border-white/30 overflow-hidden mb-4 p-1">
@@ -68,16 +67,17 @@ export default function ProfilePage() {
         </div>
 
         <main className="px-5 mt-4 flex-1 relative z-10 mb-6 space-y-4">
-          {/* 🌟 ส่วนการตั้งค่าแจ้งเตือน */}
-          <section>
+          {/* 🌟 ส่วนการตั้งค่าแจ้งเตือน (ใส่กรอบให้เข้าเซ็ต) */}
+          <section className="bg-white rounded-[1.5rem] shadow-sm border border-gray-100 overflow-hidden">
              <PushToggle />
           </section>
 
-          {/* เมนูอื่นๆ ปรับให้เข้ากับสไตล์การ์ดของหน้าหลัก */}
+          {/* เมนูอื่นๆ ปรับให้เหมือน Reference */}
           <section className="bg-white rounded-[1.5rem] p-2 shadow-sm border border-gray-100">
-            <Link href="/profile/edit" className="flex items-center justify-between p-4 hover:bg-orange-50/50 rounded-xl transition-colors active:scale-95">
+            <Link href="/profile/edit" className="flex items-center justify-between p-4 hover:bg-slate-50 rounded-xl transition-colors active:scale-95">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-orange-50 flex items-center justify-center text-2xl">📝</div>
+                {/* ✅ เปลี่ยนเป็นไอคอนฟันเฟือง ตามที่บรีฟ */}
+                <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-2xl">⚙️</div>
                 <span className="font-black text-gray-800 text-sm">จัดการข้อมูลส่วนตัว</span>
               </div>
               <span className="text-gray-300 font-bold text-xl">›</span>
@@ -85,9 +85,10 @@ export default function ProfilePage() {
             
             <div className="h-[1px] bg-gray-50 mx-4" />
             
-            <Link href="/my-jobs" className="flex items-center justify-between p-4 hover:bg-orange-50/50 rounded-xl transition-colors active:scale-95">
+            <Link href="/my-jobs" className="flex items-center justify-between p-4 hover:bg-slate-50 rounded-xl transition-colors active:scale-95">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-orange-50 flex items-center justify-center text-2xl">📋</div>
+                {/* ปรับสีพื้นหลังไอคอนให้คลีนๆ */}
+                <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-2xl">📋</div>
                 <span className="font-black text-gray-800 text-sm">ประวัติงานของฉัน</span>
               </div>
               <span className="text-gray-300 font-bold text-xl">›</span>
@@ -97,13 +98,13 @@ export default function ProfilePage() {
           {/* ปุ่มออกจากระบบ */}
           <button 
             onClick={handleSignOut}
-            className="w-full py-4 bg-white border border-red-100 text-red-500 font-black text-sm rounded-[1.5rem] shadow-sm active:scale-95 transition-all hover:bg-red-50 hover:border-red-200 mt-2"
+            className="w-full py-4 bg-white border border-red-100 text-[#EE4D2D] font-black text-sm rounded-[1.5rem] shadow-sm active:scale-95 transition-all hover:bg-red-50 mt-2 flex items-center justify-center gap-2"
           >
             ออกจากระบบ 🚪
           </button>
         </main>
 
-        {/* Navigation Bar ด้านล่าง (จัดให้กว้างพอดีกรอบหน้าจอเหมือนหน้าหลัก) */}
+        {/* Navigation Bar ด้านล่าง */}
         <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center pointer-events-none">
           <nav className="w-full sm:max-w-2xl md:max-w-3xl pb-6 px-6 pointer-events-auto">
             <div className="bg-gray-900/95 backdrop-blur-xl rounded-[2rem] py-3.5 px-8 flex justify-between items-center shadow-2xl border border-white/10">
