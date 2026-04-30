@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { supabase } from '@/lib/supabase';
+// ✅ เปลี่ยนมาใช้กุญแจตัวใหม่
+import { createClient } from '@/lib/supabase/client';
 
 const CATEGORIES = [
   { id: 'electric', label: 'ช่างไฟ', emoji: '⚡' },
@@ -52,6 +53,8 @@ function GPPreview({ price }: { price: number }) {
 }
 
 export default function ManageServicesPage() {
+  // ✅ สร้างตัวแปรเชื่อมต่อฐานข้อมูล
+  const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const [providerId, setProviderId] = useState('');
   const [services, setServices] = useState<ServiceItem[]>([]);
@@ -98,7 +101,7 @@ export default function ManageServicesPage() {
       setLoading(false);
     };
     init();
-  }, [router]);
+  }, [router, supabase]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
