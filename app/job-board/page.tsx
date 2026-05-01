@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 
-// หมวดหมู่งานสไตล์ Fastwork
 const JOB_CATEGORIES = [
   { key: 'all', label: 'ทั้งหมด', icon: '📋' },
   { key: 'online', label: 'งานออนไลน์', icon: '💻' },
@@ -23,7 +22,7 @@ export default function JobBoardPage() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [activeCategory, setActiveCategory] = useState('all');
 
-  // 🌟 State สำหรับฟอร์มโพสต์งาน
+  // 🌟 State สำหรับฟอร์มโพสต์จ้างงาน
   const [isPostModalOpen, setIsPostModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [postTitle, setPostTitle] = useState('');
@@ -32,18 +31,23 @@ export default function JobBoardPage() {
   const [postCategory, setPostCategory] = useState('graphic');
   const [postJobType, setPostJobType] = useState<'online' | 'onsite'>('online');
 
+  // 🌟 State สำหรับฟอร์มยื่นข้อเสนอ (Proposal)
+  const [isProposalModalOpen, setIsProposalModalOpen] = useState(false);
+  const [selectedJob, setSelectedJob] = useState<any>(null);
+  const [isSubmittingProposal, setIsSubmittingProposal] = useState(false);
+  const [proposalText, setProposalText] = useState('');
+  const [proposalPrice, setProposalPrice] = useState('');
+  const [proposalDuration, setProposalDuration] = useState('');
+
   const fetchFreelanceJobs = useCallback(async () => {
     setIsLoading(true);
-    // ดึงงานที่เปิดอยู่ และ "ไม่ใช่งานวิน/ส่งของ" 
     let query = supabase.from('jobs')
       .select(`*, employer:profiles!employer_id (first_name, full_name, avatar_url)`)
       .eq('status', 'open')
       .not('job_type', 'in', '("ride","buy","deliver")')
       .order('created_at', { ascending: false });
 
-    if (activeCategory !== 'all') {
-      query = query.eq('category', activeCategory);
-    }
+    if (activeCategory !== 'all') query = query.eq('category', activeCategory);
 
     const { data } = await query;
     if (data) setJobs(data);
@@ -66,13 +70,48 @@ export default function JobBoardPage() {
     return () => { supabase.removeChannel(channel); };
   }, [fetchFreelanceJobs, supabase]);
 
-  // 🌟 ปรับปรุงฟังก์ชัน: จาก "รับงาน" เป็น "ยื่นข้อเสนอ (Proposal)"
-  const handleSubmitProposal = async (jobId: string) => {
-    if (!currentUser) return alert('กรุณาเข้าสู่ระบบก่อนยื่นโปรไฟล์ค่ะ');
-    if (!confirm('ยืนยันส่งโปรไฟล์ของคุณให้ผู้จ้างพิจารณาใช่ไหมคะ?')) return;
+  // 🌟 1. ฟังก์ชันกดปุ่ม "ยื่นโปรไฟล์" (เพื่อเปิด Modal)
+  const handleOpenProposalModal = (job: any) => {
+    if (!currentUser) {
+      alert('กรุณาเข้าสู่ระบบก่อนยื่นโปรไฟล์ค่ะ');
+      router.push('/auth/login');
+      return;
+    }
+    // ป้องกันไม่ให้รับงานตัวเอง
+    if (job.employer_id === currentUser.id) {
+      alert('ไม่สามารถยื่นข้อเสนอในงานที่คุณเป็นผู้จ้างได้ค่ะ');
+      return;
+    }
+    setSelectedJob(job);
+    setProposalPrice(job.budget ? job.budget.toString() : ''); // ตั้งค่าเริ่มต้นเป็นงบลูกค้า
+    setIsProposalModalOpen(true);
+  };
 
-    // TODO: ในอนาคตเราจะบันทึกลงตาราง job_proposals แทนการอัปเดตงาน
-    alert('ส่งโปรไฟล์สำเร็จ! 🚀 ระบบได้ส่งข้อมูลของคุณให้ผู้จ้างแล้ว หากผู้จ้างสนใจจะทักแชทกลับมาหาคุณค่ะ');
+  // 🌟 2. ฟังก์ชันส่งข้อมูลเข้าตาราง job_proposals
+  const submitProposalData = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmittingProposal(true);
+
+    const { error } = await supabase.from('job_proposals').insert({
+      job_id: selectedJob.id,
+      worker_id: currentUser.id,
+      cover_letter: proposalText,
+      proposed_price: proposalPrice ? Number(proposalPrice) : null,
+      duration_days: proposalDuration ? Number(proposalDuration) : null,
+      status: 'pending'
+    });
+
+    if (!error) {
+      alert('ส่งโปรไฟล์สำเร็จ! 🚀 ระบบได้ส่งข้อมูลของคุณให้ผู้จ้างพิจารณาแล้วค่ะ');
+      setIsProposalModalOpen(false);
+      setProposalText('');
+      setProposalPrice('');
+      setProposalDuration('');
+    } else {
+      // เช็คเผื่อกรณีส่งซ้ำ (ถ้าทำ RLS หรือ Unique constraint ไว้)
+      alert('เกิดข้อผิดพลาด หรือคุณอาจจะเคยยื่นเสนอไปแล้วค่ะ');
+    }
+    setIsSubmittingProposal(false);
   };
 
   const handlePostJob = async (e: React.FormEvent) => {
@@ -97,9 +136,7 @@ export default function JobBoardPage() {
     if (!error) {
       alert('ประกาศงานสำเร็จเรียบร้อยค่ะ! 🚀');
       setIsPostModalOpen(false);
-      setPostTitle('');
-      setPostDescription('');
-      setPostBudget('');
+      setPostTitle(''); setPostDescription(''); setPostBudget('');
       fetchFreelanceJobs(); 
     } else {
       alert('เกิดข้อผิดพลาด: ' + error.message);
@@ -120,9 +157,7 @@ export default function JobBoardPage() {
           <div className="flex justify-between items-start mb-4">
             <div>
               <Link href="/" className="text-white/80 font-black text-xs mb-2 inline-block hover:text-white">← กลับหน้าหลัก</Link>
-              <h1 className="text-2xl font-black tracking-tight flex items-center gap-2">
-                💼 ศูนย์รวมงานอิสระ
-              </h1>
+              <h1 className="text-2xl font-black tracking-tight flex items-center gap-2">💼 ศูนย์รวมงานอิสระ</h1>
               <p className="text-xs text-blue-100 font-bold mt-1 opacity-90">จ้างงานออนไลน์และหาช่างฝีมือทั่วไทย</p>
             </div>
             <button 
@@ -192,9 +227,9 @@ export default function JobBoardPage() {
                     </p>
                   </div>
                   
-                  {/* เปลี่ยนปุ่มเป็น "ยื่นข้อเสนอ" แทนการรับงานตรงๆ */}
+                  {/* เปลี่ยนปุ่มเรียกใช้ฟังก์ชันเปิด Modal */}
                   <button 
-                    onClick={() => handleSubmitProposal(job.id)}
+                    onClick={() => handleOpenProposalModal(job)}
                     className="bg-[#0047FF] hover:bg-[#0038cc] text-white px-5 py-3 rounded-xl text-xs font-black active:scale-95 transition-all shadow-md flex items-center gap-2"
                   >
                     <span>ยื่นโปรไฟล์เสนอตัว</span> <span>📝</span>
@@ -205,6 +240,7 @@ export default function JobBoardPage() {
           )}
         </main>
 
+        {/* 🌟 Modal 1: โพสต์งานใหม่ (ลูกค้า) */}
         {isPostModalOpen && (
           <div className="fixed inset-0 z-[100] flex items-end justify-center bg-blue-900/40 backdrop-blur-sm animate-fade-in">
             <div className="bg-white w-full max-w-xl rounded-t-[2rem] p-8 max-h-[90vh] overflow-y-auto pb-10 shadow-2xl relative">
@@ -249,9 +285,57 @@ export default function JobBoardPage() {
                   </div>
                 </div>
 
-                {/* ✅ โค้ดตรงนี้ที่ขาดหายไปในรอบที่แล้วค่ะ */}
                 <button type="submit" disabled={isSubmitting} className="w-full bg-[#0047FF] text-white font-black py-4 rounded-xl text-sm mt-4 shadow-lg active:scale-95 transition-all disabled:opacity-50">
                   {isSubmitting ? 'กำลังประกาศงาน...' : 'ประกาศจ้างงาน 🚀'}
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* 🌟 Modal 2: ยื่นข้อเสนอ (ฟรีแลนซ์/ช่าง) */}
+        {isProposalModalOpen && selectedJob && (
+          <div className="fixed inset-0 z-[100] flex items-end justify-center bg-blue-900/40 backdrop-blur-sm animate-fade-in">
+            <div className="bg-white w-full max-w-xl rounded-t-[2rem] p-8 max-h-[90vh] overflow-y-auto pb-10 shadow-2xl relative">
+              <div className="flex justify-between items-center mb-6">
+                <div>
+                  <h2 className="text-xl font-black text-gray-800">ยื่นโปรไฟล์เสนอตัว 📝</h2>
+                  <p className="text-xs text-gray-500 font-bold mt-1 truncate max-w-[250px]">สำหรับงาน: {selectedJob.title}</p>
+                </div>
+                <button onClick={() => setIsProposalModalOpen(false)} className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-200 transition-colors">✕</button>
+              </div>
+
+              <form onSubmit={submitProposalData} className="space-y-5">
+                
+                <div>
+                  <label className="block text-[11px] font-black text-gray-500 uppercase mb-2">แนะนำตัวและพรีเซนต์ความสามารถ</label>
+                  <textarea required rows={5} value={proposalText} onChange={(e) => setProposalText(e.target.value)} placeholder="บอกผู้จ้างว่าทำไมคุณถึงเหมาะกับงานนี้ มีประสบการณ์อะไรบ้าง หรือมีลิงก์ผลงานแนบมาได้เลยค่ะ..." className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3.5 text-sm font-medium outline-none focus:border-[#0047FF] transition-colors resize-none"></textarea>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[11px] font-black text-gray-500 uppercase mb-2">ราคาที่เสนอ (บาท)</label>
+                    <div className="relative">
+                      <input type="number" min="0" required value={proposalPrice} onChange={(e) => setProposalPrice(e.target.value)} placeholder="0" className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3.5 text-sm font-bold outline-none focus:border-[#0047FF] transition-colors pr-10" />
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-xs">฿</span>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-black text-gray-500 uppercase mb-2">ใช้เวลาทำงาน (วัน)</label>
+                    <div className="relative">
+                      <input type="number" min="1" required value={proposalDuration} onChange={(e) => setProposalDuration(e.target.value)} placeholder="เช่น 3" className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3.5 text-sm font-bold outline-none focus:border-[#0047FF] transition-colors pr-10" />
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-xs">วัน</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex items-start gap-3 mt-4">
+                  <span className="text-lg">💡</span>
+                  <p className="text-[10px] text-blue-800 font-bold leading-relaxed">ข้อมูลและโปรไฟล์ของคุณจะถูกส่งให้ผู้จ้างพิจารณา หากผู้จ้างสนใจจะทำการเปิดห้องแชทเพื่อสนทนากับคุณโดยตรงค่ะ</p>
+                </div>
+
+                <button type="submit" disabled={isSubmittingProposal} className="w-full bg-gradient-to-r from-[#0047FF] to-[#0082FA] text-white font-black py-4 rounded-xl text-sm mt-4 shadow-lg active:scale-95 transition-all disabled:opacity-50 flex justify-center items-center gap-2">
+                  {isSubmittingProposal ? 'กำลังส่งข้อมูล...' : <>ส่งโปรไฟล์ให้พิจารณา 🚀</>}
                 </button>
               </form>
             </div>
