@@ -48,7 +48,7 @@ export default function JobBoardPage() {
     let query = supabase.from('jobs')
       .select(`*, employer:profiles!employer_id (first_name, full_name, avatar_url)`)
       .eq('status', 'open')
-      .not('job_type', 'in', '("ride","buy","deliver")')
+      .not('job_type', 'in', ['ride', 'buy', 'deliver'])
       .order('created_at', { ascending: false })
       .limit(displayLimit); // ดึงมาแค่เท่าที่กำหนด
 
@@ -96,11 +96,12 @@ export default function JobBoardPage() {
     setIsProposalModalOpen(true);
   };
 
+  // ✅ เพิ่มระบบส่งการแจ้งเตือนลง Database อัตโนมัติเมื่อยื่นโปรไฟล์
   const submitProposalData = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmittingProposal(true);
 
-    const { error } = await supabase.from('job_proposals').insert({
+    const { error: proposalError } = await supabase.from('job_proposals').insert({
       job_id: selectedJob.id,
       worker_id: currentUser.id,
       cover_letter: proposalText,
@@ -109,8 +110,20 @@ export default function JobBoardPage() {
       status: 'pending'
     });
 
-    if (!error) {
-      alert('ส่งโปรไฟล์สำเร็จ! 🚀 ระบบได้ส่งข้อมูลของคุณให้ผู้จ้างพิจารณาแล้วค่ะ');
+    if (!proposalError) {
+      // 🌟 สร้างการแจ้งเตือนไปยังผู้จ้าง
+      const { error: notifError } = await supabase.from('notifications').insert({
+        user_id: selectedJob.employer_id, // ผู้จ้างจะได้รับการแจ้งเตือน
+        title: '📝 มีผู้ยื่นข้อเสนอใหม่!',
+        body: `มีฟรีแลนซ์/ช่าง ยื่นโปรไฟล์สำหรับงาน "${selectedJob.title}" ของคุณค่ะ ลองเข้าไปพิจารณาดูนะคะ`,
+        type: 'new_proposal',
+        is_read: false,
+        data: { job_id: selectedJob.id }
+      });
+
+      if (notifError) console.error('สร้างแจ้งเตือนไม่สำเร็จ:', notifError);
+
+      alert('ส่งโปรไฟล์สำเร็จ! 🚀 ระบบได้แจ้งเตือนไปยังผู้จ้างแล้วค่ะ');
       setIsProposalModalOpen(false);
       setProposalText(''); setProposalPrice(''); setProposalDuration('');
     } else {
@@ -254,7 +267,7 @@ export default function JobBoardPage() {
           )}
         </main>
 
-        {/* --- ส่วนของ Modal โพสต์งาน และ ยื่นเสนอตัว ยังคงเหมือนเดิม 100% --- */}
+        {/* 🌟 Modal 1: โพสต์งานใหม่ (ลูกค้า) */}
         {isPostModalOpen && (
           <div className="fixed inset-0 z-[100] flex items-end justify-center bg-blue-900/40 backdrop-blur-sm animate-fade-in">
             <div className="bg-white w-full max-w-xl rounded-t-[2rem] p-8 max-h-[90vh] overflow-y-auto pb-10 shadow-2xl relative">
@@ -307,6 +320,7 @@ export default function JobBoardPage() {
           </div>
         )}
 
+        {/* 🌟 Modal 2: ยื่นข้อเสนอ (ฟรีแลนซ์/ช่าง) */}
         {isProposalModalOpen && selectedJob && (
           <div className="fixed inset-0 z-[100] flex items-end justify-center bg-blue-900/40 backdrop-blur-sm animate-fade-in">
             <div className="bg-white w-full max-w-xl rounded-t-[2rem] p-8 max-h-[90vh] overflow-y-auto pb-10 shadow-2xl relative">
