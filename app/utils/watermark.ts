@@ -23,11 +23,11 @@ export async function addKycWatermark(file: File, userId: string): Promise<File>
         // 3. วาดรูปต้นฉบับลงบน Canvas
         ctx.drawImage(img, 0, 0);
 
-        // 4. ตั้งค่าตัวหนังสือลายน้ำ (diagonal repeating text)
+        // 4. ตั้งค่าตัวหนังสือลายน้ำ
         const text = `ใช้สำหรับยืนยันตัวตนแอป "จงเจริญ" เท่านั้น  ID: ${userId.slice(0, 8)}`;
         const dateText = `วันที่ ${new Date().toLocaleDateString('th-TH')}`;
         
-        // คำนวณขนาดฟอนต์ตามความกว้างรูป (เพื่อให้ลายน้ำดูพอดีไม่ว่าจะรูปเล็กหรือใหญ่)
+        // คำนวณขนาดฟอนต์ตามความกว้างรูป
         const fontSize = Math.max(16, Math.floor(img.width / 30));
         ctx.font = `bold ${fontSize}px "Prompt", "Helvetica", sans-serif`;
         ctx.fillStyle = 'rgba(238, 77, 45, 0.25)'; // สีส้มจงเจริญ โปร่งแสง 25%
@@ -45,12 +45,12 @@ export async function addKycWatermark(file: File, userId: string): Promise<File>
         // หมุนตัวหนังสือ
         ctx.rotate((angle * Math.PI) / 180);
 
-        // วาดให้เต็มทั่วรูป
+        // วาดให้เต็มทั่วรูป (✅ แก้ไขเอา </tr> ออกแล้ว ใส่ปีกกาปิดปกติค่ะ)
         for (let x = -img.width; x < img.width * 2; x += spacingX) {
           for (let y = -img.height; y < img.height * 2; y += spacingY) {
             ctx.fillText(text, x, y);
             ctx.fillText(dateText, x, y + fontSize * 1.2);
-          </tr>
+          }
         }
 
         // คืนสถานะ Canvas
