@@ -63,34 +63,24 @@ export default function MyJobsPage() {
     });
   }, [fetchMyJobs, supabase.auth]);
 
-  // 🌟 ฟังก์ชัน: ตอบรับผู้รับงาน
+  // 🌟 ฟังก์ชัน: ตอบรับผู้รับงาน (อัปเกรดความปลอดภัยด้วย RPC)
   const handleAcceptProposal = async (job: any, proposal: any) => {
     if (!confirm(`ยืนยันการจ้างงาน ${proposal.worker?.full_name} ใช่ไหมคะ?`)) return;
     setActionLoading(proposal.id);
 
     try {
-      // 1. อัปเดตตาราง jobs: เปลี่ยนสถานะและผูก worker_id
-      const { error: jobErr } = await supabase
-        .from('jobs')
-        .update({ status: 'in_progress', worker_id: proposal.worker_id })
-        .eq('id', job.id);
-
-      // 2. อัปเดตตาราง job_proposals: เปลี่ยนสถานะของคนนี้เป็น accepted
-      await supabase.from('job_proposals').update({ status: 'accepted' }).eq('id', proposal.id);
-
-      // 3. ส่งแจ้งเตือนไปหาช่าง
-      await supabase.from('notifications').insert({
-        user_id: proposal.worker_id,
-        title: '🎉 งานได้รับการอนุมัติ!',
-        body: `คุณได้รับเลือกให้ทำงาน "${job.title}" แล้วค่ะ เริ่มคุยรายละเอียดในแชทได้เลย`,
-        type: 'job',
-        data: { job_id: job.id }
+      const { error } = await supabase.rpc('accept_proposal', {
+        p_job_id: job.id,
+        p_proposal_id: proposal.id,
+        p_worker_id: proposal.worker_id
       });
+
+      if (error) throw error;
 
       alert('จ้างงานสำเร็จ! 🎉 พาท่านไปยังห้องแชทค่ะ');
       router.push(`/chat/${job.id}`);
-    } catch (err) {
-      alert('เกิดข้อผิดพลาดในการจ้างงานค่ะ');
+    } catch (err: any) {
+      alert('เกิดข้อผิดพลาดในการจ้างงานค่ะ: ' + err.message);
     }
     setActionLoading(null);
     if (userId) fetchMyJobs(userId);
