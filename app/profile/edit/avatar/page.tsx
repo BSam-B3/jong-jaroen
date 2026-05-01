@@ -11,7 +11,6 @@ export default function AvatarEditPage() {
   const [uploading, setUploading] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   
-  // ✅ เพิ่ม State สำหรับ Preview รูปให้ดูก่อนอัปโหลดจริง
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
@@ -26,16 +25,13 @@ export default function AvatarEditPage() {
     getProfile();
   }, [supabase]);
 
-  // เมื่อผู้ใช้กดเลือกรูปจากมือถือ
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!event.target.files || event.target.files.length === 0) return;
     const file = event.target.files[0];
     setSelectedFile(file);
-    // สร้าง URL จำลองให้ดูตัวอย่างก่อน
     setPreviewUrl(URL.createObjectURL(file));
   };
 
-  // เมื่อผู้ใช้กดปุ่ม "ยืนยันอัปโหลด"
   const handleConfirmUpload = async () => {
     if (!selectedFile) return;
     
@@ -44,24 +40,42 @@ export default function AvatarEditPage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      const fileExt = selectedFile.name.split('.').pop();
-      // ตั้งชื่อไฟล์ใหม่สุ่มเพื่อไม่ให้ซ้ำกัน
-      const filePath = `${session.user.id}-${Math.random()}.${fileExt}`;
+      // 🗑️ STEP 1: ลบรูปเก่าออกจาก Storage (ถ้ามี)
+      if (avatarUrl) {
+        try {
+          // ดึงเฉพาะชื่อไฟล์จาก URL (ตัวอย่าง: .../avatars/filename.jpg -> filename.jpg)
+          const oldFileName = avatarUrl.split('/').pop();
+          if (oldFileName) {
+            await supabase.storage.from('avatars').remove([oldFileName]);
+            console.log("ลบรูปเก่าเรียบร้อย:", oldFileName);
+          }
+        } catch (err) {
+          console.error("Error deleting old avatar:", err);
+          // ไม่ต้องหยุดการทำงาน เผื่อรูปเก่าไม่มีอยู่จริงใน Storage
+        }
+      }
 
-      // 1. อัปโหลดขึ้น Storage ถัง avatars
-      const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, selectedFile);
+      // 📤 STEP 2: อัปโหลดรูปใหม่ (สุ่มชื่อใหม่เพื่อเลี่ยงปัญหา Cache)
+      const fileExt = selectedFile.name.split('.').pop();
+      const filePath = `${session.user.id}-${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, selectedFile);
+
       if (uploadError) throw uploadError;
 
-      // 2. ดึง Public URL ของรูปที่เพิ่งอัปโหลด
+      // 🔗 STEP 3: ดึง Public URL และอัปเดต Database
       const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(filePath);
 
-      // 3. อัปเดตลิงก์รูปลง Database (ตาราง profiles)
-      const { error: updateError } = await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', session.user.id);
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: publicUrl })
+        .eq('id', session.user.id);
+
       if (updateError) throw updateError;
 
       alert('อัปเดตรูปโปรไฟล์สำเร็จแล้วค่ะ!');
-      
-      // ✅ พอกดตกลง ให้เด้งกลับไปหน้าแก้ไขข้อมูลพื้นฐานอัตโนมัติ
       router.push('/profile/edit/basic');
       router.refresh();
 
@@ -73,7 +87,6 @@ export default function AvatarEditPage() {
     }
   };
 
-  // รูปที่จะโชว์: ถ้ามีพรีวิวให้โชว์พรีวิว ถ้ายังไม่ได้เลือกให้โชว์รูปเก่าจาก Database
   const displayImage = previewUrl || avatarUrl;
 
   return (
@@ -90,7 +103,6 @@ export default function AvatarEditPage() {
             ) : '👤'}
           </div>
 
-          {/* 🔘 แบ่งเป็น 2 โหมด: โหมดเลือกรูปปกติ กับ โหมดยืนยันอัปโหลด */}
           {!selectedFile ? (
             <label className="px-8 py-4 rounded-2xl font-black text-[#EE4D2D] bg-white border-2 border-[#EE4D2D] shadow-sm transition-all active:scale-95 cursor-pointer hover:bg-orange-50">
               📷 เลือกรูปภาพใหม่
@@ -116,7 +128,8 @@ export default function AvatarEditPage() {
           )}
           
           <p className="text-xs text-gray-400 text-center leading-relaxed">
-            รูปนี้จะแสดงให้ลูกค้าและเพื่อนสมาชิกเห็นในระบบ <br/>แนะนำให้ใช้รูปที่เห็นใบหน้าชัดเจนเพื่อความน่าเชื่อถือค่ะ
+            รูปนี้จะแสดงให้ลูกค้าเห็น สามารถเปลี่ยนได้บ่อยเท่าที่ต้องการค่ะ <br/>
+            ระบบจะช่วยลบรูปเก่าทิ้งให้อัตโนมัติเพื่อประหยัดพื้นที่ค่ะ ✨
           </p>
         </div>
       </div>
