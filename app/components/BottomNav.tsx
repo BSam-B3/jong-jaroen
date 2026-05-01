@@ -1,39 +1,51 @@
 'use client';
-import Link from "next/link";
+
+import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 export default function BottomNav() {
   const pathname = usePathname();
 
+  const navItems = [
+    { name: 'หน้าหลัก', href: '/win-online', icon: '🏠' },
+    { name: 'บริการ', href: '/services', icon: '🔍' },
+    { name: 'แจ้งเตือน', href: '/notifications', icon: '🔔', hasBadge: true },
+    { name: 'บัญชี', href: '/profile', icon: '👤' },
+  ];
+
   return (
-    <div className="fixed bottom-0 w-full sm:max-w-2xl md:max-w-3xl left-1/2 -translate-x-1/2 z-50">
-      <nav className="bg-white/95 backdrop-blur-md border-t border-gray-100 px-2 py-2 flex items-center shadow-[0_-4px_25px_rgba(0,0,0,0.06)] rounded-t-[2.5rem]">
-        <NavItem icon="🏠" label="หน้าหลัก" href="/" pathname={pathname} />
-        <NavItem icon="💼" label="งานของฉัน" href="/my-jobs" pathname={pathname} />
-        <NavItem icon="👤" label="บัญชี" href="/profile" pathname={pathname} />
+    <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center pointer-events-none">
+      <nav className="w-full sm:max-w-2xl md:max-w-3xl pb-6 px-5 pointer-events-auto">
+        <div className="bg-gray-900/95 backdrop-blur-xl rounded-[2.2rem] py-3 px-4 flex justify-between items-center shadow-2xl border border-white/10">
+          {navItems.map((item) => {
+            const isActive = pathname === item.href;
+            return (
+              <Link 
+                key={item.href} 
+                href={item.href} 
+                className={`flex flex-col items-center gap-1 w-16 transition-all duration-300 relative ${
+                  isActive ? 'scale-110' : 'opacity-60 hover:opacity-100'
+                }`}
+              >
+                <span className="text-2xl">{item.icon}</span>
+                <span className={`text-[9px] font-black tracking-wide ${isActive ? 'text-[#EE4D2D]' : 'text-gray-400'}`}>
+                  {item.name}
+                </span>
+                
+                {/* 🔴 จุดแจ้งเตือนสำหรับเมนู Notifications */}
+                {item.hasBadge && (
+                  <div className="absolute top-0 right-4 w-2.5 h-2.5 bg-[#EE4D2D] rounded-full border-2 border-gray-900" />
+                )}
+
+                {/* 🟠 แถบขีดล่างสำหรับเมนูที่ Active */}
+                {isActive && (
+                  <div className="absolute -bottom-1 w-1.5 h-1.5 bg-[#EE4D2D] rounded-full shadow-[0_0_8px_#EE4D2D]" />
+                )}
+              </Link>
+            );
+          })}
+        </div>
       </nav>
     </div>
-  );
-}
-
-// คอมโพเนนต์เมนูด้านล่าง
-function NavItem({ icon, label, href, pathname }: { icon: string, label: string, href: string, pathname: string }) {
-  // ✅ [Audit Fix] รองรับ Nested Routes (เช่น /profile/edit ก็ยังถือว่าแอคทีฟ)
-  const active = href === '/' ? pathname === '/' : pathname.startsWith(href);
-
-  return (
-    <Link 
-      href={href} 
-      className={`relative flex flex-col items-center justify-center gap-1 cursor-pointer transition-all ${active ? 'scale-110' : 'opacity-40 hover:opacity-100'} flex-1 h-14`}
-    >
-      <span className="text-[26px] leading-none">{icon}</span>
-      <span className={`text-[10px] font-black tracking-wide ${active ? 'text-[#EE4D2D]' : 'text-gray-500'} whitespace-nowrap`}>
-        {label}
-      </span>
-      
-      {active && (
-        <div className="absolute -bottom-0.5 w-1.5 h-1.5 bg-[#EE4D2D] rounded-full shadow-sm"></div>
-      )}
-    </Link>
   );
 }
