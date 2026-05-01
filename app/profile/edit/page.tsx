@@ -33,11 +33,9 @@ export default async function ProfileEditPage() {
     .eq('id', user.id)
     .single();
 
-  // ดึงค่าสถานะ (ถ้ายังไม่มีใน DB ให้เป็น none)
   const kycStatus = profile?.kyc_status || 'none';
   const bankStatus = profile?.bank_status || 'none'; 
   const certStatus = profile?.cert_status || 'none';
-  // สถานะใหม่ที่เพิ่มเข้ามา
   const vehicleStatus = profile?.vehicle_status || 'none'; 
   const addressStatus = profile?.address_status || 'none';
 
@@ -58,7 +56,6 @@ export default async function ProfileEditPage() {
             </p>
           </div>
 
-          {/* รูปโปรไฟล์ พร้อมปุ่มแก้ไข (ไอคอนกล้อง) */}
           <div className="relative shrink-0">
             <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm shadow-inner border border-white/30 overflow-hidden">
               {profile?.avatar_url ? (
@@ -67,7 +64,6 @@ export default async function ProfileEditPage() {
                 <span className="text-3xl">👤</span>
               )}
             </div>
-            {/* ปุ่มแก้ไขรูปโปรไฟล์ */}
             <Link href="/profile/edit/avatar" className="absolute -bottom-1 -right-1 w-7 h-7 bg-white text-[#EE4D2D] rounded-full flex items-center justify-center shadow-lg border border-gray-100 text-xs active:scale-95 transition-transform z-10">
               📷
             </Link>
@@ -76,7 +72,6 @@ export default async function ProfileEditPage() {
 
         <main className="flex-1 relative z-10 space-y-6 mt-2 px-4 pb-8">
           
-          {/* Banner แจ้งเตือน */}
           <div className="bg-orange-50/80 border border-orange-100 rounded-[1.2rem] p-4 flex gap-3 shadow-sm">
             <span className="text-xl">💡</span>
             <p className="text-[11px] font-bold text-orange-800/80 leading-relaxed">
@@ -84,7 +79,7 @@ export default async function ProfileEditPage() {
             </p>
           </div>
 
-          {/* Section 1: ข้อมูลพื้นฐาน */}
+          {/* Section 1: ข้อมูลพื้นฐาน (เพิ่มเมนู GPS) */}
           <section>
             <h2 className="text-[11px] font-black text-gray-400 px-2 mb-2 uppercase tracking-wide">ข้อมูลพื้นฐาน (Profile)</h2>
             <div className="bg-white rounded-[1.5rem] shadow-sm border border-gray-100 overflow-hidden">
@@ -100,12 +95,12 @@ export default async function ProfileEditPage() {
                 <span className="text-gray-300 text-xl font-bold">›</span>
               </Link>
 
-              <Link href="/profile/edit/address" className="flex items-center justify-between p-4 hover:bg-gray-50 transition-colors active:bg-gray-100">
+              <Link href="/profile/edit/address" className="flex items-center justify-between p-4 hover:bg-gray-50 transition-colors active:bg-gray-100 border-b border-gray-50">
                 <div className="flex items-center gap-3">
                   <span className="text-[22px]">📍</span>
                   <div>
-                    <h3 className="font-medium text-gray-800 text-sm">ที่อยู่และพื้นที่รับงาน</h3>
-                    <p className="text-[10px] text-gray-400">ปักหมุดโซนที่ให้บริการ</p>
+                    <h3 className="font-medium text-gray-800 text-sm">ที่อยู่ตามบัตรประชาชน</h3>
+                    <p className="text-[10px] text-gray-400">ที่อยู่ที่ระบุไว้ในฐานข้อมูลรัฐ</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -114,10 +109,28 @@ export default async function ProfileEditPage() {
                 </div>
               </Link>
 
+              {/* ✅ [NEW] เมนูตั้งค่า GPS และรัศมีรับงาน */}
+              <Link href="/profile/edit/location" className="flex items-center justify-between p-4 hover:bg-gray-50 transition-colors active:bg-gray-100">
+                <div className="flex items-center gap-3">
+                  <span className="text-[22px]">📡</span>
+                  <div>
+                    <h3 className="font-medium text-gray-800 text-sm">พิกัดและรัศมีรับงาน (GPS)</h3>
+                    <p className="text-[10px] text-gray-400">กำหนดรัศมี 1-50 กม. รอบตัวคุณ</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {/* แสดงค่ารัศมีปัจจุบันถ้ามี */}
+                  <span className="text-[10px] font-black text-[#EE4D2D] bg-orange-50 px-2 py-1 rounded-md">
+                    {profile?.work_radius_km || 10} กม.
+                  </span>
+                  <span className="text-gray-300 text-xl font-bold">›</span>
+                </div>
+              </Link>
+
             </div>
           </section>
 
-          {/* Section 2: ความปลอดภัย & ยานพาหนะ (เพิ่มใหม่ตามที่บีสามขอ) */}
+          {/* Section 2: ความปลอดภัย */}
           <section>
             <h2 className="text-[11px] font-black text-gray-400 px-2 mb-2 uppercase tracking-wide">ความปลอดภัย (Trust & Safety)</h2>
             <div className="bg-white rounded-[1.5rem] shadow-sm border border-gray-100 overflow-hidden">
@@ -136,7 +149,6 @@ export default async function ProfileEditPage() {
                 </div>
               </Link>
 
-              {/* ✅ เมนูลงทะเบียนรถและใบขับขี่ */}
               <Link href="/profile/vehicles" className="flex items-center justify-between p-4 hover:bg-gray-50 transition-colors active:bg-gray-100 border-b border-gray-50">
                 <div className="flex items-center gap-3">
                   <span className="text-[22px]">🛵</span>
@@ -151,7 +163,6 @@ export default async function ProfileEditPage() {
                 </div>
               </Link>
 
-              {/* ✅ ผู้ติดต่อฉุกเฉิน */}
               <Link href="/profile/edit/emergency" className="flex items-center justify-between p-4 hover:bg-gray-50 transition-colors active:bg-gray-100">
                 <div className="flex items-center gap-3">
                   <span className="text-[22px]">🚨</span>
@@ -186,7 +197,7 @@ export default async function ProfileEditPage() {
             </div>
           </section>
 
-          {/* Section 4: Portfolio */}
+          {/* Section 4: ผลงาน */}
           <section>
             <h2 className="text-[11px] font-black text-gray-400 px-2 mb-2 uppercase tracking-wide">ผลงาน (Portfolio)</h2>
             <div className="bg-white rounded-[1.5rem] shadow-sm border border-gray-100 overflow-hidden">
