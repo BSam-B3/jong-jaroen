@@ -58,7 +58,6 @@ export default function JobBoardPage() {
     };
     initData();
 
-    // Real-time Feed สำหรับงานฟรีแลนซ์
     const channel = supabase.channel('public-jobs-freelance')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs', filter: "status=eq.open" }, () => {
         fetchFreelanceJobs();
@@ -67,26 +66,15 @@ export default function JobBoardPage() {
     return () => { supabase.removeChannel(channel); };
   }, [fetchFreelanceJobs, supabase]);
 
-  const handleAcceptJob = async (jobId: string) => {
-    if (!currentUser) return alert('กรุณาเข้าสู่ระบบก่อนรับงานค่ะ');
-    if (!confirm('ยืนยันรับงานนี้ใช่ไหมคะ? (ระบบจะพาท่านไปหน้าแชทเพื่อคุยรายละเอียด)')) return;
+  // 🌟 ปรับปรุงฟังก์ชัน: จาก "รับงาน" เป็น "ยื่นข้อเสนอ (Proposal)"
+  const handleSubmitProposal = async (jobId: string) => {
+    if (!currentUser) return alert('กรุณาเข้าสู่ระบบก่อนยื่นโปรไฟล์ค่ะ');
+    if (!confirm('ยืนยันส่งโปรไฟล์ของคุณให้ผู้จ้างพิจารณาใช่ไหมคะ?')) return;
 
-    const { error } = await supabase
-      .from('jobs')
-      .update({ status: 'in_progress', worker_id: currentUser.id })
-      .eq('id', jobId)
-      .eq('status', 'open');
-
-    if (error) {
-      alert('ขออภัยค่ะ งานนี้ถูกรับไปแล้ว หรือเกิดข้อผิดพลาด 🙏');
-    } else {
-      alert('รับงานสำเร็จ! 🎉 ไปลุยกันเลยค่ะ');
-      router.push('/my-jobs');
-    }
-    fetchFreelanceJobs();
+    // TODO: ในอนาคตเราจะบันทึกลงตาราง job_proposals แทนการอัปเดตงาน
+    alert('ส่งโปรไฟล์สำเร็จ! 🚀 ระบบได้ส่งข้อมูลของคุณให้ผู้จ้างแล้ว หากผู้จ้างสนใจจะทักแชทกลับมาหาคุณค่ะ');
   };
 
-  // 🌟 ฟังก์ชันจัดการการโพสต์งานใหม่
   const handlePostJob = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser) {
@@ -112,14 +100,13 @@ export default function JobBoardPage() {
       setPostTitle('');
       setPostDescription('');
       setPostBudget('');
-      fetchFreelanceJobs(); // โหลดหน้าฟีดใหม่
+      fetchFreelanceJobs(); 
     } else {
       alert('เกิดข้อผิดพลาด: ' + error.message);
     }
     setIsSubmitting(false);
   };
 
-  // แปลงวันที่ให้อ่านง่าย
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('th-TH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -129,7 +116,6 @@ export default function JobBoardPage() {
     <div className="min-h-screen bg-[#F8FAFC] flex justify-center font-sans pb-24">
       <div className="w-full max-w-3xl bg-[#F8FAFC] min-h-screen relative flex flex-col shadow-2xl border-x border-gray-100">
         
-        {/* 🔵 Header สไตล์ Professional */}
         <header className="px-6 pt-12 pb-6 bg-gradient-to-br from-[#0047FF] to-[#0082FA] text-white shadow-lg rounded-b-[2.5rem] relative z-20">
           <div className="flex justify-between items-start mb-4">
             <div>
@@ -139,8 +125,6 @@ export default function JobBoardPage() {
               </h1>
               <p className="text-xs text-blue-100 font-bold mt-1 opacity-90">จ้างงานออนไลน์และหาช่างฝีมือทั่วไทย</p>
             </div>
-            
-            {/* ✅ ปุ่มเปิดหน้าต่างโพสต์งาน */}
             <button 
               onClick={() => setIsPostModalOpen(true)} 
               className="bg-white text-[#0047FF] px-4 py-2.5 rounded-2xl text-[11px] font-black shadow-md active:scale-95 transition-transform flex items-center gap-1 hover:bg-blue-50"
@@ -149,7 +133,6 @@ export default function JobBoardPage() {
             </button>
           </div>
 
-          {/* หมวดหมู่งาน (Scrollable) */}
           <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2 pt-2 -mx-2 px-2">
             {JOB_CATEGORIES.map((cat) => (
               <button 
@@ -163,7 +146,6 @@ export default function JobBoardPage() {
           </div>
         </header>
 
-        {/* 📋 Job Feed */}
         <main className="p-4 space-y-4 mt-2">
           {isLoading ? (
             <div className="space-y-4 animate-pulse">
@@ -179,12 +161,10 @@ export default function JobBoardPage() {
             jobs.map((job) => (
               <article key={job.id} className="bg-white rounded-[1.5rem] p-5 shadow-sm border border-gray-100 relative overflow-hidden group hover:border-blue-200 transition-colors">
                 
-                {/* ริบบิ้นประเภทงาน */}
                 <div className="absolute top-0 right-0 bg-[#0047FF] text-white text-[9px] font-black px-3 py-1.5 rounded-bl-xl shadow-sm">
                   {job.job_type === 'online' ? '💻 ทำออนไลน์' : '📍 ลงพื้นที่'}
                 </div>
 
-                {/* โปรไฟล์ผู้จ้าง & เวลา */}
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-10 h-10 bg-gray-100 rounded-full overflow-hidden border border-gray-200 shrink-0">
                     {job.employer?.avatar_url ? (
@@ -199,13 +179,11 @@ export default function JobBoardPage() {
                   </div>
                 </div>
 
-                {/* หัวข้องาน & รายละเอียด */}
                 <h2 className="text-base font-black text-gray-900 leading-snug mb-2 pr-16">{job.title}</h2>
                 <p className="text-[11px] text-gray-500 font-medium leading-relaxed line-clamp-3 mb-4 whitespace-pre-line">
                   {job.description || 'ไม่มีคำอธิบายเพิ่มเติม สามารถทักแชทเพื่อสอบถามรายละเอียดได้เลยค่ะ'}
                 </p>
 
-                {/* งบประมาณ & ปุ่มรับงาน */}
                 <div className="flex justify-between items-end pt-4 border-t border-gray-50">
                   <div>
                     <p className="text-[9px] text-gray-400 font-black uppercase tracking-widest mb-1">งบประมาณ</p>
@@ -214,11 +192,12 @@ export default function JobBoardPage() {
                     </p>
                   </div>
                   
+                  {/* เปลี่ยนปุ่มเป็น "ยื่นข้อเสนอ" แทนการรับงานตรงๆ */}
                   <button 
-                    onClick={() => handleAcceptJob(job.id)}
-                    className="bg-[#0047FF] hover:bg-[#0038cc] text-white px-6 py-3 rounded-xl text-xs font-black active:scale-95 transition-all shadow-md flex items-center gap-2"
+                    onClick={() => handleSubmitProposal(job.id)}
+                    className="bg-[#0047FF] hover:bg-[#0038cc] text-white px-5 py-3 rounded-xl text-xs font-black active:scale-95 transition-all shadow-md flex items-center gap-2"
                   >
-                    <span>เจรจารับงาน</span> <span>›</span>
+                    <span>ยื่นโปรไฟล์เสนอตัว</span> <span>📝</span>
                   </button>
                 </div>
               </article>
@@ -226,7 +205,6 @@ export default function JobBoardPage() {
           )}
         </main>
 
-        {/* 🌟 Modal โพสต์งานใหม่ (Pop-up) */}
         {isPostModalOpen && (
           <div className="fixed inset-0 z-[100] flex items-end justify-center bg-blue-900/40 backdrop-blur-sm animate-fade-in">
             <div className="bg-white w-full max-w-xl rounded-t-[2rem] p-8 max-h-[90vh] overflow-y-auto pb-10 shadow-2xl relative">
@@ -236,8 +214,6 @@ export default function JobBoardPage() {
               </div>
 
               <form onSubmit={handlePostJob} className="space-y-5">
-                
-                {/* 1. รูปแบบงาน (Online / Onsite) */}
                 <div>
                   <label className="block text-[11px] font-black text-gray-500 uppercase mb-2">รูปแบบการทำงาน</label>
                   <div className="flex gap-3">
@@ -246,7 +222,6 @@ export default function JobBoardPage() {
                   </div>
                 </div>
 
-                {/* 2. หมวดหมู่ */}
                 <div>
                   <label className="block text-[11px] font-black text-gray-500 uppercase mb-2">หมวดหมู่งาน</label>
                   <select value={postCategory} onChange={(e) => setPostCategory(e.target.value)} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm font-bold text-gray-700 outline-none focus:border-[#0047FF] appearance-none">
@@ -256,19 +231,16 @@ export default function JobBoardPage() {
                   </select>
                 </div>
 
-                {/* 3. หัวข้องาน */}
                 <div>
                   <label className="block text-[11px] font-black text-gray-500 uppercase mb-2">หัวข้องานที่ต้องการ</label>
                   <input type="text" required value={postTitle} onChange={(e) => setPostTitle(e.target.value)} placeholder="เช่น ออกแบบโลโก้ร้านกาแฟ, ซ่อมแอร์บ้าน..." className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3.5 text-sm font-bold outline-none focus:border-[#0047FF] transition-colors" />
                 </div>
 
-                {/* 4. รายละเอียด */}
                 <div>
                   <label className="block text-[11px] font-black text-gray-500 uppercase mb-2">รายละเอียดและขอบเขตงาน</label>
                   <textarea required rows={4} value={postDescription} onChange={(e) => setPostDescription(e.target.value)} placeholder="อธิบายรายละเอียด สิ่งที่ต้องการ หรือเงื่อนไขต่างๆ ให้ชัดเจน..." className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3.5 text-sm font-medium outline-none focus:border-[#0047FF] transition-colors resize-none"></textarea>
                 </div>
 
-                {/* 5. งบประมาณ */}
                 <div>
                   <label className="block text-[11px] font-black text-gray-500 uppercase mb-2">งบประมาณที่ตั้งไว้ (ปล่อยว่างได้ถ้าต้องการให้เสนอราคา)</label>
                   <div className="relative">
@@ -277,5 +249,16 @@ export default function JobBoardPage() {
                   </div>
                 </div>
 
-                {/* Submit Button */}
-                <button type="submit" disabled={isSubmitting} className="w-full bg-[#0047FF] text-white font-black py-4 rounded-xl text-sm mt-4 shadow-lg active
+                {/* ✅ โค้ดตรงนี้ที่ขาดหายไปในรอบที่แล้วค่ะ */}
+                <button type="submit" disabled={isSubmitting} className="w-full bg-[#0047FF] text-white font-black py-4 rounded-xl text-sm mt-4 shadow-lg active:scale-95 transition-all disabled:opacity-50">
+                  {isSubmitting ? 'กำลังประกาศงาน...' : 'ประกาศจ้างงาน 🚀'}
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}
