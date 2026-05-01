@@ -1,18 +1,21 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase/client';
 import { addKycWatermark } from '@/app/utils/watermark';
 
 export default function KYCPage() {
   const router = useRouter();
+  // ✅ เรียกใช้ Supabase แบบ Client อย่างถูกต้อง แก้ Error Vercel ทันที
+  const supabase = useMemo(() => createClient(), []); 
+  
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [kycStatus, setKycStatus] = useState<string | null>(null);
   const [error, setError] = useState('');
 
-  // -- 📝 Form States (แยกเป็นช่องๆ อย่างละเอียด) --
+  // -- 📝 Form States --
   const [firstNameTh, setFirstNameTh] = useState('');
   const [lastNameTh, setLastNameTh] = useState('');
   const [firstNameEn, setFirstNameEn] = useState('');
@@ -25,9 +28,6 @@ export default function KYCPage() {
   const [subDistrict, setSubDistrict] = useState('');
   const [district, setDistrict] = useState('');
   const [province, setProvince] = useState('');
-  
-  // พื้นที่รับงาน
-  const [serviceArea, setServiceArea] = useState('');
   
   const [pdpaConsent, setPdpaConsent] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -75,13 +75,12 @@ export default function KYCPage() {
         if (profile.last_name_th) setLastNameTh(profile.last_name_th);
         if (profile.first_name_en) setFirstNameEn(profile.first_name_en);
         if (profile.last_name_en) setLastNameEn(profile.last_name_en);
-        if (profile.national_id || profile.id_card_number) setIdNumber(profile.national_id || profile.id_card_number || '');
+        if (profile.id_card_number) setIdNumber(profile.id_card_number); // ✅ ใช้ id_card_number ตามฐานข้อมูลใหม่
         if (profile.date_of_birth) setDateOfBirth(profile.date_of_birth);
         if (profile.address_no) setAddressNo(profile.address_no);
         if (profile.sub_district) setSubDistrict(profile.sub_district);
         if (profile.district) setDistrict(profile.district);
         if (profile.province) setProvince(profile.province);
-        if (profile.service_area) setServiceArea(profile.service_area);
       }
     } catch (_e) {}
     setLoading(false);
@@ -166,30 +165,24 @@ export default function KYCPage() {
         setStatusMessage('✅ วิเคราะห์สำเร็จ กรุณาตรวจสอบข้อมูลอีกครั้ง');
 
         // --- 🤖 ขุมพลัง AI OCR (อัปเกรด: แยกข้อมูลเป็นชิ้นๆ) ---
-        
-        // 1. เลขบัตร 13 หลัก
         const idMatch = rawText.replace(/\D/g, '').match(/(\d{13})/);
         if (idMatch) setIdNumber(idMatch[1]);
 
-        // 2. ชื่อ-สกุล ไทย
         const thNameMatch = cleanText.match(/(นาย|นาง|นางสาว)\s*([ก-๙]+)\s+([ก-๙]+)/);
         if (thNameMatch) {
             setFirstNameTh(thNameMatch[2]);
             setLastNameTh(thNameMatch[3]);
         }
 
-        // 3. ชื่อ-สกุล อังกฤษ (มักจะตามหลังคำว่า Name)
         const enNameMatch = cleanText.match(/Name\s+([A-Za-z]+)\s+([A-Za-z]+)/i);
         if (enNameMatch) {
             setFirstNameEn(enNameMatch[1]);
             setLastNameEn(enNameMatch[2]);
         }
 
-        // 4. วันเกิด
         const dobMatch = cleanText.match(/(\d{1,2}\s*[ก-๙\.]+\s*\d{4})/);
         if (dobMatch) setDateOfBirth(dobMatch[1]);
 
-        // 5. ที่อยู่ (แยกบ้านเลขที่, ตำบล, อำเภอ, จังหวัด)
         const houseMatch = cleanText.match(/(?:ที่อยู่|Address)\s*([0-9/]+(?:\s*(?:หมู่ที่|หมู่|ม\.)\s*\d+)?)/);
         if (houseMatch) setAddressNo(houseMatch[1].trim());
 
@@ -237,10 +230,10 @@ export default function KYCPage() {
       const { data: selfieUploadData, error: selfieUploadErr } = await supabase.storage.from('kyc-documents').upload(selfieFileName, watermarkedSelfie);
       if (selfieUploadErr) throw selfieUploadErr;
 
-      // ประกอบร่าง Full Name สำหรับใช้งานทั่วไป (อิงตามฐานข้อมูลเดิม)
       const full_name = `${firstNameTh} ${lastNameTh}`.trim();
       const full_name_en = `${firstNameEn} ${lastNameEn}`.trim();
 
+      // ✅ อัปเดตข้อมูลด้วยชื่อคอลัมน์ที่คลีนแล้ว
       await supabase.from('profiles').update({
         kyc_status: 'pending',
         kyc_rejected_reason: null, 
@@ -250,15 +243,14 @@ export default function KYCPage() {
         last_name_th: lastNameTh,
         first_name_en: firstNameEn,
         last_name_en: lastNameEn,
-        id_card_number: idNumber, 
-        date_of_birth: dateOfBirth,
+        id_card_number: idNumber, // ใช้ id_card_number
+        date_of_birth: dateOfBirth, // ใช้ date_of_birth
         address_no: addressNo,
         sub_district: subDistrict,
         district: district,
         province: province,
-        service_area: serviceArea, // บันทึกพื้นที่รับงาน
         id_card_url: idUploadData.path, 
-        selfie_url: selfieUploadData.path,
+        selfie_url: selfieUploadData.path, // ใช้ selfie_url
         pdpa_consented_at: new Date().toISOString()
       }).eq('id', currentUser.id);
 
@@ -425,13 +417,6 @@ export default function KYCPage() {
                   <input type="text" value={province} onChange={e => setProvince(e.target.value)} className="w-full p-3 bg-white border border-orange-100 rounded-xl font-medium focus:ring-2 focus:ring-orange-500" />
                 </div>
               </div>
-            </div>
-
-            {/* พื้นที่รับงาน (Service Area) */}
-            <div className="bg-green-50/50 p-4 rounded-3xl border border-green-100">
-              <label className="block text-[11px] font-black text-green-700 mb-2 uppercase">🛵 พื้นที่รับงานที่สะดวก (เขต/จังหวัด)</label>
-              <input type="text" value={serviceArea} onChange={e => setServiceArea(e.target.value)} className="w-full p-4 bg-white border border-green-200 rounded-2xl font-bold focus:ring-2 focus:ring-green-500" placeholder="เช่น รังสิต, ปทุมธานี, หรือ ทั่วกรุงเทพฯ" />
-              <p className="text-[9px] text-gray-400 mt-2">*ไม่จำเป็นต้องตรงกับที่อยู่ตามบัตรประชาชน</p>
             </div>
 
             <div className="flex items-start gap-3 bg-blue-50 p-4 rounded-2xl">
