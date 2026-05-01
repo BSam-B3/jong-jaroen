@@ -238,8 +238,19 @@ export default function WinOnlinePage() {
             </button>
             <button 
               onClick={() => {
-                // TODO: ในอนาคตถ้า isRiderApproved เป็น false ให้โชว์ Alert ไปลงทะเบียนรถ
-                setUserRole('provider')
+                if (!currentUser) {
+                  alert('กรุณาเข้าสู่ระบบก่อนค่ะ');
+                  router.push('/auth/login');
+                  return;
+                }
+                if (!isRiderApproved) {
+                  // ✅ เด้งเตือนถ้ายังไม่ผ่าน KYC
+                  if (confirm('🛑 สิทธิ์ถูกจำกัด!\nคุณต้องผ่านการยืนยันตัวตน (KYC) ก่อนถึงจะเปิดโหมดรับงานได้ค่ะ ไปที่หน้าจัดการข้อมูลเลยไหมคะ?')) {
+                    router.push('/profile/edit');
+                  }
+                  return;
+                }
+                setUserRole('provider');
               }} 
               className={`relative z-10 flex-1 py-3 text-xs font-black transition-colors ${userRole === 'provider' ? 'text-[#EE4D2D]' : 'text-white'}`}
             >
