@@ -1,22 +1,25 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-// 🌟 นำเข้าแผนที่ติดตามรถ
 import RiderTrackingMap from "@/app/components/RiderTrackingMap";
 
 export default function ChatPage({ params }: { params: { id: string } }) {
   const jobId = params.id;
   const router = useRouter();
-  const supabase = createClient();
+  
+  // 🌟 [AUDIT FIX] ใช้ useMemo เพื่อไม่ให้สร้าง Connection ใหม่ทุกครั้งที่พิมพ์แชท
+  const supabase = useMemo(() => createClient(), []);
 
   const [userId, setUserId] = useState<string | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [jobDetails, setJobDetails] = useState<any>(null);
-  const [isUploading, setIsUploading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const userIdRef = useRef<string | null>(null); // เก็บ ID ไว้ใช้ใน Realtime โดยไม่ทำให้ติด Loop
 
   const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
 
@@ -24,17 +27,29 @@ export default function ChatPage({ params }: { params: { id: string } }) {
     scrollToBottom();
   }, [messages]);
 
-  const fetchJobAndMessages = useCallback(async () => {
-    // ดึงข้อมูลงาน
-    const { data: jobData } = await supabase
+  // 🌟 แยกฟังก์ชันดึงข้อมูลให้เป็นระเบียบ
+  const fetchJobAndMessages = useCallback(async (uid: string) => {
+    // 1. ดึงข้อมูลงาน
+    const { data: jobData, error: jobError } = await supabase
       .from('jobs')
       .select('*, employer:profiles!employer_id(first_name, avatar_url), worker:profiles!worker_id(first_name, avatar_url)')
       .eq('id', jobId)
       .single();
       
-    if (jobData) setJobDetails(jobData);
+    if (jobError || !jobData) {
+      alert('ไม่พบข้อมูลงานนี้ค่ะ');
+      return router.push('/my-jobs');
+    }
 
-    // ดึงข้อความแชท
+    // 🌟 [AUDIT FIX] ป้องกันคนนอกแอบเข้าห้องแชท (เช็คซ้ำฝั่งหน้าบ้าน)
+    if (uid !== jobData.employer_id && uid !== jobData.worker_id) {
+      alert('คุณไม่มีสิทธิ์เข้าถึงห้องแชทนี้ค่ะ 🚫');
+      return router.push('/my-jobs');
+    }
+    
+    setJobDetails(jobData);
+
+    // 2. ดึงประวัติแชท
     const { data: chatData } = await supabase
       .from('job_messages')
       .select('*')
@@ -42,51 +57,74 @@ export default function ChatPage({ params }: { params: { id: string } }) {
       .order('created_at', { ascending: true });
       
     if (chatData) setMessages(chatData);
-  }, [jobId, supabase]);
+    setIsLoading(false);
+  }, [jobId, supabase, router]);
 
+  // 🌟 [AUDIT FIX] จัดการ Realtime ให้เชื่อมต่อแค่ครั้งเดียว และไม่มี Memory Leak
   useEffect(() => {
-    let sub: any;
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) return router.push('/auth/login');
-      setUserId(session.user.id);
-      fetchJobAndMessages();
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let cancelled = false;
+
+    const initChat = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (cancelled) return;
+      if (!session?.user) return router.push('/auth/login');
+      
+      const uid = session.user.id;
+      setUserId(uid);
+      userIdRef.current = uid;
+      
+      await fetchJobAndMessages(uid);
 
       // ดักจับแชทใหม่แบบ Real-time
-      sub = supabase
-        .channel(`chat_${jobId}`)
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'job_messages', filter: `job_id=eq.${jobId}` },
-          (p) => {
-            setMessages((prev) => [...prev, p.new]);
+      channel = supabase.channel(`chat_${jobId}`)
+        .on('postgres_changes', 
+          { event: 'INSERT', schema: 'public', table: 'job_messages', filter: `job_id=eq.${jobId}` },
+          (payload) => {
+            const newMsg = payload.new;
+            // 🌟 ป้องกันข้อความเบิ้ล (Deduplication)
+            setMessages((prev) => prev.some(m => m.id === newMsg.id) ? prev : [...prev, newMsg]);
           }
         )
         .subscribe();
-    });
+    };
+
+    initChat();
 
     return () => {
-      if (sub) supabase.removeChannel(sub);
+      cancelled = true;
+      if (channel) supabase.removeChannel(channel);
     };
-  }, [jobId, router, supabase, fetchJobAndMessages]);
+  }, [jobId, supabase, fetchJobAndMessages, router]);
 
   const handleSendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!newMessage.trim() || !userId) return;
 
     const textToSend = newMessage;
-    setNewMessage(''); 
+    setNewMessage(''); // เคลียร์ UI ให้รู้สึกลื่นไหล
 
-    await supabase.from('job_messages').insert({
+    const recipientId = userId === jobDetails?.employer_id ? jobDetails?.worker_id : jobDetails?.employer_id;
+
+    const { error } = await supabase.from('job_messages').insert({
       job_id: jobId,
       sender_id: userId,
-      recipient_id: userId === jobDetails?.employer_id ? jobDetails?.worker_id : jobDetails?.employer_id,
+      recipient_id: recipientId,
       content: textToSend
     });
+
+    if (error) {
+      console.error('ส่งข้อความไม่สำเร็จ:', error.message);
+      alert('ส่งข้อความไม่สำเร็จค่ะ กรุณาลองใหม่');
+    }
   };
 
-  // ดึงพิกัดปลายทาง (Dropoff) จากงาน (ถ้ามี) หรือใช้พิกัดเริ่มต้น
   const dropoffLocation = {
     lat: jobDetails?.dropoff_lat || 13.7563,
     lng: jobDetails?.dropoff_lng || 100.5018
   };
+
+  if (isLoading) return <div className="flex h-screen items-center justify-center font-bold text-gray-400 bg-[#F8FAFC]">กำลังเชื่อมต่อห้องสนทนา...</div>;
 
   return (
     <div className="flex flex-col h-screen bg-[#F8FAFC] font-sans">
@@ -117,6 +155,11 @@ export default function ChatPage({ params }: { params: { id: string } }) {
 
       {/* 💬 พื้นที่แสดงแชท */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-32">
+        {messages.length === 0 && (
+          <div className="text-center text-gray-400 text-xs font-bold mt-10">
+            เริ่มการสนทนาเกี่ยวกับงานนี้ได้เลยค่ะ 🚀
+          </div>
+        )}
         {messages.map((msg) => {
           const isMe = msg.sender_id === userId;
           return (
