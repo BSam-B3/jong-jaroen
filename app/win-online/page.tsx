@@ -34,20 +34,12 @@ export default function WinOnlinePage() {
     region: 'TH'
   });
 
+  // 🌟 โหมดปัจจุบัน (ลูกค้า หรือ คนขับ)
   const [userRole, setUserRole] = useState<'customer' | 'provider'>('customer');
-  const [activeTab, setActiveTab] = useState<'feed' | 'my_jobs'>('feed');
   const [jobs, setJobs] = useState<any[]>([]);
-  const [myJobs, setMyJobs] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<any>(null);
-
-  const [isChatOpen, setIsChatOpen] = useState(false);
-  const [activeChatJob, setActiveChatJob] = useState<any>(null);
-  const activeChatJobRef = useRef<any>(null);
-  const [messages, setMessages] = useState<any[]>([]);
-  const [newMessage, setNewMessage] = useState('');
-  const chatEndRef = useRef<null | HTMLDivElement>(null);
-  useEffect(() => { activeChatJobRef.current = activeChatJob; }, [activeChatJob]);
+  const [isRiderApproved, setIsRiderApproved] = useState(false); // เช็คว่าเป็นช่างจริงไหม
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -71,9 +63,7 @@ export default function WinOnlinePage() {
   const [title, setTitle] = useState('');
   const [pickup, setPickup] = useState('');
   const [dropoff, setDropoff] = useState('');
-  const [note, setNote] = useState('');
   const [distanceKm, setDistanceKm] = useState<number>(0);
-
   const [fareBreakdown, setFareBreakdown] = useState({ base: 0, distanceFee: 0, fuelSurge: 0, platformFee: 0, totalFare: 0 });
 
   const popularPlaces = [
@@ -82,63 +72,55 @@ export default function WinOnlinePage() {
     { name: 'เซเว่นอีเลฟเว่น ตลาดแกลง', detail: '7-Eleven Sam Yan' },
   ];
 
-  const fetchMessages = useCallback(async (jobId: string) => {
-    const { data } = await supabase.from('job_messages').select('*').eq('job_id', jobId).order('created_at', { ascending: true });
-    if (data) setMessages(data);
-  }, [supabase]);
-
-  const fetchJobs = useCallback(async (userId?: string) => {
+  const fetchJobs = useCallback(async () => {
     setIsLoading(true);
-    // 🌟 อัปเดตการดึงข้อมูล ให้ดึง full_name มาด้วยเหมือน Job Board
-    const { data: openData } = await supabase.from('jobs').select(`*, employer:profiles!employer_id (first_name, full_name)`).eq('status', 'open').order('created_at', { ascending: false });
-    if (openData) setJobs(openData);
+    const { data: openData } = await supabase.from('jobs')
+      .select(`*, employer:profiles!employer_id (first_name, full_name)`)
+      .eq('status', 'open')
+      .order('created_at', { ascending: false });
     
-    if (userId) {
-      const { data: myData } = await supabase.from('jobs').select(`*, employer:profiles!employer_id (first_name, full_name, phone), worker:profiles!worker_id (first_name, full_name, phone)`).or(`employer_id.eq.${userId},worker_id.eq.${userId}`).order('created_at', { ascending: false });
-      if (myData) setMyJobs(myData);
-    }
+    if (openData) setJobs(openData);
     setIsLoading(false);
   }, [supabase]);
 
-  // 🌟 ระบบ Real-time: นำมาจากหน้า Job Board
   useEffect(() => {
     const initData = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      setCurrentUser(session?.user || null);
-      fetchJobs(session?.user?.id);
+      if (session?.user) {
+        setCurrentUser(session.user);
+        // เช็คว่าลงทะเบียนไรเดอร์ผ่านหรือยัง (สมมติใช้ is_kyc_verified ไปก่อน)
+        const { data: profile } = await supabase.from('profiles').select('is_kyc_verified').eq('id', session.user.id).single();
+        if (profile?.is_kyc_verified) setIsRiderApproved(true);
+      }
+      fetchJobs();
     };
     initData();
 
     const channel = supabase.channel('public-jobs-win')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs', filter: "status=eq.open" }, async () => {
-        // เมื่อมีงานใหม่ ให้รีเฟรชข้อมูลทันที
-        const { data: { session } } = await supabase.auth.getSession();
-        fetchJobs(session?.user?.id);
-      })
-      .subscribe();
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs', filter: "status=eq.open" }, () => {
+        fetchJobs();
+      }).subscribe();
 
     return () => { supabase.removeChannel(channel); };
   }, [fetchJobs, supabase]);
 
-  // 🌟 ฟังก์ชันกดรับงาน: นำมาจากหน้า Job Board
   const handleAcceptJob = async (jobId: string) => {
     if (!currentUser) return alert('กรุณาเข้าสู่ระบบก่อนรับงานค่ะ');
     if (!confirm('ยืนยันรับงานนี้ใช่ไหมคะ?')) return;
 
-    // อัปเดตสถานะเป็น in_progress และล็อคไอดีคนรับ
     const { error } = await supabase
       .from('jobs')
       .update({ status: 'in_progress', worker_id: currentUser.id })
       .eq('id', jobId)
-      .eq('status', 'open'); // ป้องกันคนกดรับงานทับกัน
+      .eq('status', 'open');
 
     if (error) {
-      alert('ขออภัยค่ะ งานนี้ถูกผู้อื่นรับไปแล้ว หรือเกิดข้อผิดพลาด 🙏');
+      alert('ขออภัยค่ะ งานนี้ถูกผู้อื่นรับไปแล้ว 🙏');
     } else {
-      alert('รับงานสำเร็จ! 🚀 กรุณาไปที่หน้า "งานของฉัน" เพื่อดูรายละเอียดค่ะ');
-      setActiveTab('my_jobs'); // เด้งไปแท็บงานของฉันให้อัตโนมัติ
+      alert('รับงานสำเร็จ! 🚀 กำลังพาท่านไปหน้าแชทงาน...');
+      router.push('/my-jobs');
     }
-    fetchJobs(currentUser.id);
+    fetchJobs();
   };
 
   const calculateRoute = useCallback(async (origin: google.maps.LatLngLiteral, destination: google.maps.LatLngLiteral) => {
@@ -168,11 +150,7 @@ export default function WinOnlinePage() {
       const totalDriverFare = rawBeforeFuel + fuelSurge;
 
       setFareBreakdown({
-        base: baseFare,
-        distanceFee: distanceFee,
-        fuelSurge: fuelSurge,
-        platformFee: totalDriverFare * 0.03,
-        totalFare: Math.ceil(totalDriverFare * 1.03)
+        base: baseFare, distanceFee, fuelSurge, platformFee: totalDriverFare * 0.03, totalFare: Math.ceil(totalDriverFare * 1.03)
       });
     }
   }, [pickupCoords, dropoffCoords, jobType, vehicleType, distanceKm, calculateRoute]);
@@ -184,7 +162,7 @@ export default function WinOnlinePage() {
     const { error } = await supabase.from('jobs').insert({
       employer_id: currentUser.id, title, job_type: jobType, vehicle_type: vehicleType, pickup_location: pickup, dropoff_location: dropoff || null, distance_km: distanceKm, budget: fareBreakdown.totalFare, status: 'open'
     });
-    if (!error) { setIsModalOpen(false); alert('โพสต์งานเรียบร้อยค่ะ! 🚀'); fetchJobs(currentUser.id); }
+    if (!error) { setIsModalOpen(false); alert('โพสต์งานเรียบร้อยค่ะ! 🚀'); fetchJobs(); }
     setIsSubmitting(false);
   };
 
@@ -234,9 +212,10 @@ export default function WinOnlinePage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F4F6F8] flex justify-center font-sans relative">
+    <div className="min-h-screen bg-[#F4F6F8] flex justify-center font-sans relative pb-20">
       <div className="w-full max-w-3xl bg-[#F4F6F8] min-h-screen relative flex flex-col shadow-2xl border-x border-gray-100 overflow-hidden">
         
+        {/* 🟠 Header & Role Switcher */}
         <div className="m-4 bg-gradient-to-b from-[#EE4D2D] to-[#FF7337] rounded-[2rem] p-6 shadow-md z-10">
           <div className="flex justify-between items-center mb-6 mt-2">
             <h1 className="text-white text-xl font-black flex items-center gap-2">🛵 งานด่วนชุมชน</h1>
@@ -246,32 +225,44 @@ export default function WinOnlinePage() {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
                 </span>
-                <span className="text-[10px] font-bold text-white">LIVE</span>
+                <span className="text-[10px] font-bold text-white">รับงาน LIVE</span>
               </div>
             )}
           </div>
-          <div className="flex gap-2">
-            <button onClick={() => setActiveTab('feed')} className={`flex-1 py-3 rounded-[1.2rem] text-xs font-black transition-all ${activeTab === 'feed' ? 'bg-white text-[#EE4D2D] shadow-lg' : 'bg-white/20 text-white'}`}>🏠 หน้าหลัก</button>
-            <button onClick={() => {
-              // กดปุ่มนี้แล้วไปหน้า My Jobs แบบเต็มเลย
-              router.push('/my-jobs');
-            }} className={`flex-1 py-3 rounded-[1.2rem] text-xs font-black transition-all bg-white/20 text-white hover:bg-white/30`}>📋 งานของฉัน</button>
+          
+          {/* สลับโหมด (แสดงผลเป็น Tab สวยๆ) */}
+          <div className="relative bg-white/20 backdrop-blur-md rounded-2xl p-1.5 flex shadow-inner">
+            <span className={`absolute top-1.5 bottom-1.5 w-[calc(50%-0.375rem)] rounded-xl bg-white shadow-md transition-all duration-300 ${userRole === 'customer' ? 'left-1.5' : 'left-[calc(50%+0rem)]'}`} />
+            <button onClick={() => setUserRole('customer')} className={`relative z-10 flex-1 py-3 text-xs font-black transition-colors ${userRole === 'customer' ? 'text-[#EE4D2D]' : 'text-white'}`}>
+              🙋‍♂️ เรียกใช้บริการ
+            </button>
+            <button 
+              onClick={() => {
+                // TODO: ในอนาคตถ้า isRiderApproved เป็น false ให้โชว์ Alert ไปลงทะเบียนรถ
+                setUserRole('provider')
+              }} 
+              className={`relative z-10 flex-1 py-3 text-xs font-black transition-colors ${userRole === 'provider' ? 'text-[#EE4D2D]' : 'text-white'}`}
+            >
+              🛵 โหมดคนขับ
+            </button>
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-5 pb-32">
-          {/* 🌟 มุมมองลูกค้า (เรียกใช้งาน) */}
-          {activeTab === 'feed' && userRole === 'customer' && (
-            <div className="text-center bg-white rounded-[2rem] p-10 shadow-sm border border-gray-100">
+        <div className="flex-1 overflow-y-auto p-4 space-y-5">
+          {/* 🌟 หน้าเรียกรถ (โหมดลูกค้า) */}
+          {userRole === 'customer' && (
+            <div className="text-center bg-white rounded-[2rem] p-10 shadow-sm border border-gray-100 animate-fade-in">
               <div className="text-7xl mb-6">🏠</div>
               <h3 className="text-xl font-black text-gray-800 mb-3">จงเจริญ วินออนไลน์</h3>
               <p className="text-xs text-gray-400 mb-8 font-medium">สนับสนุนไรเดอร์ในบ้านเรา ด้วยราคาที่โปร่งใส ❤️</p>
-              <button onClick={() => setIsModalOpen(true)} className="bg-[#EE4D2D] text-white px-8 py-5 rounded-[1.5rem] font-black w-full shadow-lg active:scale-95 transition-all">+ เรียกใช้บริการเลย</button>
+              <button onClick={() => setIsModalOpen(true)} className="bg-[#EE4D2D] text-white px-8 py-5 rounded-[1.5rem] font-black w-full shadow-lg active:scale-95 transition-all">
+                + สร้างรายการใหม่
+              </button>
             </div>
           )}
 
-          {/* 🌟 มุมมองไรเดอร์ (Feed งาน Live) */}
-          {activeTab === 'feed' && userRole === 'provider' && (
+          {/* 🌟 หน้าฟีดงาน (โหมดคนขับ) */}
+          {userRole === 'provider' && (
             <div className="space-y-4 animate-fade-in">
               {isLoading ? (
                 <div className="space-y-4 animate-pulse">
@@ -281,7 +272,7 @@ export default function WinOnlinePage() {
                 <div className="bg-white rounded-[2rem] p-10 text-center border border-gray-100 shadow-sm mt-4">
                   <div className="text-6xl mb-4 opacity-80">☕</div>
                   <p className="font-black text-gray-800 text-sm mt-4">ยังไม่มีงานใหม่ในขณะนี้</p>
-                  <p className="text-xs text-gray-400 font-bold mt-1">พักผ่อนรอสักครู่นะคะ งานเข้าปุ๊บจะเด้งที่นี่เลย</p>
+                  <p className="text-xs text-gray-400 font-bold mt-1">เปิดหน้านี้ทิ้งไว้ งานเข้าปุ๊บจะเด้งที่นี่เลย</p>
                 </div>
               ) : jobs.map((job) => (
                 <div key={job.id} className="bg-white rounded-[1.5rem] p-5 shadow-sm border border-gray-50 relative overflow-hidden">
@@ -305,7 +296,6 @@ export default function WinOnlinePage() {
                     </div>
                   </div>
 
-                  {/* 📍 สถานที่รับ-ส่ง */}
                   <div className="bg-[#F8FAFC] p-3 rounded-xl border border-gray-100 space-y-2 mb-4">
                     <div className="flex items-start gap-2 text-[11px] font-bold text-gray-600">
                       <span className="text-green-500 mt-0.5">📍</span>
@@ -319,11 +309,7 @@ export default function WinOnlinePage() {
                     )}
                   </div>
 
-                  {/* ⚡ ปุ่มรับงาน */}
-                  <button 
-                    onClick={() => handleAcceptJob(job.id)}
-                    className="w-full bg-gradient-to-r from-[#EE4D2D] to-[#FF7337] text-white py-3.5 rounded-[1rem] text-sm font-black active:scale-95 transition-transform shadow-md"
-                  >
+                  <button onClick={() => handleAcceptJob(job.id)} className="w-full bg-gradient-to-r from-[#EE4D2D] to-[#FF7337] text-white py-3.5 rounded-[1rem] text-sm font-black active:scale-95 transition-transform shadow-md">
                     รับงานนี้ ⚡
                   </button>
                 </div>
@@ -332,7 +318,7 @@ export default function WinOnlinePage() {
           )}
         </div>
 
-        {/* --- UI Modal ต่างๆ ด้านล่างเหมือนเดิม 100% --- */}
+        {/* --- ส่วน Modal เรียกรถคงเดิม --- */}
         {isModalOpen && !isLocationPickerOpen && (
           <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/60 backdrop-blur-sm animate-fade-in">
             <div className="bg-white w-full max-w-xl rounded-t-[2rem] p-8 max-h-[90vh] overflow-y-auto pb-10 shadow-2xl relative">
@@ -376,20 +362,9 @@ export default function WinOnlinePage() {
                 <div className="bg-orange-50 border border-orange-100 rounded-[1.5rem] p-5 shadow-sm">
                   {fareBreakdown.totalFare > 0 && (
                     <div className="space-y-2 mb-3 pb-3 border-b border-orange-200/50 text-[11px] font-bold text-gray-600">
-                      <div className="flex justify-between">
-                        <span>ค่าเริ่มต้น</span>
-                        <span>{fareBreakdown.base.toLocaleString('th-TH')} บาท</span>
-                      </div>
-                      {distanceKm > 0 && (
-                        <div className="flex justify-between">
-                          <span>ค่าระยะทาง ({distanceKm} กม.)</span>
-                          <span>{Math.round(fareBreakdown.distanceFee).toLocaleString('th-TH')} บาท</span>
-                        </div>
-                      )}
-                      <div className="flex justify-between text-[#EE4D2D]">
-                        <span>ค่าบำรุงแอป (3%)</span>
-                        <span>{Math.ceil(fareBreakdown.platformFee).toLocaleString('th-TH')} บาท</span>
-                      </div>
+                      <div className="flex justify-between"><span>ค่าเริ่มต้น</span><span>{fareBreakdown.base.toLocaleString('th-TH')} บาท</span></div>
+                      {distanceKm > 0 && <div className="flex justify-between"><span>ค่าระยะทาง ({distanceKm} กม.)</span><span>{Math.round(fareBreakdown.distanceFee).toLocaleString('th-TH')} บาท</span></div>}
+                      <div className="flex justify-between text-[#EE4D2D]"><span>ค่าบำรุงแอป (3%)</span><span>{Math.ceil(fareBreakdown.platformFee).toLocaleString('th-TH')} บาท</span></div>
                     </div>
                   )}
                   <div className="flex justify-between items-end">
@@ -430,17 +405,14 @@ export default function WinOnlinePage() {
                     {isLocating && <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>}
                   </div>
                   <div onClick={() => setIsMapMode(true)} className="p-4 bg-white rounded-[1rem] border border-gray-200 flex items-center gap-3 text-gray-700 font-bold text-sm shadow-sm cursor-pointer"><span>🗺️</span>ปักหมุดบนแผนที่เอง</div>
-
                   {status === "OK" ? data.map(({ place_id, description }) => (
                     <div key={place_id} onClick={() => handleSelectLocation(description)} className="p-4 bg-white rounded-[1rem] shadow-sm border border-gray-100 flex items-center gap-4 cursor-pointer">
-                      <div className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-lg">📍</div>
-                      <h4 className="text-sm font-bold text-gray-800">{description}</h4>
+                      <div className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-lg">📍</div><h4 className="text-sm font-bold text-gray-800">{description}</h4>
                     </div>
                   )) : (
                     popularPlaces.map((p, i) => (
                       <div key={i} onClick={() => handleSelectLocation(p.name)} className="p-4 bg-white rounded-[1rem] shadow-sm border border-gray-100 flex items-center gap-4 cursor-pointer">
-                        <div className="w-10 h-10 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center text-lg">⭐</div>
-                        <div><h4 className="text-sm font-bold text-gray-800">{p.name}</h4><p className="text-[11px] text-gray-400 mt-0.5">{p.detail}</p></div>
+                        <div className="w-10 h-10 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center text-lg">⭐</div><div><h4 className="text-sm font-bold text-gray-800">{p.name}</h4><p className="text-[11px] text-gray-400 mt-0.5">{p.detail}</p></div>
                       </div>
                     ))
                   )}
@@ -460,12 +432,6 @@ export default function WinOnlinePage() {
             </div>
           </div>
         )}
-
-        <div className="fixed bottom-24 right-4 z-[90] opacity-10 hover:opacity-100 transition-opacity">
-          <button onClick={() => setUserRole(r => r === 'customer' ? 'provider' : 'customer')} className="bg-black/50 text-white text-[8px] px-2 py-1 rounded-md">[Dev] สลับโหมด</button>
-        </div>
-
-        {!isModalOpen && !isLocationPickerOpen && !isChatOpen}
       </div>
     </div>
   );
