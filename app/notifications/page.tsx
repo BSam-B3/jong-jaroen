@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useEffect, useCallback } from 'react';
+import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 
@@ -21,10 +21,9 @@ const TYPE_META: Record<NotifType, { icon: string; label: string; bg: string; te
   system: { icon: '✅', label: 'ระบบ', bg: 'bg-emerald-50', text: 'text-emerald-700', ring: 'ring-emerald-200' },
   job: { icon: '🛵', label: 'งาน', bg: 'bg-blue-50', text: 'text-blue-700', ring: 'ring-blue-200' },
   promo: { icon: '🎁', label: 'โปรโมชั่น', bg: 'bg-amber-50', text: 'text-amber-700', ring: 'ring-amber-200' },
-  new_proposal: { icon: '📝', label: 'ผู้รับงาน', bg: 'bg-[#0047FF]/10', text: 'text-[#0047FF]', ring: 'ring-[#0047FF]/20' }, // เพิ่มหมวดสำหรับงานฟรีแลนซ์
+  new_proposal: { icon: '📝', label: 'ผู้รับงาน', bg: 'bg-[#0047FF]/10', text: 'text-[#0047FF]', ring: 'ring-[#0047FF]/20' }, 
 };
 
-// ฟังก์ชันคำนวณเวลา (เช่น "5 นาทีที่แล้ว")
 const timeAgo = (dateString: string) => {
   const date = new Date(dateString);
   const now = new Date();
@@ -37,64 +36,91 @@ const timeAgo = (dateString: string) => {
 };
 
 export default function NotificationsPage() {
-  const supabase = createClient();
+  // 🌟 สร้าง Supabase Client ให้คงที่
+  const supabase = useMemo(() => createClient(), []);
+  
   const [notifs, setNotifs] = useState<Notification[]>([]);
   const [tab, setTab] = useState<Tab>('all');
   const [userId, setUserId] = useState<string | null>(null);
+  
+  // 🌟 ใช้ useRef เก็บ ID เพื่อให้ Callback ฟังก์ชันเรียกใช้ได้โดยไม่ต้องรีโหลด
+  const userIdRef = useRef<string | null>(null);
 
-  // 🌟 ดึงข้อมูลแจ้งเตือนจาก Database
   const fetchNotifs = useCallback(async (uid: string) => {
     const { data, error } = await supabase
       .from('notifications')
       .select('*')
       .eq('user_id', uid)
-      .order('created_at', { ascending: false });
-
-    if (!error && data) {
-      setNotifs(data);
-    }
+      .order('created_at', { ascending: false })
+      .limit(100); // ดึงมาแค่ 100 รายการล่าสุด
+      
+    if (!error && data) setNotifs(data);
   }, [supabase]);
 
-  // เริ่มต้นดึงข้อมูล & ฟัง Real-time
+  // 🌟 รอจนรู้ UID ก่อน ค่อยเปิดช่องสัญญาณดักฟังเฉพาะตัวเอง (ป้องกันแบนด์วิดท์ทะลุ)
   useEffect(() => {
-    const initData = async () => {
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let cancelled = false;
+
+    (async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        setUserId(session.user.id);
-        fetchNotifs(session.user.id);
-      }
+      if (cancelled || !session?.user) return;
+      
+      const uid = session.user.id;
+      userIdRef.current = uid;
+      setUserId(uid);
+      await fetchNotifs(uid);
+
+      channel = supabase.channel(`notifs:${uid}`)
+        .on('postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${uid}` },
+          (payload) => {
+            const row = payload.new as Notification;
+            // ดันแจ้งเตือนใหม่เข้า state โดยไม่ต้อง Fetch ทั้งตารางใหม่
+            setNotifs(prev => prev.some(n => n.id === row.id) ? prev : [row, ...prev]);
+          })
+        .subscribe();
+    })();
+
+    return () => { 
+      cancelled = true; 
+      if (channel) supabase.removeChannel(channel); 
     };
-    initData();
-
-    // ฟังการแจ้งเตือนใหม่แบบ Real-time
-    const channel = supabase.channel('realtime-notifs')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) fetchNotifs(session.user.id);
-      }).subscribe();
-
-    return () => { supabase.removeChannel(channel); };
-  }, [fetchNotifs, supabase]);
+  }, [supabase, fetchNotifs]);
 
   const unreadCount = useMemo(() => notifs.filter((n) => !n.is_read).length, [notifs]);
   const visible = useMemo(() => (tab === 'unread' ? notifs.filter((n) => !n.is_read) : notifs), [notifs, tab]);
 
-  // 🌟 ฟังก์ชันกดอ่านทั้งหมด (อัปเดต DB)
-  const markAllRead = async () => {
-    if (unreadCount === 0 || !userId) return;
+  // 🌟 อัปเกรดปุ่ม: อ่านแล้วแบบมี Rollback เผื่อเน็ตหลุด
+  const markAllRead = useCallback(async () => {
+    const uid = userIdRef.current;
+    if (!uid) return;
     
-    // อัปเดต State หน้าบ้านให้ไว
-    setNotifs((prev) => prev.map((n) => ({ ...n, is_read: true })));
+    // ล็อกเป้าเฉพาะอันที่ยังไม่อ่าน
+    const targetIds = notifs.filter(n => !n.is_read).map(n => n.id);
+    if (targetIds.length === 0) return;
     
-    // อัปเดต Database หลังบ้าน
-    await supabase.from('notifications').update({ is_read: true }).eq('user_id', userId).eq('is_read', false);
-  };
+    const snapshot = notifs; // ถ่ายรูปเก็บไว้
+    setNotifs(prev => prev.map(n => targetIds.includes(n.id) ? { ...n, is_read: true } : n));
+    
+    const { error } = await supabase.from('notifications')
+      .update({ is_read: true })
+      .in('id', targetIds); // อัปเดตเฉพาะ ID เป้าหมาย
+      
+    if (error) setNotifs(snapshot); // ถ้าเซิร์ฟเวอร์พัง ให้ดึงรูปเก่ามาโชว์ (Rollback)
+  }, [supabase, notifs]);
 
-  // 🌟 ฟังก์ชันกดอ่านทีละอัน (อัปเดต DB)
-  const markOneRead = async (id: string) => {
-    setNotifs((prev) => prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)));
-    await supabase.from('notifications').update({ is_read: true }).eq('id', id);
-  };
+  const markOneRead = useCallback(async (id: string) => {
+    const snapshot = notifs;
+    setNotifs(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+    
+    const { error } = await supabase.from('notifications')
+      .update({ is_read: true })
+      .eq('id', id)
+      .eq('user_id', userIdRef.current); // ดัก RLS ซ้ำอีกชั้น
+      
+    if (error) setNotifs(snapshot);
+  }, [supabase, notifs]);
 
   return (
     <div className="min-h-screen bg-[#F4F6F8] flex justify-center font-sans relative">
@@ -149,16 +175,18 @@ export default function NotificationsPage() {
 }
 
 function NotifItem({ notif, onRead }: { notif: Notification; onRead: (id: string) => void }) {
-  // สร้าง Link ไปหน้า My Jobs ถ้ามีการแนบ job_id มา
   const href = notif.data?.job_id ? `/my-jobs` : undefined; 
-  const meta = TYPE_META[notif.type] || TYPE_META.system; // Fallback ไปหา system ถ้าระบุประเภทผิด
+  const meta = TYPE_META[notif.type] || TYPE_META.system; 
   const Wrapper: React.ElementType = href ? Link : 'div';
   const wrapperProps = href ? { href } : {};
 
   return (
     <Wrapper
       {...wrapperProps}
-      onClick={() => !notif.is_read && onRead(notif.id)}
+      onClick={(e: React.MouseEvent) => {
+        // ให้กดอ่านได้ถึงแม้จะมี Link
+        if (!notif.is_read) onRead(notif.id);
+      }}
       className={`relative flex gap-4 p-5 rounded-[1.5rem] border transition-all active:scale-[0.99] shadow-sm ${
         notif.is_read ? 'bg-white border-gray-100' : 'bg-orange-50/50 border-orange-100'
       } ${href ? 'cursor-pointer hover:border-gray-200' : ''}`}
