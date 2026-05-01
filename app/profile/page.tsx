@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import PushToggle from '@/app/components/PushToggle';
+// ✅ นำเข้า BottomNav Component
+import BottomNav from '@/app/components/BottomNav';
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -47,7 +49,7 @@ export default function ProfilePage() {
     <div className="min-h-screen bg-[#F4F6F8] flex justify-center font-sans pb-10">
       <div className="w-full sm:max-w-2xl md:max-w-3xl bg-[#F4F6F8] min-h-screen relative flex flex-col shadow-xl overflow-x-hidden">
         
-        {/* 🟠 Header ส้มจงเจริญ (✅ ปรับขอบมนและมีระยะร่นแบบหน้า Services) */}
+        {/* 🟠 Header ส้มจงเจริญ */}
         <div className="bg-gradient-to-b from-[#EE4D2D] to-[#FF7337] rounded-[2.5rem] p-6 pt-8 pb-8 shadow-md relative z-20 m-3 mt-4 flex items-center gap-4">
           
           {/* 🚪 ปุ่มออกจากระบบ */}
@@ -81,7 +83,8 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        <main className="flex-1 relative z-10 space-y-3 mt-1 pb-8">
+        {/* ✅ ปรับ pb-28 เพื่อเว้นที่ให้ BottomNav ด้านล่าง */}
+        <main className="flex-1 relative z-10 space-y-3 mt-1 pb-28">
           
           {/* 🌟 Section 1: ระบบแจ้งเตือน */}
           <section className="px-4 py-1">
@@ -127,6 +130,10 @@ export default function ProfilePage() {
           </section>
 
         </main>
+
+        {/* ✅ เรียกใช้ BottomNav ตรงนี้เลย โค้ดดูสะอาดขึ้นเยอะค่ะ */}
+        <BottomNav />
+
       </div>
     </div>
   );
