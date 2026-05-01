@@ -21,8 +21,11 @@ export default function JobBoardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [activeCategory, setActiveCategory] = useState('all');
+  
+  // 🌟 เพิ่ม State สำหรับกำหนดจำนวนการดึงข้อมูล (Pagination)
+  const [displayLimit, setDisplayLimit] = useState(10); 
 
-  // 🌟 State สำหรับฟอร์มโพสต์จ้างงาน
+  // State สำหรับฟอร์มโพสต์จ้างงาน
   const [isPostModalOpen, setIsPostModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [postTitle, setPostTitle] = useState('');
@@ -31,7 +34,7 @@ export default function JobBoardPage() {
   const [postCategory, setPostCategory] = useState('graphic');
   const [postJobType, setPostJobType] = useState<'online' | 'onsite'>('online');
 
-  // 🌟 State สำหรับฟอร์มยื่นข้อเสนอ (Proposal)
+  // State สำหรับฟอร์มยื่นข้อเสนอ
   const [isProposalModalOpen, setIsProposalModalOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState<any>(null);
   const [isSubmittingProposal, setIsSubmittingProposal] = useState(false);
@@ -39,55 +42,60 @@ export default function JobBoardPage() {
   const [proposalPrice, setProposalPrice] = useState('');
   const [proposalDuration, setProposalDuration] = useState('');
 
-  const fetchFreelanceJobs = useCallback(async () => {
+  // 🌟 อัปเกรดฟังก์ชัน: รับค่า uid เพื่อเอาไปซ่อนงานตัวเอง และใช้ limit(10)
+  const fetchFreelanceJobs = useCallback(async (uid?: string) => {
     setIsLoading(true);
     let query = supabase.from('jobs')
       .select(`*, employer:profiles!employer_id (first_name, full_name, avatar_url)`)
       .eq('status', 'open')
       .not('job_type', 'in', '("ride","buy","deliver")')
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(displayLimit); // ดึงมาแค่เท่าที่กำหนด
 
-    if (activeCategory !== 'all') query = query.eq('category', activeCategory);
+    if (activeCategory !== 'all') {
+      query = query.eq('category', activeCategory);
+    }
+    
+    // ✅ ซ่อนโพสต์ของตัวเองออกจากกระดานหางาน
+    if (uid) {
+      query = query.neq('employer_id', uid);
+    }
 
     const { data } = await query;
     if (data) setJobs(data);
     setIsLoading(false);
-  }, [supabase, activeCategory]);
+  }, [supabase, activeCategory, displayLimit]);
 
   useEffect(() => {
     const initData = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) setCurrentUser(session.user);
-      fetchFreelanceJobs();
+      const uid = session?.user?.id;
+      if (uid) setCurrentUser(session.user);
+      fetchFreelanceJobs(uid);
     };
     initData();
 
+    // ดึงงานใหม่แบบ Real-time
     const channel = supabase.channel('public-jobs-freelance')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs', filter: "status=eq.open" }, () => {
-        fetchFreelanceJobs();
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs', filter: "status=eq.open" }, async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        fetchFreelanceJobs(session?.user?.id);
       }).subscribe();
 
     return () => { supabase.removeChannel(channel); };
   }, [fetchFreelanceJobs, supabase]);
 
-  // 🌟 1. ฟังก์ชันกดปุ่ม "ยื่นโปรไฟล์" (เพื่อเปิด Modal)
   const handleOpenProposalModal = (job: any) => {
     if (!currentUser) {
       alert('กรุณาเข้าสู่ระบบก่อนยื่นโปรไฟล์ค่ะ');
       router.push('/auth/login');
       return;
     }
-    // ป้องกันไม่ให้รับงานตัวเอง
-    if (job.employer_id === currentUser.id) {
-      alert('ไม่สามารถยื่นข้อเสนอในงานที่คุณเป็นผู้จ้างได้ค่ะ');
-      return;
-    }
     setSelectedJob(job);
-    setProposalPrice(job.budget ? job.budget.toString() : ''); // ตั้งค่าเริ่มต้นเป็นงบลูกค้า
+    setProposalPrice(job.budget ? job.budget.toString() : '');
     setIsProposalModalOpen(true);
   };
 
-  // 🌟 2. ฟังก์ชันส่งข้อมูลเข้าตาราง job_proposals
   const submitProposalData = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmittingProposal(true);
@@ -104,11 +112,8 @@ export default function JobBoardPage() {
     if (!error) {
       alert('ส่งโปรไฟล์สำเร็จ! 🚀 ระบบได้ส่งข้อมูลของคุณให้ผู้จ้างพิจารณาแล้วค่ะ');
       setIsProposalModalOpen(false);
-      setProposalText('');
-      setProposalPrice('');
-      setProposalDuration('');
+      setProposalText(''); setProposalPrice(''); setProposalDuration('');
     } else {
-      // เช็คเผื่อกรณีส่งซ้ำ (ถ้าทำ RLS หรือ Unique constraint ไว้)
       alert('เกิดข้อผิดพลาด หรือคุณอาจจะเคยยื่นเสนอไปแล้วค่ะ');
     }
     setIsSubmittingProposal(false);
@@ -134,10 +139,10 @@ export default function JobBoardPage() {
     });
 
     if (!error) {
-      alert('ประกาศงานสำเร็จเรียบร้อยค่ะ! 🚀');
+      alert('ประกาศงานสำเร็จเรียบร้อยค่ะ! 🚀 (ระบบจะซ่อนงานนี้จากหน้าฟีดของคุณ แต่คุณสามารถดูได้ใน "งานของฉัน")');
       setIsPostModalOpen(false);
       setPostTitle(''); setPostDescription(''); setPostBudget('');
-      fetchFreelanceJobs(); 
+      fetchFreelanceJobs(currentUser.id); 
     } else {
       alert('เกิดข้อผิดพลาด: ' + error.message);
     }
@@ -172,7 +177,10 @@ export default function JobBoardPage() {
             {JOB_CATEGORIES.map((cat) => (
               <button 
                 key={cat.key} 
-                onClick={() => setActiveCategory(cat.key)}
+                onClick={() => {
+                  setActiveCategory(cat.key);
+                  setDisplayLimit(10); // รีเซ็ตกลับมาเป็น 10 เวลาเปลี่ยนหมวดหมู่
+                }}
                 className={`whitespace-nowrap px-4 py-2 rounded-full text-xs font-black transition-all shadow-sm border ${activeCategory === cat.key ? 'bg-white text-[#0047FF] border-white' : 'bg-white/10 text-white border-white/20 hover:bg-white/20'}`}
               >
                 {cat.icon} {cat.label}
@@ -182,7 +190,7 @@ export default function JobBoardPage() {
         </header>
 
         <main className="p-4 space-y-4 mt-2">
-          {isLoading ? (
+          {isLoading && jobs.length === 0 ? (
             <div className="space-y-4 animate-pulse">
               {[1, 2, 3].map(i => <div key={i} className="h-48 bg-white rounded-[1.5rem] border border-gray-100" />)}
             </div>
@@ -190,57 +198,63 @@ export default function JobBoardPage() {
             <div className="bg-white rounded-[2rem] p-12 text-center border border-gray-100 shadow-sm mt-4">
               <div className="text-6xl mb-4 opacity-50 grayscale">📭</div>
               <h3 className="font-black text-gray-800 text-lg">ยังไม่มีงานในหมวดหมู่นี้</h3>
-              <p className="text-xs text-gray-400 font-bold mt-2 leading-relaxed">ลองเปลี่ยนหมวดหมู่<br/>หรือเป็นคนแรกที่เริ่มโพสต์จ้างงานสิคะ</p>
+              <p className="text-xs text-gray-400 font-bold mt-2 leading-relaxed">เปลี่ยนหมวดหมู่ หรือประกาศจ้างงานสิคะ</p>
             </div>
           ) : (
-            jobs.map((job) => (
-              <article key={job.id} className="bg-white rounded-[1.5rem] p-5 shadow-sm border border-gray-100 relative overflow-hidden group hover:border-blue-200 transition-colors">
-                
-                <div className="absolute top-0 right-0 bg-[#0047FF] text-white text-[9px] font-black px-3 py-1.5 rounded-bl-xl shadow-sm">
-                  {job.job_type === 'online' ? '💻 ทำออนไลน์' : '📍 ลงพื้นที่'}
-                </div>
-
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 bg-gray-100 rounded-full overflow-hidden border border-gray-200 shrink-0">
-                    {job.employer?.avatar_url ? (
-                      <img src={job.employer.avatar_url} alt="employer" className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-lg">👤</div>
-                    )}
+            <>
+              {jobs.map((job) => (
+                <article key={job.id} className="bg-white rounded-[1.5rem] p-5 shadow-sm border border-gray-100 relative overflow-hidden group hover:border-blue-200 transition-colors">
+                  <div className="absolute top-0 right-0 bg-[#0047FF] text-white text-[9px] font-black px-3 py-1.5 rounded-bl-xl shadow-sm">
+                    {job.job_type === 'online' ? '💻 ทำออนไลน์' : '📍 ลงพื้นที่'}
                   </div>
-                  <div>
-                    <p className="text-xs font-black text-gray-800">{job.employer?.full_name || job.employer?.first_name || 'ผู้ใช้ไม่ระบุชื่อ'}</p>
-                    <p className="text-[9px] text-gray-400 font-bold mt-0.5">โพสต์เมื่อ {formatDate(job.created_at)}</p>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 bg-gray-100 rounded-full overflow-hidden border border-gray-200 shrink-0">
+                      {job.employer?.avatar_url ? (
+                        <img src={job.employer.avatar_url} alt="employer" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-lg">👤</div>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-xs font-black text-gray-800">{job.employer?.full_name || job.employer?.first_name || 'ผู้ใช้ไม่ระบุชื่อ'}</p>
+                      <p className="text-[9px] text-gray-400 font-bold mt-0.5">โพสต์เมื่อ {formatDate(job.created_at)}</p>
+                    </div>
                   </div>
-                </div>
-
-                <h2 className="text-base font-black text-gray-900 leading-snug mb-2 pr-16">{job.title}</h2>
-                <p className="text-[11px] text-gray-500 font-medium leading-relaxed line-clamp-3 mb-4 whitespace-pre-line">
-                  {job.description || 'ไม่มีคำอธิบายเพิ่มเติม สามารถทักแชทเพื่อสอบถามรายละเอียดได้เลยค่ะ'}
-                </p>
-
-                <div className="flex justify-between items-end pt-4 border-t border-gray-50">
-                  <div>
-                    <p className="text-[9px] text-gray-400 font-black uppercase tracking-widest mb-1">งบประมาณ</p>
-                    <p className="text-xl font-black text-[#0047FF]">
-                      {job.budget ? `${job.budget.toLocaleString()} บาท` : 'เสนอราคา'}
-                    </p>
+                  <h2 className="text-base font-black text-gray-900 leading-snug mb-2 pr-16">{job.title}</h2>
+                  <p className="text-[11px] text-gray-500 font-medium leading-relaxed line-clamp-3 mb-4 whitespace-pre-line">
+                    {job.description || 'ไม่มีคำอธิบายเพิ่มเติม สามารถทักแชทเพื่อสอบถามรายละเอียดได้เลยค่ะ'}
+                  </p>
+                  <div className="flex justify-between items-end pt-4 border-t border-gray-50">
+                    <div>
+                      <p className="text-[9px] text-gray-400 font-black uppercase tracking-widest mb-1">งบประมาณ</p>
+                      <p className="text-xl font-black text-[#0047FF]">
+                        {job.budget ? `${job.budget.toLocaleString()} ฿` : 'เสนอราคา'}
+                      </p>
+                    </div>
+                    <button 
+                      onClick={() => handleOpenProposalModal(job)}
+                      className="bg-[#0047FF] hover:bg-[#0038cc] text-white px-5 py-3 rounded-xl text-xs font-black active:scale-95 transition-all shadow-md flex items-center gap-2"
+                    >
+                      <span>ยื่นโปรไฟล์เสนอตัว</span> <span>📝</span>
+                    </button>
                   </div>
-                  
-                  {/* เปลี่ยนปุ่มเรียกใช้ฟังก์ชันเปิด Modal */}
-                  <button 
-                    onClick={() => handleOpenProposalModal(job)}
-                    className="bg-[#0047FF] hover:bg-[#0038cc] text-white px-5 py-3 rounded-xl text-xs font-black active:scale-95 transition-all shadow-md flex items-center gap-2"
-                  >
-                    <span>ยื่นโปรไฟล์เสนอตัว</span> <span>📝</span>
-                  </button>
-                </div>
-              </article>
-            ))
+                </article>
+              ))}
+
+              {/* ✅ ปุ่ม โหลดรายการเพิ่มเติม (Pagination) */}
+              {jobs.length >= displayLimit && (
+                <button 
+                  onClick={() => setDisplayLimit(prev => prev + 10)}
+                  className="w-full bg-white border border-blue-100 text-[#0047FF] font-black py-4 rounded-[1.5rem] text-xs mt-2 shadow-sm active:scale-95 transition-all hover:bg-blue-50"
+                >
+                  โหลดรายการเพิ่มเติม...
+                </button>
+              )}
+            </>
           )}
         </main>
 
-        {/* 🌟 Modal 1: โพสต์งานใหม่ (ลูกค้า) */}
+        {/* --- ส่วนของ Modal โพสต์งาน และ ยื่นเสนอตัว ยังคงเหมือนเดิม 100% --- */}
         {isPostModalOpen && (
           <div className="fixed inset-0 z-[100] flex items-end justify-center bg-blue-900/40 backdrop-blur-sm animate-fade-in">
             <div className="bg-white w-full max-w-xl rounded-t-[2rem] p-8 max-h-[90vh] overflow-y-auto pb-10 shadow-2xl relative">
@@ -293,7 +307,6 @@ export default function JobBoardPage() {
           </div>
         )}
 
-        {/* 🌟 Modal 2: ยื่นข้อเสนอ (ฟรีแลนซ์/ช่าง) */}
         {isProposalModalOpen && selectedJob && (
           <div className="fixed inset-0 z-[100] flex items-end justify-center bg-blue-900/40 backdrop-blur-sm animate-fade-in">
             <div className="bg-white w-full max-w-xl rounded-t-[2rem] p-8 max-h-[90vh] overflow-y-auto pb-10 shadow-2xl relative">
