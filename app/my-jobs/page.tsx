@@ -6,11 +6,13 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 
 type Mode = 'hired' | 'received';
-type Status = 'open' | 'in_progress' | 'completed' | 'cancelled';
+// 🌟 เพิ่มสถานะ 'delivered' เข้าไป
+type Status = 'open' | 'in_progress' | 'delivered' | 'completed' | 'cancelled';
 
 const STATUS_META: Record<Status, { label: string; icon: string; bg: string; text: string; ring: string }> = {
   open: { label: 'รอคนรับงาน', icon: '🟡', bg: 'bg-amber-50', text: 'text-amber-700', ring: 'ring-amber-200' },
   in_progress: { label: 'กำลังดำเนินการ', icon: '🛵', bg: 'bg-blue-50', text: 'text-blue-700', ring: 'ring-blue-200' },
+  delivered: { label: 'ส่งมอบแล้ว', icon: '📦', bg: 'bg-purple-50', text: 'text-purple-700', ring: 'ring-purple-200' },
   completed: { label: 'เสร็จสิ้น', icon: '✅', bg: 'bg-emerald-50', text: 'text-emerald-700', ring: 'ring-emerald-200' },
   cancelled: { label: 'ยกเลิกแล้ว', icon: '❌', bg: 'bg-gray-100', text: 'text-gray-600', ring: 'ring-gray-200' },
 };
@@ -33,7 +35,6 @@ export default function MyJobsPage() {
 
   const fetchMyJobs = useCallback(async (uid: string) => {
     setLoading(true);
-    // 🌟 ดึงข้อมูลงาน + Join ข้อมูลคนยื่นข้อเสนอ (Proposals)
     const { data, error } = await supabase
       .from('jobs')
       .select(`
@@ -63,7 +64,6 @@ export default function MyJobsPage() {
     });
   }, [fetchMyJobs, supabase.auth]);
 
-  // 🌟 ฟังก์ชัน: ตอบรับผู้รับงาน (อัปเกรดความปลอดภัยด้วย RPC)
   const handleAcceptProposal = async (job: any, proposal: any) => {
     if (!confirm(`ยืนยันการจ้างงาน ${proposal.worker?.full_name} ใช่ไหมคะ?`)) return;
     setActionLoading(proposal.id);
@@ -98,7 +98,7 @@ export default function MyJobsPage() {
         
         {/* Header */}
         <div className="bg-gradient-to-b from-[#EE4D2D] to-[#FF7337] rounded-[2.5rem] p-6 pt-10 pb-8 shadow-md relative z-20 m-3 mt-4 flex flex-col">
-          <Link href="/profile" className="w-11 h-11 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm border border-white/30 text-white text-xl mb-4">←</Link>
+          <Link href="/profile" className="w-11 h-11 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm border border-white/30 text-white text-xl mb-4 active:scale-95 transition-transform">←</Link>
           <h1 className="text-3xl font-black text-white tracking-tight">งานของฉัน</h1>
           <p className="text-[11px] font-bold text-white/80 mt-1">จัดการรายการจ้างงานและงานที่รับผิดชอบ</p>
         </div>
@@ -125,6 +125,15 @@ export default function MyJobsPage() {
               const s = STATUS_META[job.status as Status] || STATUS_META.open;
               const proposals = job.proposals?.filter((p: any) => p.status === 'pending') || [];
 
+              // 🌟 คำนวณความคืบหน้าของ Status Tracker
+              let progressIndex = 0;
+              if (job.status === 'in_progress') progressIndex = 2;
+              if (job.status === 'delivered') progressIndex = 3;
+              if (job.status === 'completed') progressIndex = 4;
+              if (job.status === 'cancelled') progressIndex = -1;
+
+              const steps = ['รับงาน', 'พักเงิน', 'กำลังทำ', 'ส่งมอบ', 'จบงาน'];
+
               return (
                 <article key={job.id} className={`bg-white rounded-[2rem] p-5 shadow-sm border-2 ${accent.border} relative overflow-hidden`}>
                   <div className={`absolute top-0 left-0 bottom-0 w-1.5 bg-gradient-to-b ${accent.grad}`} />
@@ -135,9 +144,40 @@ export default function MyJobsPage() {
                   </div>
 
                   <h3 className="font-black text-gray-800 text-base leading-tight">{job.title}</h3>
-                  <p className="text-[10px] text-gray-400 font-bold mt-1 mb-3">⏰ {formatDate(job.created_at)}</p>
+                  <p className="text-[10px] text-gray-400 font-bold mt-1 mb-2">⏰ {formatDate(job.created_at)}</p>
 
-                  {/* 🌟 ส่วนแสดงรายชื่อผู้เสนอตัว (โชว์เฉพาะงานที่ยัง 'open' และเราเป็นคนจ้าง) */}
+                  {/* 🌟 1. Status Tracker Progress Bar */}
+                  {job.status !== 'cancelled' && (
+                    <div className="mt-3 mb-4">
+                      <div className="flex items-center gap-1">
+                        {steps.map((step, idx) => (
+                          <div key={step} className={`flex-1 h-1.5 rounded-full transition-colors duration-500 ${idx <= progressIndex ? 'bg-emerald-500' : 'bg-gray-100'}`} />
+                        ))}
+                      </div>
+                      <div className="flex justify-between mt-1 px-1">
+                        <span className="text-[8px] font-black text-emerald-600">จองงาน</span>
+                        <span className={`text-[8px] font-black ${progressIndex >= 2 ? 'text-emerald-600' : 'text-gray-300'}`}>พักเงิน/ทำ</span>
+                        <span className={`text-[8px] font-black ${progressIndex >= 4 ? 'text-emerald-600' : 'text-gray-300'}`}>ปล่อยเงิน</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 🌟 2. Escrow Trust Badge (โชว์เฉพาะตอนพักเงิน) */}
+                  {(job.status === 'in_progress' || job.status === 'delivered') && (
+                    <div className="mb-4 bg-emerald-50/80 border border-emerald-100 rounded-2xl p-3 flex items-start gap-3 shadow-sm">
+                      <div className="text-xl">🔒</div>
+                      <div>
+                        <p className="text-[11px] font-black text-emerald-800 tracking-wide">เงิน ฿{job.budget?.toLocaleString() || '0'} ถูกพักไว้ในระบบอย่างปลอดภัย</p>
+                        <p className="text-[10px] text-emerald-600/80 font-bold mt-0.5 leading-tight">
+                          {isHired 
+                            ? 'ระบบจะโอนให้ช่าง ก็ต่อเมื่อคุณตรวจสอบและกดยืนยันรับงานเท่านั้น' 
+                            : 'ผู้จ้างชำระเงินเรียบร้อยแล้ว ลุยงานและส่งมอบผ่านระบบได้เลย'}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ส่วนแสดงรายชื่อผู้เสนอตัว (ซ่อนไว้ถ้ารับงานไปแล้ว) */}
                   {isHired && job.status === 'open' && proposals.length > 0 && (
                     <div className="mt-4 pt-4 border-t border-gray-100 space-y-3">
                       <p className="text-[11px] font-black text-[#EE4D2D] flex items-center gap-1">👥 มีผู้ยื่นข้อเสนอ {proposals.length} คน:</p>
@@ -172,9 +212,16 @@ export default function MyJobsPage() {
                       <p className="text-[10px] text-gray-400 font-bold uppercase">งบประมาณ/ค่าบริการ</p>
                       <p className={`font-black text-2xl ${accent.text} tracking-tight`}>{job.budget ? `${job.budget.toLocaleString()} ฿` : 'เสนอราคา'}</p>
                     </div>
+                    
+                    {/* เปลี่ยนปุ่มตามสถานะ */}
                     <div className="flex gap-2">
-                      {job.status === 'in_progress' && (
-                        <Link href={`/chat/${job.id}`} className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-5 py-2.5 rounded-xl text-[11px] font-black shadow-md">💬 คุยรายละเอียด</Link>
+                      {(job.status === 'in_progress' || job.status === 'delivered') && (
+                        <Link href={`/chat/${job.id}`} className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-5 py-2.5 rounded-xl text-[11px] font-black shadow-md active:scale-95 transition-transform">
+                          {job.status === 'delivered' ? '📦 ตรวจรับงาน' : '💬 คุยรายละเอียด'}
+                        </Link>
+                      )}
+                      {job.status === 'completed' && (
+                        <span className="bg-gray-100 text-gray-400 px-4 py-2 rounded-xl text-[10px] font-black">งานสำเร็จแล้ว</span>
                       )}
                     </div>
                   </div>
