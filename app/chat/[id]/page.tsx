@@ -1,203 +1,121 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import RiderTrackingMap from "@/app/components/RiderTrackingMap";
 
-export default function ChatPage({ params }: { params: { id: string } }) {
-  const jobId = params.id;
-  const router = useRouter();
-  
-  // 🌟 [AUDIT FIX] ใช้ useMemo เพื่อไม่ให้สร้าง Connection ใหม่ทุกครั้งที่พิมพ์แชท
-  const supabase = useMemo(() => createClient(), []);
+export default function AdminDashboardPage() {
+  const supabase = createClient();
+  const [withdrawals, setWithdrawals] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const [userId, setUserId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<any[]>([]);
-  const [newMessage, setNewMessage] = useState('');
-  const [jobDetails, setJobDetails] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const userIdRef = useRef<string | null>(null); // เก็บ ID ไว้ใช้ใน Realtime โดยไม่ทำให้ติด Loop
+  const fetchWithdrawals = async () => {
+    setLoading(true);
+    // ดึงรายการถอนเงินที่สถานะ 'hold' (รอโอน)
+    const { data, error } = await supabase
+      .from('withdrawals')
+      .select('*, worker:profiles!worker_id(first_name, full_name, avatar_url)')
+      .eq('status', 'hold')
+      .order('requested_at', { ascending: true });
 
-  const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (!error && data) setWithdrawals(data);
+    setLoading(false);
+  };
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    fetchWithdrawals();
+  }, []);
 
-  // 🌟 แยกฟังก์ชันดึงข้อมูลให้เป็นระเบียบ
-  const fetchJobAndMessages = useCallback(async (uid: string) => {
-    // 1. ดึงข้อมูลงาน
-    const { data: jobData, error: jobError } = await supabase
-      .from('jobs')
-      .select('*, employer:profiles!employer_id(first_name, avatar_url), worker:profiles!worker_id(first_name, avatar_url)')
-      .eq('id', jobId)
-      .single();
-      
-    if (jobError || !jobData) {
-      alert('ไม่พบข้อมูลงานนี้ค่ะ');
-      return router.push('/my-jobs');
-    }
-
-    // 🌟 [AUDIT FIX] ป้องกันคนนอกแอบเข้าห้องแชท (เช็คซ้ำฝั่งหน้าบ้าน)
-    if (uid !== jobData.employer_id && uid !== jobData.worker_id) {
-      alert('คุณไม่มีสิทธิ์เข้าถึงห้องแชทนี้ค่ะ 🚫');
-      return router.push('/my-jobs');
-    }
+  const handleMarkAsPaid = async (id: string) => {
+    if (!confirm('ยืนยันว่าคุณได้โอนเงินเข้าบัญชีธนาคารของช่างเรียบร้อยแล้วใช่ไหมคะ?')) return;
     
-    setJobDetails(jobData);
+    // อัปเดตสถานะเป็นโอนแล้ว (paid)
+    const { error } = await supabase
+      .from('withdrawals')
+      .update({ status: 'paid', settled_at: new Date().toISOString() })
+      .eq('id', id);
 
-    // 2. ดึงประวัติแชท
-    const { data: chatData } = await supabase
-      .from('job_messages')
-      .select('*')
-      .eq('job_id', jobId)
-      .order('created_at', { ascending: true });
-      
-    if (chatData) setMessages(chatData);
-    setIsLoading(false);
-  }, [jobId, supabase, router]);
-
-  // 🌟 [AUDIT FIX] จัดการ Realtime ให้เชื่อมต่อแค่ครั้งเดียว และไม่มี Memory Leak
-  useEffect(() => {
-    let channel: ReturnType<typeof supabase.channel> | null = null;
-    let cancelled = false;
-
-    const initChat = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (cancelled) return;
-      if (!session?.user) return router.push('/auth/login');
-      
-      const uid = session.user.id;
-      setUserId(uid);
-      userIdRef.current = uid;
-      
-      await fetchJobAndMessages(uid);
-
-      // ดักจับแชทใหม่แบบ Real-time
-      channel = supabase.channel(`chat_${jobId}`)
-        .on('postgres_changes', 
-          { event: 'INSERT', schema: 'public', table: 'job_messages', filter: `job_id=eq.${jobId}` },
-          (payload) => {
-            const newMsg = payload.new;
-            // 🌟 ป้องกันข้อความเบิ้ล (Deduplication)
-            setMessages((prev) => prev.some(m => m.id === newMsg.id) ? prev : [...prev, newMsg]);
-          }
-        )
-        .subscribe();
-    };
-
-    initChat();
-
-    return () => {
-      cancelled = true;
-      if (channel) supabase.removeChannel(channel);
-    };
-  }, [jobId, supabase, fetchJobAndMessages, router]);
-
-  const handleSendMessage = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!newMessage.trim() || !userId) return;
-
-    const textToSend = newMessage;
-    setNewMessage(''); // เคลียร์ UI ให้รู้สึกลื่นไหล
-
-    const recipientId = userId === jobDetails?.employer_id ? jobDetails?.worker_id : jobDetails?.employer_id;
-
-    const { error } = await supabase.from('job_messages').insert({
-      job_id: jobId,
-      sender_id: userId,
-      recipient_id: recipientId,
-      content: textToSend
-    });
-
-    if (error) {
-      console.error('ส่งข้อความไม่สำเร็จ:', error.message);
-      alert('ส่งข้อความไม่สำเร็จค่ะ กรุณาลองใหม่');
+    if (!error) {
+      alert('บันทึกการโอนเงินเรียบร้อยค่ะ! ✅');
+      fetchWithdrawals();
+    } else {
+      alert('เกิดข้อผิดพลาด: ' + error.message);
     }
   };
-
-  const dropoffLocation = {
-    lat: jobDetails?.dropoff_lat || 13.7563,
-    lng: jobDetails?.dropoff_lng || 100.5018
-  };
-
-  if (isLoading) return <div className="flex h-screen items-center justify-center font-bold text-gray-400 bg-[#F8FAFC]">กำลังเชื่อมต่อห้องสนทนา...</div>;
 
   return (
-    <div className="flex flex-col h-screen bg-[#F8FAFC] font-sans">
-      {/* 🌟 Header ด้านบน */}
-      <div className="flex items-center px-4 py-3 bg-white shadow-sm z-20">
-        <button onClick={() => router.back()} className="mr-4 text-2xl text-gray-600 hover:text-gray-900 transition-colors">
-          ←
-        </button>
-        <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-xl overflow-hidden mr-3 border border-gray-200">
-          👤
-        </div>
-        <div>
-          <h2 className="font-bold text-gray-900 text-sm">สนทนา</h2>
-          <p className="text-[10px] font-bold text-emerald-500 flex items-center gap-1.5 uppercase tracking-wider">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-            </span> 
-            กำลังออนไลน์
-          </p>
-        </div>
-      </div>
-
-      {/* 📍 แผนที่ติดตามรถ (RiderTrackingMap) */}
-      <div className="w-full shrink-0 bg-white z-10 border-b border-gray-100 relative">
-        <RiderTrackingMap jobId={jobId} dropoff={dropoffLocation} />
-      </div>
-
-      {/* 💬 พื้นที่แสดงแชท */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-32">
-        {messages.length === 0 && (
-          <div className="text-center text-gray-400 text-xs font-bold mt-10">
-            เริ่มการสนทนาเกี่ยวกับงานนี้ได้เลยค่ะ 🚀
+    <div className="min-h-screen bg-[#F4F6F8] font-sans pb-24 flex justify-center">
+      <div className="w-full max-w-4xl p-6">
+        
+        {/* Header */}
+        <div className="bg-gradient-to-r from-gray-900 to-gray-800 rounded-3xl p-8 shadow-xl text-white mb-6 flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-black tracking-tight">Admin Dashboard 👑</h1>
+            <p className="text-sm text-gray-400 mt-1 font-bold">จัดการระบบการเงินและอนุมัติการถอนเงิน</p>
           </div>
-        )}
-        {messages.map((msg) => {
-          const isMe = msg.sender_id === userId;
-          return (
-            <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm shadow-sm ${
-                isMe 
-                  ? 'bg-gradient-to-r from-[#EE4D2D] to-[#FF7337] text-white rounded-br-sm' 
-                  : 'bg-white text-gray-800 border border-gray-100 rounded-bl-sm'
-              }`}>
-                {msg.content}
-              </div>
-            </div>
-          );
-        })}
-        <div ref={messagesEndRef} />
-      </div>
+          <div className="bg-white/10 px-5 py-3 rounded-2xl border border-white/20 backdrop-blur-md text-center">
+            <p className="text-[10px] uppercase font-black tracking-widest text-gray-300">รอดำเนินการ</p>
+            <p className="text-3xl font-black text-emerald-400">{withdrawals.length}</p>
+          </div>
+        </div>
 
-      {/* ⌨️ กล่องพิมพ์ข้อความ */}
-      <div className="fixed bottom-[80px] left-0 right-0 bg-white p-3 border-t border-gray-100 z-20">
-        <form onSubmit={handleSendMessage} className="flex items-center gap-2 max-w-md mx-auto">
-          <button type="button" className="p-2.5 text-gray-400 hover:text-gray-600 bg-gray-50 rounded-full transition-colors">
-            📷
-          </button>
-          <input
-            type="text"
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            placeholder="พิมพ์ข้อความ..."
-            className="flex-1 bg-gray-50 rounded-full px-5 py-2.5 text-sm outline-none border border-gray-200 focus:border-[#EE4D2D] focus:ring-1 focus:ring-[#EE4D2D] transition-all"
-          />
-          <button 
-            type="submit" 
-            disabled={!newMessage.trim()} 
-            className="w-10 h-10 rounded-full bg-[#EE4D2D] text-white flex items-center justify-center disabled:opacity-50 hover:bg-[#D44327] transition-colors shadow-sm"
-          >
-            🚀
-          </button>
-        </form>
+        {/* ตารางรายการรอโอนเงิน */}
+        <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-6 py-5 border-b border-gray-100 bg-gray-50/50">
+            <h2 className="font-black text-gray-800">📥 รายการขอถอนเงินเข้าธนาคาร (Withdrawals)</h2>
+          </div>
+          
+          {loading ? (
+            <div className="p-10 text-center font-bold text-gray-400 animate-pulse">กำลังโหลดข้อมูล...</div>
+          ) : withdrawals.length === 0 ? (
+            <div className="p-16 text-center">
+              <div className="text-5xl mb-4 grayscale opacity-50">💸</div>
+              <p className="font-black text-gray-800 text-lg">ไม่มีรายการรอโอนเงินค่ะ</p>
+              <p className="text-xs text-gray-400 font-bold mt-1">แอดมินพักผ่อนได้เลย เยี่ยมมาก!</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {withdrawals.map((w) => (
+                <div key={w.id} className="p-6 flex items-center justify-between hover:bg-blue-50/50 transition-colors">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-gray-100 rounded-full overflow-hidden border border-gray-200 shrink-0">
+                      {w.worker?.avatar_url ? (
+                        <img src={w.worker.avatar_url} alt="worker" className="w-full h-full object-cover" />
+                      ) : <div className="w-full h-full flex items-center justify-center text-xl">👤</div>}
+                    </div>
+                    <div>
+                      <p className="font-black text-gray-900">{w.worker?.full_name || 'ผู้ใช้ไม่ระบุชื่อ'}</p>
+                      <div className="flex gap-3 mt-1">
+                        <span className="text-xs font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md">
+                          ธนาคาร: {w.bank_account?.bank_name || 'ไม่ได้ระบุ'}
+                        </span>
+                        <span className="text-xs font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md">
+                          เลขที่: {w.bank_account?.account_number || 'ไม่ได้ระบุ'}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-gray-400 font-medium mt-1.5">
+                        แจ้งถอนเมื่อ: {new Date(w.requested_at).toLocaleString('th-TH')}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-6">
+                    <div className="text-right">
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-0.5">ยอดโอน (บาท)</p>
+                      <p className="text-2xl font-black text-gray-900">{(w.amount_satang / 100).toLocaleString()}</p>
+                    </div>
+                    <button 
+                      onClick={() => handleMarkAsPaid(w.id)}
+                      className="bg-gray-900 text-white px-6 py-3 rounded-xl text-xs font-black shadow-lg hover:bg-gray-800 active:scale-95 transition-all"
+                    >
+                      อนุมัติโอนแล้ว
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
       </div>
     </div>
   );
