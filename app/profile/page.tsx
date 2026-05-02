@@ -11,27 +11,47 @@ import BottomNav from '@/app/components/BottomNav';
 export default function ProfilePage() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
+  
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  
+  // 🌟 เพิ่ม State สำหรับเก็บยอดเงินในกระเป๋า
+  const [walletBalance, setWalletBalance] = useState<number>(0);
+  const [isLoadingWallet, setIsLoadingWallet] = useState(true);
 
   useEffect(() => {
-    async function getProfile() {
+    async function fetchData() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         router.push('/auth/login');
         return;
       }
 
-      const { data } = await supabase
+      // ดึงข้อมูลโปรไฟล์
+      const { data: profileData } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', session.user.id)
         .single();
       
-      setProfile(data);
+      setProfile(profileData);
       setLoading(false);
+
+      // 🌟 ดึงข้อมูลยอดเงินจาก wallets
+      const { data: walletData } = await supabase
+        .from('wallets')
+        .select('balance_satang')
+        .eq('owner_id', session.user.id)
+        .eq('kind', 'user')
+        .maybeSingle();
+
+      if (walletData) {
+        setWalletBalance(walletData.balance_satang / 100); // แปลงสกุลเงินเป็น บาท
+      }
+      setIsLoadingWallet(false);
     }
-    getProfile();
+    
+    fetchData();
   }, [router, supabase]);
 
   const handleSignOut = async () => {
@@ -80,6 +100,34 @@ export default function ProfilePage() {
                 ID: {profile?.id?.slice(0, 8)}
               </span>
             </div>
+          </div>
+        </div>
+
+        {/* 💳 การ์ดกระเป๋าเงิน (Wallet Card) แทรกตรงนี้เลยค่ะ */}
+        <div 
+          onClick={() => router.push('/wallet')}
+          className="mx-4 mb-2 bg-gradient-to-r from-gray-900 to-gray-800 rounded-3xl p-5 text-white shadow-md cursor-pointer active:scale-95 transition-transform relative overflow-hidden"
+        >
+          {/* ลายกราฟิกตกแต่ง */}
+          <div className="absolute -right-6 -top-6 w-24 h-24 bg-white/10 rounded-full blur-xl"></div>
+          <div className="absolute right-10 -bottom-10 w-20 h-20 bg-[#EE4D2D]/30 rounded-full blur-lg"></div>
+
+          <div className="flex justify-between items-center mb-2 relative z-10">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center text-sm backdrop-blur-sm">
+                💸
+              </div>
+              <span className="font-bold text-sm text-gray-100">กระเป๋าตังค์ของฉัน</span>
+            </div>
+            <div className="flex items-center text-[#EE4D2D] bg-white px-3 py-1 rounded-full text-[10px] font-black shadow-sm">
+              ถอนเงิน <span className="ml-1">→</span>
+            </div>
+          </div>
+          
+          <div className="flex items-baseline gap-1 relative z-10 mt-2">
+            <span className="text-3xl font-black tracking-tight">
+              {isLoadingWallet ? '...' : `฿${walletBalance.toLocaleString('th-TH', { minimumFractionDigits: 2 })}`}
+            </span>
           </div>
         </div>
 
