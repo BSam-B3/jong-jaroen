@@ -1,122 +1,152 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 
-export default function AdminDashboardPage() {
-  const supabase = createClient();
-  const [withdrawals, setWithdrawals] = useState<any[]>([]);
+export default function ChatPage({ params }: { params: { id: string } }) {
+  const router = useRouter();
+  const supabase = useMemo(() => createClient(), []);
+  const jobId = params.id;
+
+  const [job, setJob] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-
-  const fetchWithdrawals = async () => {
-    setLoading(true);
-    // ดึงรายการถอนเงินที่สถานะ 'hold' (รอโอน)
-    const { data, error } = await supabase
-      .from('withdrawals')
-      .select('*, worker:profiles!worker_id(first_name, full_name, avatar_url)')
-      .eq('status', 'hold')
-      .order('requested_at', { ascending: true });
-
-    if (!error && data) setWithdrawals(data);
-    setLoading(false);
-  };
+  const [isActionLoading, setIsActionLoading] = useState(false);
 
   useEffect(() => {
-    fetchWithdrawals();
-  }, []);
+    async function initChat() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return router.push('/auth/login');
+      setCurrentUser(session.user);
 
-  const handleMarkAsPaid = async (id: string) => {
-    if (!confirm('ยืนยันว่าคุณได้โอนเงินเข้าบัญชีธนาคารของช่างเรียบร้อยแล้วใช่ไหมคะ?')) return;
-    
-    // อัปเดตสถานะเป็นโอนแล้ว (paid)
-    const { error } = await supabase
-      .from('withdrawals')
-      .update({ status: 'paid', settled_at: new Date().toISOString() })
-      .eq('id', id);
-
-    if (!error) {
-      alert('บันทึกการโอนเงินเรียบร้อยค่ะ! ✅');
-      fetchWithdrawals();
-    } else {
-      alert('เกิดข้อผิดพลาด: ' + error.message);
+      // ดึงข้อมูลงานและคู่สัญญา
+      const { data } = await supabase
+        .from('jobs')
+        .select('*, employer:profiles!employer_id(full_name), worker:profiles!worker_id(full_name)')
+        .eq('id', jobId)
+        .single();
+      
+      setJob(data);
+      setLoading(false);
     }
+    initChat();
+  }, [jobId, router, supabase]);
+
+  // 📦 1. ฟังก์ชันช่างกดส่งงาน
+  const handleSubmitWork = async () => {
+    if (!confirm('ช่างทำเสร็จแล้วโว้ย 🔧 ยืนยันการส่งมอบงานใช่ไหมคะ?')) return;
+    setIsActionLoading(true);
+    try {
+      const { error } = await supabase
+        .from('jobs')
+        .update({ status: 'delivered', updated_at: new Date().toISOString() })
+        .eq('id', jobId);
+      if (error) throw error;
+      
+      alert('ส่งงานเรียบร้อย! ✨\nแจ้งเตือนลูกค้า: "งานเสร็จแล้ว! ช่างส่งงานซ่อมให้ตรวจ แวะกดรับงานหน่อย ช่างจะได้เบิกตังค์จ้า"');
+      window.location.reload();
+    } catch (err: any) { alert(err.message); }
+    finally { setIsActionLoading(false); }
   };
 
+  // 💸 2. ฟังก์ชันผู้จ้างกดรับงานและปล่อยเงิน (เรียก RPC)
+  const handleReleaseFunds = async () => {
+    if (!confirm('เฮ! ตรวจงานเรียบร้อยแล้ว ยืนยันการปล่อยเงินให้ช่างใช่ไหมคะ?')) return;
+    setIsActionLoading(true);
+    try {
+      const { error } = await supabase.rpc('release_escrow', { p_job_id: jobId });
+      if (error) throw error;
+      
+      alert('ปล่อยเงินสำเร็จ! 🎉\nแจ้งเตือนช่าง: "ตังค์เข้าเป๋าแล้วนายช่าง! 💸 งานผ่านฉลุย กดถอนโลด"');
+      router.push('/my-jobs');
+    } catch (err: any) { alert(err.message); }
+    finally { setIsActionLoading(false); }
+  };
+
+  if (loading) return <div className="min-h-screen bg-gray-50 flex items-center justify-center">⏳ กำลังเปิดห้องคุย...</div>;
+
+  const isWorker = currentUser?.id === job?.worker_id;
+  const isEmployer = currentUser?.id === job?.employer_id;
+
   return (
-    <div className="min-h-screen bg-[#F4F6F8] font-sans pb-24 flex justify-center">
-      <div className="w-full max-w-4xl p-6">
-        
-        {/* Header */}
-        <div className="bg-gradient-to-r from-gray-900 to-gray-800 rounded-3xl p-8 shadow-xl text-white mb-6 flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-black tracking-tight">Admin Dashboard 👑</h1>
-            <p className="text-sm text-gray-400 mt-1 font-bold">จัดการระบบการเงินและอนุมัติการถอนเงิน</p>
+    <div className="min-h-screen bg-[#F4F6F8] flex flex-col font-sans">
+      
+      {/* 🟢 Action Header (ศูนย์บัญชาการปิดงาน) */}
+      <div className="bg-white border-b border-gray-200 p-4 sticky top-0 z-30 shadow-sm">
+        <div className="flex items-center justify-between max-w-2xl mx-auto">
+          <button onClick={() => router.back()} className="text-gray-400 text-2xl active:scale-95 transition-transform">←</button>
+          <div className="text-center">
+            <h1 className="font-black text-gray-800 text-sm line-clamp-1">{job?.title || 'ห้องแชทงาน'}</h1>
+            <p className="text-[10px] font-bold text-[#EE4D2D] uppercase tracking-widest">
+              สถานะ: {job?.status === 'in_progress' ? 'กำลังดำเนินการ' : job?.status === 'delivered' ? 'ส่งมอบแล้ว' : job?.status}
+            </p>
           </div>
-          <div className="bg-white/10 px-5 py-3 rounded-2xl border border-white/20 backdrop-blur-md text-center">
-            <p className="text-[10px] uppercase font-black tracking-widest text-gray-300">รอดำเนินการ</p>
-            <p className="text-3xl font-black text-emerald-400">{withdrawals.length}</p>
-          </div>
+          <div className="w-8"></div>
         </div>
 
-        {/* ตารางรายการรอโอนเงิน */}
-        <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="px-6 py-5 border-b border-gray-100 bg-gray-50/50">
-            <h2 className="font-black text-gray-800">📥 รายการขอถอนเงินเข้าธนาคาร (Withdrawals)</h2>
-          </div>
-          
-          {loading ? (
-            <div className="p-10 text-center font-bold text-gray-400 animate-pulse">กำลังโหลดข้อมูล...</div>
-          ) : withdrawals.length === 0 ? (
-            <div className="p-16 text-center">
-              <div className="text-5xl mb-4 grayscale opacity-50">💸</div>
-              <p className="font-black text-gray-800 text-lg">ไม่มีรายการรอโอนเงินค่ะ</p>
-              <p className="text-xs text-gray-400 font-bold mt-1">แอดมินพักผ่อนได้เลย เยี่ยมมาก!</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-gray-100">
-              {withdrawals.map((w) => (
-                <div key={w.id} className="p-6 flex items-center justify-between hover:bg-blue-50/50 transition-colors">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-gray-100 rounded-full overflow-hidden border border-gray-200 shrink-0">
-                      {w.worker?.avatar_url ? (
-                        <img src={w.worker.avatar_url} alt="worker" className="w-full h-full object-cover" />
-                      ) : <div className="w-full h-full flex items-center justify-center text-xl">👤</div>}
-                    </div>
-                    <div>
-                      <p className="font-black text-gray-900">{w.worker?.full_name || 'ผู้ใช้ไม่ระบุชื่อ'}</p>
-                      <div className="flex gap-3 mt-1">
-                        <span className="text-xs font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md">
-                          ธนาคาร: {w.bank_account?.bank_name || 'ไม่ได้ระบุ'}
-                        </span>
-                        <span className="text-xs font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md">
-                          เลขที่: {w.bank_account?.account_number || 'ไม่ได้ระบุ'}
-                        </span>
-                      </div>
-                      <p className="text-[10px] text-gray-400 font-medium mt-1.5">
-                        แจ้งถอนเมื่อ: {new Date(w.requested_at).toLocaleString('th-TH')}
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-6">
-                    <div className="text-right">
-                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-0.5">ยอดโอน (บาท)</p>
-                      <p className="text-2xl font-black text-gray-900">{(w.amount_satang / 100).toLocaleString()}</p>
-                    </div>
-                    <button 
-                      onClick={() => handleMarkAsPaid(w.id)}
-                      className="bg-gray-900 text-white px-6 py-3 rounded-xl text-xs font-black shadow-lg hover:bg-gray-800 active:scale-95 transition-all"
-                    >
-                      อนุมัติโอนแล้ว
-                    </button>
-                  </div>
-                </div>
-              ))}
+        {/* ปุ่มตามหน้าที่ (Role-based Actions) */}
+        <div className="max-w-2xl mx-auto mt-4">
+          {isWorker && job?.status === 'in_progress' && (
+            <button 
+              onClick={handleSubmitWork}
+              disabled={isActionLoading}
+              className="w-full bg-[#EE4D2D] text-white py-3 rounded-2xl font-black text-sm shadow-md active:scale-95 transition-transform disabled:opacity-50"
+            >
+              {isActionLoading ? 'กำลังส่งงาน...' : '📦 ส่งมอบงาน (เก็บตังค์!)'}
+            </button>
+          )}
+
+          {isEmployer && job?.status === 'delivered' && (
+            <button 
+              onClick={handleReleaseFunds}
+              disabled={isActionLoading}
+              className="w-full bg-emerald-500 text-white py-3 rounded-2xl font-black text-sm shadow-md active:scale-95 transition-transform disabled:opacity-50"
+            >
+              {isActionLoading ? 'กำลังปล่อยเงิน...' : '✅ ตรวจรับงานและปล่อยเงิน 💸'}
+            </button>
+          )}
+
+          {job?.status === 'completed' && (
+            <div className="w-full bg-emerald-50 text-emerald-600 py-3 rounded-2xl font-black text-xs text-center border border-emerald-100">
+              🎉 งานนี้สำเร็จเรียบร้อยแล้ว เงินเข้ากระเป๋าช่างแล้วค่ะ!
             </div>
           )}
         </div>
-
       </div>
+
+      {/* 💬 Chat Area (Mockup พื้นที่คุย) */}
+      <main className="flex-1 p-6 space-y-4 max-w-2xl mx-auto w-full">
+        <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 self-start max-w-[80%]">
+          <p className="text-xs font-bold text-[#EE4D2D] mb-1">จงเจริญ AI 🤖</p>
+          <p className="text-sm text-gray-700 leading-relaxed">
+            ยินดีด้วยค่ะ! ห้องแชทเปิดแล้ว คุยรายละเอียดงานกันที่นี่ได้เลยนะ<br/>
+            <span className="font-bold">กฎเหล็ก:</span> อย่าลืมกด "ส่งงาน" และ "รับงาน" ผ่านแอปเพื่อความปลอดภัยของเงินนะคะ!
+          </p>
+        </div>
+
+        {/* ตัวอย่างแชทจากคู่สัญญา */}
+        <div className="flex flex-col gap-2">
+           <div className={`p-4 rounded-2xl shadow-sm max-w-[80%] ${isWorker ? 'bg-[#EE4D2D] text-white self-end' : 'bg-white text-gray-800 self-start border border-gray-100'}`}>
+              <p className="text-sm font-medium">สวัสดีครับ พร้อมลุยงานแล้วครับ!</p>
+           </div>
+        </div>
+      </main>
+
+      {/* ⌨️ Input Area */}
+      <div className="p-4 bg-white border-t border-gray-100 sticky bottom-0">
+        <div className="max-w-2xl mx-auto flex gap-2">
+          <input 
+            type="text" 
+            placeholder="พิมพ์ข้อความที่นี่..." 
+            className="flex-1 bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-[#EE4D2D] focus:border-transparent outline-none transition-all"
+          />
+          <button className="bg-[#EE4D2D] text-white w-12 h-12 rounded-2xl flex items-center justify-center shadow-md active:scale-95 transition-transform">
+            🚀
+          </button>
+        </div>
+      </div>
+
     </div>
   );
 }
