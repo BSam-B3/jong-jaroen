@@ -3,22 +3,28 @@
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
-export default function WithdrawalActions({ withdrawalId, workerName, amount }: { withdrawalId: string, workerName: string, amount: number }) {
+export default function WithdrawalActions({ withdrawalId, workerName, amount, bankInfo }: { withdrawalId: string, workerName: string, amount: number, bankInfo: string }) {
   const [isLoading, setIsLoading] = useState(false);
   const supabase = createClient();
 
   const handleApprovePayout = async () => {
-    if (!confirm(`ยืนยันว่าคุณได้โอนเงิน ${amount.toLocaleString('th-TH')} บาท ให้กับ ${workerName} เรียบร้อยแล้วใช่ไหมคะ?`)) return;
+    // ให้แอดมินกรอกเลข Ref สลิปโอนเงินสั้นๆ
+    const bankRef = prompt(`กำลังจะโอนเงิน ฿${amount.toLocaleString('th-TH')} ให้ ${workerName}\nหากโอนสำเร็จ กรุณากรอก 'เลขที่อ้างอิงสลิป' เพื่อยืนยัน:`);
+    
+    if (!bankRef) return; // ถ้ายกเลิกหรือไม่กรอก ให้หยุดทำงาน
     
     setIsLoading(true);
 
     try {
-      // 💡 เดี๋ยวเราจะเปลี่ยนชื่อ RPC ตามที่ C ออกแบบมาให้อีกทีค่ะ
-      const { error } = await supabase.rpc('approve_withdrawal', { p_withdrawal_id: withdrawalId });
+      // เรียกใช้ RPC อนุมัติโอนเงิน
+      const { error } = await supabase.rpc('approve_withdrawal', { 
+        p_withdrawal_id: withdrawalId,
+        p_bank_ref: bankRef
+      });
       if (error) throw error;
 
-      // 💬 รอ Copy แจ้งเตือนช่างจาก Meta AI มาใส่ตรงนี้
-      alert(`✅ ตัดยอดสำเร็จ! ระบบได้แจ้งเตือน ${workerName} แล้วค่ะ`);
+      // 💬 Push Notification จำลอง (คำพูด Meta AI)
+      alert(`✅ โอนให้แล้ว! เงินถึงบัญชี\nแจ้งเตือนช่าง: "ตังค์เข้าแล้วนายช่าง! 🎉 ฿${amount.toLocaleString('th-TH')} ถึงบัญชี ${bankInfo} เรียบร้อย เอาไปใช้โลด"`);
       
       window.location.reload();
     } catch (err: any) {
@@ -29,14 +35,12 @@ export default function WithdrawalActions({ withdrawalId, workerName, amount }: 
   };
 
   return (
-    <div className="w-full md:w-auto">
-      <button 
-        onClick={handleApprovePayout}
-        disabled={isLoading}
-        className="w-full px-8 py-3 bg-emerald-500 text-white rounded-xl text-sm font-black shadow-sm hover:bg-emerald-600 active:scale-95 transition-all disabled:opacity-50"
-      >
-        {isLoading ? 'กำลังประมวลผล...' : '💸 โอนแล้ว ยืนยัน'}
-      </button>
-    </div>
+    <button 
+      onClick={handleApprovePayout}
+      disabled={isLoading}
+      className="w-full md:w-auto px-8 py-3 bg-emerald-500 text-white rounded-xl text-sm font-black shadow-sm hover:bg-emerald-600 active:scale-95 transition-all disabled:opacity-50"
+    >
+      {isLoading ? 'กำลังประมวลผล...' : '💸 โอนแล้ว ยืนยัน'}
+    </button>
   );
 }
