@@ -2,6 +2,11 @@
 
 export async function addKycWatermark(file: File, userId: string): Promise<File> {
   return new Promise((resolve, reject) => {
+    // 🛡️ ป้องกันกรณี Next.js เผลอเรียกใช้ฝั่ง Server (Canvas มีเฉพาะฝั่ง Client)
+    if (typeof window === 'undefined') {
+      return reject(new Error('ฟังก์ชันนี้ต้องทำงานบนเบราว์เซอร์เท่านั้นค่ะ'));
+    }
+
     // 1. อ่านไฟล์รูปภาพ
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -16,7 +21,7 @@ export async function addKycWatermark(file: File, userId: string): Promise<File>
         const ctx = canvas.getContext('2d');
 
         if (!ctx) {
-          reject(new Error('Cannot get canvas context'));
+          reject(new Error('ไม่สามารถสร้าง Canvas Context ได้ค่ะ'));
           return;
         }
 
@@ -27,10 +32,10 @@ export async function addKycWatermark(file: File, userId: string): Promise<File>
         const text = `ใช้สำหรับยืนยันตัวตนแอป "จงเจริญ" เท่านั้น  ID: ${userId.slice(0, 8)}`;
         const dateText = `วันที่ ${new Date().toLocaleDateString('th-TH')}`;
         
-        // คำนวณขนาดฟอนต์ตามความกว้างรูป
+        // คำนวณขนาดฟอนต์ตามความกว้างรูป (ให้ตัวหนังสือใหญ่พอดีกับภาพ)
         const fontSize = Math.max(16, Math.floor(img.width / 30));
         ctx.font = `bold ${fontSize}px "Prompt", "Helvetica", sans-serif`;
-        ctx.fillStyle = 'rgba(238, 77, 45, 0.25)'; // สีส้มจงเจริญ โปร่งแสง 25%
+        ctx.fillStyle = 'rgba(238, 77, 45, 0.4)'; // สีส้มจงเจริญ โปร่งแสง 40% ให้เห็นชัดขึ้นนิดนึง
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
 
@@ -45,7 +50,7 @@ export async function addKycWatermark(file: File, userId: string): Promise<File>
         // หมุนตัวหนังสือ
         ctx.rotate((angle * Math.PI) / 180);
 
-        // วาดให้เต็มทั่วรูป (✅ แก้ไขเอา </tr> ออกแล้ว ใส่ปีกกาปิดปกติค่ะ)
+        // วาดให้เต็มทั่วรูป
         for (let x = -img.width; x < img.width * 2; x += spacingX) {
           for (let y = -img.height; y < img.height * 2; y += spacingY) {
             ctx.fillText(text, x, y);
@@ -56,19 +61,25 @@ export async function addKycWatermark(file: File, userId: string): Promise<File>
         // คืนสถานะ Canvas
         ctx.restore();
 
-        // 6. แปลง Canvas กลับเป็นไฟล์ Blob แล้วแปลงเป็น File
+        // 6. แปลง Canvas กลับเป็นไฟล์ Blob (🌟 อัปเกรด: บังคับแปลงเป็น JPEG และบีบอัดคุณภาพเหลือ 80%)
         canvas.toBlob((blob) => {
           if (!blob) {
-            reject(new Error('Canvas to Blob failed'));
+            reject(new Error('การแปลงภาพล้มเหลวค่ะ'));
             return;
           }
-          // สร้างไฟล์ใหม่ ชื่อเดิม แต่เป็นรูปที่ประทับลายน้ำแล้ว
-          const watermarkedFile = new File([blob], file.name, {
-            type: file.type,
+          
+          // เปลี่ยนนามสกุลไฟล์ให้เป็น .jpg เพื่อให้ตรงกับประเภทของ Blob
+          const originalName = file.name.replace(/\.[^/.]+$/, ""); // ตัดนามสกุลเดิมออก
+          const newFileName = `${originalName}_watermarked.jpg`;
+
+          // สร้างไฟล์ใหม่พร้อมส่งกลับไปให้ระบบอัปโหลด
+          const watermarkedFile = new File([blob], newFileName, {
+            type: 'image/jpeg',
             lastModified: Date.now(),
           });
+          
           resolve(watermarkedFile);
-        }, file.type);
+        }, 'image/jpeg', 0.8); // 0.8 คือคุณภาพ 80% ช่วยลดขนาดไฟล์ได้เยอะมากค่ะ
       };
       img.onerror = (error) => reject(error);
     };
