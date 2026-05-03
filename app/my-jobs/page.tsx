@@ -6,12 +6,12 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 
 type Mode = 'hired' | 'received';
-// 🌟 1. เพิ่มสถานะ 'verifying_slip' (รอตรวจสลิป) เข้าไปในระบบ
+// 🌟 สถานะทั้งหมดในระบบ รวมถึงรอตรวจสลิป
 type Status = 'open' | 'verifying_slip' | 'in_progress' | 'delivered' | 'completed' | 'cancelled';
 
 const STATUS_META: Record<Status, { label: string; icon: string; bg: string; text: string; ring: string }> = {
   open: { label: 'รอคนรับงาน', icon: '🟡', bg: 'bg-amber-50', text: 'text-amber-700', ring: 'ring-amber-200' },
-  verifying_slip: { label: 'กำลังตรวจสลิป', icon: '⏳', bg: 'bg-orange-50', text: 'text-orange-700', ring: 'ring-orange-200' }, // 👈 เพิ่มการตั้งค่าสีและไอคอน
+  verifying_slip: { label: 'กำลังตรวจสลิป', icon: '⏳', bg: 'bg-orange-50', text: 'text-orange-700', ring: 'ring-orange-200' },
   in_progress: { label: 'กำลังดำเนินการ', icon: '🛵', bg: 'bg-blue-50', text: 'text-blue-700', ring: 'ring-blue-200' },
   delivered: { label: 'ส่งมอบแล้ว', icon: '📦', bg: 'bg-purple-50', text: 'text-purple-700', ring: 'ring-purple-200' },
   completed: { label: 'เสร็จสิ้น', icon: '✅', bg: 'bg-emerald-50', text: 'text-emerald-700', ring: 'ring-emerald-200' },
@@ -55,23 +55,31 @@ export default function MyJobsPage() {
   }, [supabase]);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const initSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         setUserId(session.user.id);
         fetchMyJobs(session.user.id);
       } else {
         setLoading(false);
       }
-    });
-  }, [fetchMyJobs, supabase.auth]);
+    };
+    initSession();
+
+    // 🌟 เพิ่ม Realtime: ให้หน้าเว็บรีเฟรชเองเวลามีคนกดรับงานหรือแอดมินอนุมัติสลิป
+    const channel = supabase.channel('my-jobs-updates')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, () => {
+        if (userId) fetchMyJobs(userId);
+      }).subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [fetchMyJobs, supabase, userId]);
 
   const handleAcceptProposal = async (job: any, proposal: any) => {
     if (!confirm(`ยืนยันเลือกล็อกคิว ${proposal.worker?.full_name} ใช่ไหมคะ? (ระบบจะพาไปหน้าชำระเงิน)`)) return;
     setActionLoading(proposal.id);
 
     try {
-      // 💡 อนาคตเราจะแก้ RPC ตัวนี้ให้เปลี่ยนสถานะเป็น awaiting_payment แทน 
-      // แต่ตอนนี้เราใช้ของเดิมไปก่อน แล้วพา User ไปจ่ายเงินค่ะ
       const { error } = await supabase.rpc('accept_proposal', {
         p_job_id: job.id,
         p_proposal_id: proposal.id,
@@ -81,13 +89,11 @@ export default function MyJobsPage() {
       if (error) throw error;
 
       alert('ล็อกคิวสำเร็จ! พาท่านไปชำระเงินเข้า Escrow ค่ะ 🚀');
-      // 🌟 2. เปลี่ยนจุดหมายจากหน้า Chat ให้ไปหน้า Checkout แทน
       router.push(`/checkout/${job.id}`); 
     } catch (err: any) {
       alert('เกิดข้อผิดพลาดในการจ้างงานค่ะ: ' + err.message);
+      setActionLoading(null);
     }
-    setActionLoading(null);
-    if (userId) fetchMyJobs(userId);
   };
 
   const isHired = mode === 'hired';
@@ -102,7 +108,7 @@ export default function MyJobsPage() {
         
         {/* Header */}
         <div className="bg-gradient-to-b from-[#EE4D2D] to-[#FF7337] rounded-[2.5rem] p-6 pt-10 pb-8 shadow-md relative z-20 m-3 mt-4 flex flex-col">
-          <Link href="/profile" className="w-11 h-11 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm border border-white/30 text-white text-xl mb-4 active:scale-95 transition-transform">←</Link>
+          <Link href="/" className="w-11 h-11 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm border border-white/30 text-white text-xl mb-4 active:scale-95 transition-transform">←</Link>
           <h1 className="text-3xl font-black text-white tracking-tight">งานของฉัน</h1>
           <p className="text-[11px] font-bold text-white/80 mt-1">จัดการรายการจ้างงานและงานที่รับผิดชอบ</p>
         </div>
@@ -118,10 +124,13 @@ export default function MyJobsPage() {
 
         <main className="px-5 mt-6 space-y-4">
           {loading ? (
-            <div className="text-center py-10 font-bold text-gray-400">กำลังโหลดข้อมูล...</div>
+            <div className="text-center py-12">
+              <div className="w-8 h-8 border-4 border-gray-200 border-t-[#EE4D2D] rounded-full animate-spin mx-auto mb-4"></div>
+              <p className="font-bold text-gray-400 text-sm">กำลังโหลดข้อมูล...</p>
+            </div>
           ) : displayJobs.length === 0 ? (
             <div className="bg-white rounded-[2rem] p-12 text-center border border-gray-100 shadow-sm mt-4">
-              <div className="text-6xl mb-4">📭</div>
+              <div className="text-6xl mb-4 opacity-50">📭</div>
               <p className="font-black text-gray-800 text-lg">ยังไม่มีรายการงาน</p>
             </div>
           ) : (
@@ -129,7 +138,7 @@ export default function MyJobsPage() {
               const s = STATUS_META[job.status as Status] || STATUS_META.open;
               const proposals = job.proposals?.filter((p: any) => p.status === 'pending') || [];
 
-              // 🌟 3. อัปเดตการคำนวณ Progress Bar ให้รู้จักสถานะกำลังตรวจสลิป
+              // คำนวณ Progress Bar
               let progressIndex = 0;
               if (job.status === 'verifying_slip') progressIndex = 1;
               if (job.status === 'in_progress') progressIndex = 2;
@@ -167,15 +176,15 @@ export default function MyJobsPage() {
                     </div>
                   )}
 
-                  {/* 🌟 4. ป้ายสถานะ Escrow (แยกสีระหว่าง รอตรวจสลิป กับ ตรวจผ่านแล้ว) */}
+                  {/* ป้ายสถานะ Escrow */}
                   {(job.status === 'verifying_slip' || job.status === 'in_progress' || job.status === 'delivered') && (
                     <div className={`mb-4 border rounded-2xl p-3 flex items-start gap-3 shadow-sm ${job.status === 'verifying_slip' ? 'bg-orange-50/80 border-orange-100' : 'bg-emerald-50/80 border-emerald-100'}`}>
                       <div className="text-xl">{job.status === 'verifying_slip' ? '⏳' : '🔒'}</div>
                       <div>
                         <p className={`text-[11px] font-black tracking-wide ${job.status === 'verifying_slip' ? 'text-orange-800' : 'text-emerald-800'}`}>
                           {job.status === 'verifying_slip' 
-                            ? `กำลังตรวจสอบสลิป ฿${job.budget?.toLocaleString() || '0'}` 
-                            : `เงิน ฿${job.budget?.toLocaleString() || '0'} ถูกพักไว้ในระบบอย่างปลอดภัย`}
+                            ? `กำลังตรวจสอบสลิป ${job.budget?.toLocaleString('th-TH')} บาท` 
+                            : `เงิน ${job.budget?.toLocaleString('th-TH')} บาท ถูกพักไว้ในระบบอย่างปลอดภัย`}
                         </p>
                         <p className={`text-[10px] font-bold mt-0.5 leading-tight ${job.status === 'verifying_slip' ? 'text-orange-600/80' : 'text-emerald-600/80'}`}>
                           {job.status === 'verifying_slip' 
@@ -186,7 +195,7 @@ export default function MyJobsPage() {
                     </div>
                   )}
 
-                  {/* ส่วนแสดงรายชื่อผู้เสนอตัว */}
+                  {/* ส่วนแสดงรายชื่อผู้เสนอตัว (ฝั่งผู้จ้าง) */}
                   {isHired && job.status === 'open' && proposals.length > 0 && (
                     <div className="mt-4 pt-4 border-t border-gray-100 space-y-3">
                       <p className="text-[11px] font-black text-[#EE4D2D] flex items-center gap-1">👥 มีผู้ยื่นข้อเสนอ {proposals.length} คน:</p>
@@ -197,37 +206,37 @@ export default function MyJobsPage() {
                               <div className="w-6 h-6 bg-white rounded-full flex items-center justify-center text-[10px] shadow-sm border border-orange-200">👤</div>
                               <p className="text-[11px] font-black text-gray-800">{p.worker?.full_name}</p>
                             </div>
-                            <p className="text-[12px] font-black text-[#EE4D2D]">{p.proposed_price?.toLocaleString()} ฿</p>
+                            <p className="text-[12px] font-black text-[#EE4D2D]">{p.proposed_price?.toLocaleString('th-TH')} บาท</p>
                           </div>
                           <p className="text-[10px] text-gray-600 font-medium leading-relaxed mb-3 italic">"{p.cover_letter}"</p>
                           <div className="flex gap-2">
                             <button 
                               disabled={!!actionLoading}
                               onClick={() => handleAcceptProposal(job, p)}
-                              className="flex-1 bg-[#EE4D2D] text-white py-2 rounded-xl text-[10px] font-black shadow-sm active:scale-95 transition-all disabled:opacity-50"
+                              className="flex-1 bg-[#EE4D2D] text-white py-2 rounded-xl text-[10px] font-black shadow-sm active:scale-95 transition-all disabled:opacity-50 flex justify-center items-center"
                             >
-                              {actionLoading === p.id ? '...' : 'จ้างงานคนนี้'}
+                              {actionLoading === p.id ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : 'จ้างงานคนนี้'}
                             </button>
-                            <button className="px-4 py-2 bg-white text-gray-400 border border-gray-200 rounded-xl text-[10px] font-black active:scale-95 transition-all">ไม่สนใจ</button>
+                            <button className="px-4 py-2 bg-white text-gray-400 border border-gray-200 rounded-xl text-[10px] font-black active:scale-95 transition-all hover:bg-gray-50">ไม่สนใจ</button>
                           </div>
                         </div>
                       ))}
                     </div>
                   )}
 
-                  {/* ราคา & แอคชันสำหรับงานที่เริ่มแล้ว */}
+                  {/* ราคา & แอคชัน */}
                   <div className="flex justify-between items-end pt-4 border-t border-gray-100 mt-3">
                     <div>
                       <p className="text-[10px] text-gray-400 font-bold uppercase">งบประมาณ/ค่าบริการ</p>
-                      <p className={`font-black text-2xl ${accent.text} tracking-tight`}>{job.budget ? `${job.budget.toLocaleString()} ฿` : 'เสนอราคา'}</p>
+                      <p className={`font-black text-2xl ${accent.text} tracking-tight`}>
+                        {job.budget ? `${job.budget.toLocaleString('th-TH')} บาท` : 'เสนอราคา'}
+                      </p>
                     </div>
                     
-                    {/* เปลี่ยนปุ่มตามสถานะ */}
                     <div className="flex gap-2">
-                      {/* 🌟 5. ปุ่มสำหรับสถานะรอตรวจสลิป */}
                       {job.status === 'verifying_slip' && (
-                        <span className="bg-orange-100 text-orange-600 px-5 py-2.5 rounded-xl text-[11px] font-black shadow-sm">
-                          ⏳ รอตรวจสลิป
+                        <span className="bg-orange-100 text-orange-600 px-5 py-2.5 rounded-xl text-[11px] font-black shadow-sm flex items-center gap-1">
+                          <span className="animate-spin text-sm">⏳</span> รอตรวจสลิป
                         </span>
                       )}
                       {(job.status === 'in_progress' || job.status === 'delivered') && (
