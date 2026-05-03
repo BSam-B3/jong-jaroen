@@ -50,17 +50,20 @@ export default async function AdminDashboardPage() {
 
   // 6. ดึงข้อมูลคำขอถอนเงิน (Real Data)
   const { data: withdrawals } = await sb
-    .from('withdrawals')
+    .from('wallet_transactions')
     .select(`
       id,
       amount_satang,
       bank_name,
       account_no,
-      requested_at,
-      worker:profiles!user_id ( full_name )
+      created_at,
+      wallets (
+        profiles ( full_name )
+      )
     `)
+    .eq('type', 'withdraw_request')
     .eq('status', 'pending')
-    .order('requested_at', { ascending: true });
+    .order('created_at', { ascending: true });
 
   if (statsError) {
     throw new Error(`โหลดข้อมูลแดชบอร์ดไม่ได้ สาเหตุ: ${statsError.message}`);
@@ -87,8 +90,12 @@ export default async function AdminDashboardPage() {
           <Link href="/admin/jobs" className="bg-gray-800 text-white px-4 py-2 rounded-xl text-xs font-black shadow-sm hover:bg-black transition-colors">
             จัดการงาน
           </Link>
-          <Link href="/admin/vehicles" className="bg-[#EE4D2D] text-white px-4 py-2 rounded-xl text-xs font-black shadow-sm hover:bg-red-600 transition-colors">
-            อนุมัติรถไรเดอร์
+          {/* ✅ อัปเดตลิงก์ Garage และเพิ่มปุ่มจัดการถอนเงิน */}
+          <Link href="/admin/garage" className="bg-[#EE4D2D] text-white px-4 py-2 rounded-xl text-xs font-black shadow-sm hover:bg-red-600 transition-colors">
+            ศูนย์ตรวจอู่รถ
+          </Link>
+          <Link href="/admin/withdrawals" className="bg-emerald-500 text-white px-4 py-2 rounded-xl text-xs font-black shadow-sm hover:bg-emerald-600 transition-colors">
+            จัดการคิวโอนเงิน
           </Link>
         </div>
       </div>
@@ -118,7 +125,6 @@ export default async function AdminDashboardPage() {
         </h2>
         <div className="flex flex-col lg:flex-row gap-6 items-center">
           
-          {/* กล่องรายได้รวม */}
           <div className="w-full lg:w-1/3 bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl p-6 text-center shadow-lg relative overflow-hidden">
             <div className="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-white opacity-5 rounded-full blur-2xl"></div>
             <p className="text-gray-400 font-bold text-sm uppercase tracking-widest">รายได้สะสมทั้งหมด</p>
@@ -127,7 +133,6 @@ export default async function AdminDashboardPage() {
             </p>
           </div>
 
-          {/* กล่องแยก 5 กอง */}
           <div className="w-full lg:w-2/3 grid grid-cols-2 md:grid-cols-3 gap-3">
             <div className="p-4 bg-blue-50/50 rounded-2xl border border-blue-100 transition-colors hover:bg-blue-50">
               <p className="text-[10px] font-black text-blue-500 uppercase tracking-wider mb-1">เข้าแอป (5%)</p>
@@ -181,16 +186,14 @@ export default async function AdminDashboardPage() {
               <div key={slip.id} className="bg-white p-5 rounded-[2rem] border border-gray-200 shadow-sm flex flex-col justify-between">
                 <div className="flex justify-between items-start mb-4">
                   <div>
-                    {/* แก้ไขการเรียก job ให้รองรับกรณีที่มันคืนมาเป็น array */}
                     <h3 className="font-black text-gray-800 text-base line-clamp-1">{Array.isArray(slip.job) ? slip.job[0]?.title : slip.job?.title}</h3>
                     <p className="text-xs font-bold text-gray-500 mt-1">
-                      โดย: {Array.isArray(slip.employer) ? slip.employer[0]?.full_name : slip.employer?.full_name} | ⏰ {new Date(slip.created_at).toLocaleTimeString('th-TH')}
+                      โดย: {Array.isArray(slip.employer) ? slip.employer[0]?.full_name : slip.employer?.full_name}
                     </p>
                     <p className="text-xl font-black text-[#EE4D2D] mt-1 tracking-tight">
                       ฿{Array.isArray(slip.job) ? slip.job[0]?.budget?.toLocaleString() : slip.job?.budget?.toLocaleString()}
                     </p>
                   </div>
-                  {/* ลิงก์ไปดูรูปสลิปใน Storage */}
                   <a 
                     href={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/slips-pending/${slip.storage_path}`} 
                     target="_blank"
@@ -199,7 +202,6 @@ export default async function AdminDashboardPage() {
                     ดูรูปสลิป
                   </a>
                 </div>
-                {/* ปุ่ม Actions อนุมัติสลิป */}
                 <SlipActions slipId={slip.id} jobTitle={Array.isArray(slip.job) ? slip.job[0]?.title : slip.job?.title} />
               </div>
             ))}
@@ -217,7 +219,7 @@ export default async function AdminDashboardPage() {
             </span>
           </h2>
           <p className="text-sm font-medium text-gray-500 mt-1">
-            ช่างส่งคำขอถอนเงิน <span className="text-[#EE4D2D] font-bold ml-1">โอนเสร็จแล้วรบกวนกดยืนยันเพื่อตัดยอดค่ะ</span>
+            รายการถอนเงินที่รอยืนยัน <span className="text-[#EE4D2D] font-bold ml-1">โอนแล้วรบกวนกดยืนยันด้วยค่ะ</span>
           </p>
         </div>
         
@@ -230,7 +232,9 @@ export default async function AdminDashboardPage() {
             {withdrawals?.map((req: any) => (
               <div key={req.id} className="bg-white p-5 rounded-[2rem] border border-gray-200 shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
                 <div className="w-full md:w-auto">
-                  <h3 className="font-black text-gray-800 text-base">{Array.isArray(req.worker) ? req.worker[0]?.full_name : req.worker?.full_name}</h3>
+                  <h3 className="font-black text-gray-800 text-base">
+                    {req.wallets?.profiles?.full_name || 'ไม่ทราบชื่อ'}
+                  </h3>
                   <div className="flex flex-wrap gap-2 mt-1">
                     <span className="text-xs font-bold text-gray-600 bg-gray-50 border border-gray-100 px-3 py-1 rounded-lg">
                       🏦 {req.bank_name}
@@ -239,18 +243,14 @@ export default async function AdminDashboardPage() {
                       เลขบัญชี: {req.account_no}
                     </span>
                   </div>
-                  <p className="text-[10px] text-gray-400 font-bold mt-2 uppercase tracking-widest">
-                    ขอถอนเมื่อ {new Date(req.requested_at).toLocaleString('th-TH')}
-                  </p>
                 </div>
                 <div className="flex items-center gap-6 w-full md:w-auto justify-between">
                   <p className="text-2xl font-black text-gray-900 tracking-tight">
                     ฿{(req.amount_satang / 100).toLocaleString()}
                   </p>
-                  {/* ปุ่ม Actions ยืนยันการโอนเงิน */}
                   <WithdrawalActions 
                     withdrawalId={req.id} 
-                    workerName={Array.isArray(req.worker) ? req.worker[0]?.full_name : req.worker?.full_name} 
+                    workerName={req.wallets?.profiles?.full_name || 'นายช่าง'} 
                     amount={req.amount_satang / 100}
                     bankInfo={`${req.bank_name} ${req.account_no}`} 
                   />
