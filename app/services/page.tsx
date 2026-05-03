@@ -1,5 +1,4 @@
 import Link from "next/link";
-// ✅ แก้ไข: เปลี่ยนกุญแจเป็น sbServer
 import { sbServer } from "@/lib/supabase/server";
 
 export const dynamic = 'force-dynamic';
@@ -52,22 +51,6 @@ export default async function ServicesPage({ searchParams }: PageProps) {
 
   const supabase = sbServer();
 
-  // 🌟 ตรวจสอบ Session และสถานะ KYC ของผู้ใช้งาน
-  const { data: { user } } = await supabase.auth.getUser();
-  let isVerified = false;
-
-  if (user) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('kyc_status')
-      .eq('id', user.id)
-      .single();
-    
-    if (profile?.kyc_status === 'approved') {
-      isVerified = true;
-    }
-  }
-
   // ดึงข้อมูลบริการทั้งหมด (ทุกคนเห็นได้)
   const { data, error } = await supabase.rpc("get_active_services", {
     p_category: category === "all" ? null : category,
@@ -85,18 +68,13 @@ export default async function ServicesPage({ searchParams }: PageProps) {
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-white text-2xl font-black tracking-tight">ค้นหาช่าง / บริการ</h1>
             
-            {/* 🌟 แสดงปุ่มโพสต์งานเฉพาะเมื่อ ล็อกอิน และ ยืนยันตัวตนผ่านแล้ว เท่านั้น */}
-            {user && isVerified ? (
-              <Link
-                href="/jobs/create"
-                className="bg-white text-[#EE4D2D] px-4 py-2.5 rounded-full text-xs font-black shadow-lg hover:bg-orange-50 active:scale-95 transition-all flex items-center gap-1.5"
-              >
-                <span>📝</span> โพสต์หาช่าง
-              </Link>
-            ) : (
-              // ใส่ div เปล่าไว้รักษา Layout Flex
-              <div className="w-10 h-10"></div>
-            )}
+            {/* 🌟 ปลดล็อกเงื่อนไข ให้ปุ่มโชว์ตลอดเวลาเพื่อดู UI ก่อน */}
+            <Link
+              href="/jobs/create"
+              className="bg-white text-[#EE4D2D] px-4 py-2.5 rounded-full text-xs font-black shadow-lg hover:bg-orange-50 active:scale-95 transition-all flex items-center gap-1.5"
+            >
+              <span>📝</span> โพสต์หาช่าง
+            </Link>
           </div>
 
           <form action="/services" method="GET" className="relative bg-white rounded-2xl p-1.5 flex items-center shadow-lg shadow-black/5 mb-4">
@@ -150,10 +128,16 @@ export default async function ServicesPage({ searchParams }: PageProps) {
           )}
 
           {!error && services.length === 0 && (
-            <div className="text-center py-20">
+            <div className="text-center py-16 bg-white rounded-3xl border border-dashed border-gray-200 mt-2 mx-2">
               <div className="text-6xl mb-4">🤷‍♂️</div>
-              <p className="text-xl font-black text-slate-800">ยังไม่มีช่างในหมวดนี้</p>
-              <p className="text-sm font-bold text-slate-400 mt-2">ลองเลือกหมวดหมู่อื่นดูนะคะ</p>
+              <p className="text-lg font-black text-slate-800">ยังไม่มีช่างในหมวดนี้</p>
+              <p className="text-sm font-bold text-slate-400 mt-2 mb-6">แต่คุณสามารถโพสต์งานให้ช่างเข้ามาหาได้นะ!</p>
+              <Link 
+                href="/jobs/create" 
+                className="inline-block bg-[#EE4D2D] text-white font-black px-6 py-3 rounded-xl shadow-md active:scale-95 transition-transform"
+              >
+                📝 โพสต์งานฟรี
+              </Link>
             </div>
           )}
 
