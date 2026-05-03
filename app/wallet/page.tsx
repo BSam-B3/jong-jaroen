@@ -24,7 +24,7 @@ export default function WalletPage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return router.push('/auth/login');
 
-      // 1. ดึงยอดเงิน 
+      // 1. ดึงยอดเงิน (✅ แก้บั๊กกรณีเงินเป็น 0 บาท)
       const { data: wallet } = await supabase
         .from('wallets')
         .select('*')
@@ -32,7 +32,9 @@ export default function WalletPage() {
         .maybeSingle();
 
       if (wallet) {
-        const currentBalance = wallet.balance_satang ? (wallet.balance_satang / 100) : (wallet.balance || 0);
+        const currentBalance = wallet.balance_satang != null 
+          ? (wallet.balance_satang / 100) 
+          : (wallet.balance || 0);
         setBalance(currentBalance);
       }
 
@@ -40,6 +42,7 @@ export default function WalletPage() {
       const { data: txData } = await supabase
         .from('wallet_transactions')
         .select('*')
+        .eq('wallet_id', wallet?.id) // ดึงเฉพาะของกระเป๋านี้เพื่อความชัวร์
         .order('created_at', { ascending: false });
 
       if (txData) setTransactions(txData);
@@ -54,6 +57,7 @@ export default function WalletPage() {
     e.preventDefault();
     const amountNum = Number(withdrawAmount);
 
+    if (!withdrawAmount || amountNum <= 0) return alert("กรุณาระบุจำนวนเงินที่ต้องการถอนค่ะ");
     if (amountNum < 50) return alert("ยอดขั้นต่ำในการถอนคือ 50 บาทค่ะ");
     if (amountNum > balance) return alert("ยอดเงินในกระเป๋าไม่พอค่ะ");
     if (!bankName || !accountNumber) return alert("กรุณากรอกข้อมูลธนาคารให้ครบถ้วนค่ะ");
@@ -61,7 +65,7 @@ export default function WalletPage() {
     setIsSubmitting(true);
 
     try {
-      // เรียกใช้ RPC ถอนเงินของ C
+      // เรียกใช้ RPC ถอนเงิน
       const { error } = await supabase.rpc('request_withdrawal', {
         p_amount_satang: amountNum * 100, // แปลงเป็นสตางค์
         p_bank_name: bankName,
@@ -70,7 +74,7 @@ export default function WalletPage() {
 
       if (error) throw error;
 
-      // 💬 คำนวณเวลาเพื่อโชว์ข้อความของ Meta AI
+      // 💬 คำนวณเวลาเพื่อโชว์ข้อความสุดกวนสไตล์จงเจริญ
       const currentHour = new Date().getHours();
       let alertMessage = "";
       if (currentHour < 11) {
@@ -84,6 +88,8 @@ export default function WalletPage() {
       // ปิด Modal และรีเฟรชหน้าเพื่อให้ยอดเงินลดลง
       setIsWithdrawModalOpen(false);
       setWithdrawAmount('');
+      setBankName('');
+      setAccountNumber('');
       window.location.reload();
 
     } catch (err: any) {
@@ -132,12 +138,13 @@ export default function WalletPage() {
           </div>
         ) : (
           <div className="space-y-3">
-            {transactions.map((tx) => {
-              const displayAmount = tx.amount_satang ? (tx.amount_satang / 100) : (tx.amount || 0);
+            {transactions.map((tx, index) => {
+              // ✅ แก้บั๊กยอดเงินเป็น 0 และนำ index มาใช้ป้องกัน Error
+              const displayAmount = tx.amount_satang != null ? (tx.amount_satang / 100) : (tx.amount || 0);
               const isInflow = tx.type === 'deposit' || tx.type === 'slip_inflow' || displayAmount > 0;
               
               return (
-                <div key={tx.id || Math.random()} className="bg-white p-4 rounded-2xl border border-gray-100 flex justify-between items-center shadow-sm">
+                <div key={tx.id || index} className="bg-white p-4 rounded-2xl border border-gray-100 flex justify-between items-center shadow-sm">
                   <div className="flex gap-3 items-center">
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl ${isInflow ? 'bg-emerald-50' : 'bg-gray-50'}`}>
                       {isInflow ? '💰' : '💸'}
@@ -171,7 +178,7 @@ export default function WalletPage() {
             <form onSubmit={handleWithdraw}>
               <h3 className="text-xl font-black text-gray-900 mb-2 text-center">จะถอนเท่าไหร่ดี?</h3>
               <p className="text-xs text-center text-gray-500 font-bold mb-6">
-                ยอดถอนได้สูงสุด <span className="text-[#EE4D2D]">฿{balance.toLocaleString('th-TH')}</span>
+                ยอดถอนได้สูงสุด <span className="text-[#EE4D2D]">฿{balance.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</span>
               </p>
 
               {/* กล่องจำนวนเงิน */}
