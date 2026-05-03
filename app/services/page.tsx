@@ -68,7 +68,7 @@ export default async function ServicesPage({ searchParams }: PageProps) {
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-white text-2xl font-black tracking-tight">ค้นหาช่าง / บริการ</h1>
             
-            {/* 🌟 ปลดล็อกเงื่อนไข ให้ปุ่มโชว์ตลอดเวลาเพื่อดู UI ก่อน */}
+            {/* 🌟 ปุ่มโพสต์งานที่มุมบนขวา */}
             <Link
               href="/jobs/create"
               className="bg-white text-[#EE4D2D] px-4 py-2.5 rounded-full text-xs font-black shadow-lg hover:bg-orange-50 active:scale-95 transition-all flex items-center gap-1.5"
@@ -127,17 +127,12 @@ export default async function ServicesPage({ searchParams }: PageProps) {
             <div className="bg-red-50 text-red-600 p-4 rounded-2xl text-xs font-bold text-center border border-red-100">เกิดข้อผิดพลาดในการดึงข้อมูล</div>
           )}
 
+          {/* 🌟 ปรับปรุงส่วนที่ไม่มีข้อมูลช่างให้เป็นพื้นที่ว่างแบบ Marketplace */}
           {!error && services.length === 0 && (
             <div className="text-center py-16 bg-white rounded-3xl border border-dashed border-gray-200 mt-2 mx-2">
-              <div className="text-6xl mb-4">🤷‍♂️</div>
-              <p className="text-lg font-black text-slate-800">ยังไม่มีช่างในหมวดนี้</p>
-              <p className="text-sm font-bold text-slate-400 mt-2 mb-6">แต่คุณสามารถโพสต์งานให้ช่างเข้ามาหาได้นะ!</p>
-              <Link 
-                href="/jobs/create" 
-                className="inline-block bg-[#EE4D2D] text-white font-black px-6 py-3 rounded-xl shadow-md active:scale-95 transition-transform"
-              >
-                📝 โพสต์งานฟรี
-              </Link>
+              <div className="text-6xl mb-4 grayscale opacity-40">🛍️</div>
+              <p className="text-lg font-black text-slate-800">ยังไม่มีแพ็กเกจบริการในหมวดนี้</p>
+              <p className="text-sm font-bold text-slate-400 mt-2">ลองเปลี่ยนคำค้นหา หรือเลือกหมวดหมู่อื่นดูนะคะ</p>
             </div>
           )}
 
