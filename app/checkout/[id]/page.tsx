@@ -1,41 +1,43 @@
-const handleUploadSlip = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!slipFile) return alert('กรุณาแนบรูปสลิปโอนเงินด้วยจ้า');
-    
-    setIsSubmitting(true);
+'use client';
 
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('กรุณาเข้าสู่ระบบก่อนทำรายการค่ะ');
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
 
-      // 1️⃣ สร้างชื่อไฟล์และ Path ตามที่ C ออกแบบไว้ (slips-pending/{employer_id}/{job_id}/{uuid}.jpg)
-      const fileExt = slipFile.name.split('.').pop();
-      const fileName = `${crypto.randomUUID()}.${fileExt}`;
-      const filePath = `${session.user.id}/${jobId}/${fileName}`;
+export default function CheckoutPage({ params }: { params: { id: string } }) {
+  const router = useRouter();
+  const supabase = createClient();
+  const jobId = params.id;
 
-      // 2️⃣ อัปโหลดรูปสลิปขึ้น Private Bucket
-      const { error: uploadError } = await supabase.storage
-        .from('slips-pending')
-        .upload(filePath, slipFile);
+  const [jobData, setJobData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-      if (uploadError) throw new Error('อัปโหลดรูปไม่สำเร็จ: ' + uploadError.message);
-
-      // 3️⃣ เรียกใช้ RPC ของ C เพื่อล็อกสถานะงาน
-      const { error: rpcError } = await supabase.rpc('submit_slip', {
-        p_job_id: jobId,
-        p_slip_path: filePath,
-        p_trans_ref: `MOCK_REF_${Date.now()}`, // 💡 ชั่วคราว: จำลองเลข Ref ไปก่อนจนกว่าเราจะต่อ EasySlip API
-        p_amount_satang: totalAmount * 100 // แปลงสกุลเงินเป็นสตางค์ตามที่ C บรีฟไว้
-      });
-
-      if (rpcError) throw new Error('บันทึกข้อมูลไม่สำเร็จ: ' + rpcError.message);
-
-      // สำเร็จ! เปลี่ยนหน้าจอเป็น Success State
-      setIsSuccess(true);
+  useEffect(() => {
+    const fetchJob = async () => {
+      const { data } = await supabase
+        .from('jobs')
+        .select('*')
+        .eq('id', jobId)
+        .single();
       
-    } catch (err: any) {
-      alert(err.message);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+      if (data) setJobData(data);
+      setLoading(false);
+    };
+    fetchJob();
+  }, [jobId, supabase]);
+
+  if (loading) return <div className="min-h-screen flex items-center justify-center">กำลังโหลด...</div>;
+
+  return (
+    <div className="min-h-screen bg-[#F4F6F8] p-6 flex flex-col items-center">
+      <h1 className="text-2xl font-black text-gray-800 mt-10">ล็อกคิวช่าง จ่ายผ่านจงเจริญ</h1>
+      <p className="text-gray-500 mt-2">หน้านี้กำลังปรับปรุงระบบชำระเงินเข้า Escrow...</p>
+      <button 
+        onClick={() => router.back()} 
+        className="mt-6 bg-[#EE4D2D] text-white px-6 py-2 rounded-xl font-bold"
+      >
+        กลับไปหน้าก่อนหน้า
+      </button>
+    </div>
+  );
+}
