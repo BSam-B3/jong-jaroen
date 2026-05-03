@@ -154,7 +154,7 @@ export default function ProposalChatPage() {
 
           {/* แถบสรุปงาน & ปุ่มจ้าง (โชว์เฉพาะคนจ้าง และสถานะยังเปิดอยู่) */}
           {isEmployer && proposal.job.status === 'open' && (
-            <div className="bg-orange-50/50 px-4 py-3 border-t border-orange-100 flex items-center justify-between">
+            <div className="bg-orange-50/50 px-4 py-3 border-t border-orange-100 flex items-center justify-between shadow-sm">
               <div className="flex-1 pr-4">
                 <p className="text-[11px] font-bold text-gray-500 line-clamp-1">งาน: {proposal.job.title}</p>
               </div>
@@ -165,8 +165,8 @@ export default function ProposalChatPage() {
           )}
         </div>
 
-        {/* 💬 พื้นที่แชท (Scrollable) */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-32">
+        {/* 💬 พื้นที่แชท (Scrollable) - 🌟 เพิ่มพื้นที่ด้านล่าง (pb-48) ไม่ให้แชทโดนบัง */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-48">
           {messages.length === 0 ? (
             <div className="text-center mt-10">
               <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center text-2xl shadow-sm mx-auto mb-3">👋</div>
@@ -190,8 +190,8 @@ export default function ProposalChatPage() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* ⌨️ ช่องพิมพ์ข้อความ (เกาะขอบล่าง) */}
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 backdrop-blur-md border-t border-gray-100 sm:max-w-2xl sm:mx-auto">
+        {/* ⌨️ ช่องพิมพ์ข้อความ - 🌟 ยกขึ้นมา 80px หนีเมนู Bottom Navigation */}
+        <div className="fixed bottom-[80px] left-0 right-0 p-4 bg-white/95 backdrop-blur-xl border-t border-gray-100 shadow-[0_-4px_10px_-5px_rgba(0,0,0,0.05)] sm:max-w-2xl sm:mx-auto z-40">
           <form onSubmit={handleSendMessage} className="flex gap-2 items-end">
             <textarea
               rows={1}
