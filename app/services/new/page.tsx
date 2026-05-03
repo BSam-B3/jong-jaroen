@@ -1,141 +1,199 @@
 'use client';
-import { useState, useMemo } from 'react';
+
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-// ✅ เปลี่ยนมาใช้กุญแจตัวใหม่
 import { createClient } from '@/lib/supabase/client';
 
-// ── Soft Shopee Palette ───────────────────────────────────────────────────────────────────────────────────────
-const themePalette = {
-  primaryOrange: '#F05D40', 
-  bgGray: '#F9FAFB',         
-};
+const CATEGORIES = [
+  "แม่บ้าน", "ช่างแอร์", "ช่างซ่อม", "ขนย้าย", "วินส่งของ", 
+  "ทำสวน", "ผู้สูงอายุ", "สัตว์เลี้ยง", "นวด", "เสริมสวย", 
+  "ทำอาหาร", "เอกสาร", "อื่นๆ"
+];
 
 export default function NewServicePage() {
-  // ✅ สร้างตัวแปรเชื่อมต่อฐานข้อมูล
-  const supabase = useMemo(() => createClient(), []);
-  const [title, setTitle] = useState('');
-  const [desc, setDesc] = useState('');
-  const [price, setPrice] = useState('');
-  const [category, setCategory] = useState('aircon');
-  const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const supabase = createClient();
+  const [loading, setLoading] = useState(false);
+  const [user, setUser] = useState<any>(null);
+
+  // Form States
+  const [title, setTitle] = useState('');
+  const [category, setCategory] = useState(CATEGORIES[0]);
+  const [description, setDescription] = useState('');
+  const [priceStart, setPriceStart] = useState('');
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (!data.user) router.push('/auth/login?next=/services/new');
+      else setUser(data.user);
+    });
+  }, [router, supabase]);
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      setImagePreview(URL.createObjectURL(file));
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      alert('กรุณาเข้าสู่ระบบก่อนลงประกาศ');
-      setLoading(false);
+    if (!title || !description || !priceStart) {
+      setError('กรุณากรอกข้อมูลสำคัญให้ครบถ้วนนะคะ');
       return;
     }
 
-    const { error } = await supabase
-      .from('provider_services')
-      .insert({
-        provider_id: user.id,
-        category,
-        title,
-        description: desc,
-        price_start: Number(price),
-      });
+    setLoading(true);
+    setError('');
 
-    setLoading(false);
-    if (error) {
-      alert('เกิดข้อผิดพลาด: ' + error.message);
-    } else {
-      router.push('/services');
+    try {
+      let coverUrl = null;
+
+      // ถ้ามีการอัปโหลดรูปภาพหน้าปก
+      if (imageFile) {
+        const fileExt = imageFile.name.split('.').pop();
+        const fileName = `service_${user.id}_${Date.now()}.${fileExt}`;
+        
+        // 🌟 บีสามต้องไปสร้าง Bucket ชื่อ 'service-covers' ใน Supabase Storage ก่อนนะคะ
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('service-covers') 
+          .upload(fileName, imageFile);
+
+        if (uploadError) throw uploadError;
+        
+        const { data: publicUrlData } = supabase.storage.from('service-covers').getPublicUrl(uploadData.path);
+        coverUrl = publicUrlData.publicUrl;
+      }
+
+      // บันทึกลงตาราง provider_services
+      const { data, error: insertError } = await supabase.from('provider_services').insert({
+        provider_id: user.id,
+        title,
+        category,
+        description,
+        price_start: Number(priceStart),
+        cover_image_url: coverUrl,
+        rating: 0,
+        reviews_count: 0
+      }).select().single();
+
+      if (insertError) throw insertError;
+
+      alert('เปิดร้านสำเร็จ! 🎉 บริการของคุณพร้อมให้ลูกค้าเลือกช้อปแล้วค่ะ');
+      router.push(`/services/${data.id}`); // พาช่างไปดูหน้าร้านตัวเองที่เพิ่งสร้างเสร็จ
+
+    } catch (err: any) {
+      setError('เกิดข้อผิดพลาด: ' + err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen pb-24 max-w-md mx-auto relative" style={{ backgroundColor: themePalette.bgGray }}>
-      
-      {/* ── Header ── */}
-      <div className="bg-white px-4 py-4 sticky top-0 z-10 border-b border-gray-100 flex items-center gap-3 shadow-sm">
-        <button onClick={() => router.back()} className="p-1 hover:bg-orange-50 rounded-full transition text-gray-700 hover:text-[#F05D40]">
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
-        </button>
-        <h1 className="text-base font-bold text-gray-800">ลงประกาศรับงาน</h1>
-      </div>
-
-      {/* ── Form Section ── */}
-      <div className="p-4">
-        <form onSubmit={handleSubmit} className="space-y-4">
-          
-          {/* หมวดหมู่ */}
-          <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
-            <label className="block text-sm font-bold text-gray-700 mb-2">หมวดหมู่บริการ</label>
-            <div className="relative">
-              <select 
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="w-full p-3 text-sm font-medium border border-gray-200 rounded-xl focus:border-[#F05D40] focus:ring-1 focus:ring-[#F05D40] outline-none bg-gray-50 appearance-none"
-              >
-                <option value="aircon">❄️ ล้างแอร์/ซ่อมแอร์</option>
-                <option value="electrician">⚡ ช่างไฟฟ้า</option>
-                <option value="plumbing">💧 ช่างประปา</option>
-                <option value="cleaning">🧹 แม่บ้าน/ทำความสะอาด</option>
-                <option value="transport">🚚 รถรับจ้าง/ขนส่ง</option>
-                <option value="others">✨ ทั่วไป</option>
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-500">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-              </div>
+    <div className="min-h-screen bg-[#F4F6F8] flex justify-center font-sans pb-24">
+      <div className="w-full sm:max-w-2xl bg-white min-h-screen shadow-xl relative flex flex-col">
+        
+        {/* 🌟 Header */}
+        <div className="bg-gradient-to-r from-[#EE4D2D] to-[#FF7337] px-6 pt-10 pb-6 shadow-md relative z-20 rounded-b-[2rem]">
+          <div className="flex items-center gap-4">
+            <button onClick={() => router.back()} className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm text-white text-xl active:scale-95 transition-transform">←</button>
+            <div>
+              <h1 className="text-2xl font-black text-white tracking-tight">ลงประกาศรับงาน 🛠️</h1>
+              <p className="text-[11px] font-bold text-white/80 mt-0.5">สร้างโปรไฟล์ให้โดดเด่น ลูกค้าเห็นแล้วอยากจ้าง</p>
             </div>
           </div>
+        </div>
 
-          {/* ชื่อบริการ */}
-          <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
-            <label className="block text-sm font-bold text-gray-700 mb-2">ชื่อบริการที่ท่านรับทำ</label>
-            <input 
-              type="text" 
-              placeholder="เช่น รับซ่อมแอร์บ้าน, รับตัดหญ้า"
-              className="w-full p-3 text-sm border border-gray-200 rounded-xl focus:border-[#F05D40] focus:ring-1 focus:ring-[#F05D40] outline-none bg-gray-50"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-            />
-          </div>
+        {/* 🌟 Form */}
+        <main className="px-6 mt-8 flex-1">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            
+            {error && <div className="bg-red-50 text-red-600 p-4 rounded-2xl text-xs font-black border border-red-100">{error}</div>}
 
-          {/* รายละเอียด */}
-          <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
-            <label className="block text-sm font-bold text-gray-700 mb-2">รายละเอียดงาน</label>
-            <textarea 
-              rows={4}
-              placeholder="อธิบายสิ่งที่คุณถนัด เงื่อนไข หรือพื้นที่รับงานในปากน้ำประแส..."
-              className="w-full p-3 text-sm border border-gray-200 rounded-xl focus:border-[#F05D40] focus:ring-1 focus:ring-[#F05D40] outline-none bg-gray-50"
-              value={desc}
-              onChange={(e) => setDesc(e.target.value)}
-            />
-          </div>
+            {/* 1. รูปหน้าปกบริการ */}
+            <div>
+              <label className="block text-[11px] font-black text-gray-400 uppercase mb-2 ml-1">รูปหน้าปก (Cover Image)</label>
+              <label className={`flex flex-col items-center justify-center w-full aspect-video border-4 border-dashed rounded-[2rem] transition-all cursor-pointer overflow-hidden ${imagePreview ? 'border-orange-200' : 'hover:bg-gray-50 border-gray-200'}`}>
+                {imagePreview ? (
+                  <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="flex flex-col items-center gap-2 text-gray-400">
+                    <span className="text-4xl">📸</span>
+                    <p className="text-xs font-bold">อัปโหลดรูปผลงาน หรือรูปบริการ</p>
+                  </div>
+                )}
+                <input type="file" className="hidden" accept="image/*" onChange={handleImageChange} />
+              </label>
+            </div>
 
-          {/* ราคา */}
-          <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
-            <label className="block text-sm font-bold text-gray-700 mb-2">ราคาเริ่มต้น (บาท)</label>
-            <input 
-              type="number" 
-              placeholder="0"
-              className="w-full p-3 text-xl font-black border border-gray-200 rounded-xl focus:border-[#F05D40] focus:ring-1 focus:ring-[#F05D40] outline-none bg-gray-50 text-[#F05D40]"
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              required
-            />
-          </div>
+            {/* 2. ชื่อบริการ */}
+            <div>
+              <label className="block text-[11px] font-black text-gray-400 uppercase mb-2 ml-1">ชื่อบริการ / ชื่องาน</label>
+              <input 
+                type="text" 
+                placeholder="เช่น รับล้างแอร์ติดผนัง สะอาดหมดจด, รับแปลเอกสาร" 
+                value={title} onChange={(e) => setTitle(e.target.value)}
+                className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 font-bold text-gray-900 outline-none focus:ring-2 focus:ring-[#EE4D2D] focus:bg-white transition-all"
+                required
+              />
+            </div>
 
-          {/* ปุ่ม Submit */}
-          <div className="pt-2">
+            <div className="grid grid-cols-2 gap-4">
+              {/* 3. หมวดหมู่ */}
+              <div>
+                <label className="block text-[11px] font-black text-gray-400 uppercase mb-2 ml-1">หมวดหมู่</label>
+                <select 
+                  value={category} onChange={(e) => setCategory(e.target.value)}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-4 font-bold text-gray-900 outline-none focus:ring-2 focus:ring-[#EE4D2D]"
+                >
+                  {CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                </select>
+              </div>
+
+              {/* 4. ราคาเริ่มต้น */}
+              <div>
+                <label className="block text-[11px] font-black text-gray-400 uppercase mb-2 ml-1">ราคาเริ่มต้น (บาท)</label>
+                <input 
+                  type="number" 
+                  min="50"
+                  placeholder="เช่น 500" 
+                  value={priceStart} onChange={(e) => setPriceStart(e.target.value)}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-4 font-bold text-gray-900 outline-none focus:ring-2 focus:ring-[#EE4D2D] focus:bg-white"
+                  required
+                />
+              </div>
+            </div>
+
+            {/* 5. รายละเอียด */}
+            <div>
+              <label className="block text-[11px] font-black text-gray-400 uppercase mb-2 ml-1">รายละเอียดและขอบเขตงาน</label>
+              <textarea 
+                rows={5}
+                placeholder="อธิบายว่าคุณรับทำอะไรบ้าง มีขั้นตอนอย่างไร ข้อจำกัดต่างๆ..." 
+                value={description} onChange={(e) => setDescription(e.target.value)}
+                className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 font-medium text-gray-900 outline-none focus:ring-2 focus:ring-[#EE4D2D] focus:bg-white transition-all resize-none"
+                required
+              />
+            </div>
+
+            {/* 🌟 Submit Button */}
             <button 
               type="submit" 
               disabled={loading}
-              className="w-full bg-[#F05D40] hover:bg-[#E04D30] text-white text-base font-bold py-3.5 rounded-xl shadow-md shadow-orange-200 active:scale-95 transition-all disabled:opacity-50"
+              className="w-full mt-6 bg-[#EE4D2D] text-white py-4 rounded-2xl font-black text-sm shadow-xl active:scale-95 transition-all disabled:opacity-50 flex justify-center items-center gap-2"
             >
-              {loading ? 'กำลังบันทึก...' : 'บันทึกการลงประกาศ'}
+              {loading ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : 'เปิดร้านรับงานเลย! 🚀'}
             </button>
-          </div>
-          
-        </form>
+            <p className="text-center text-[10px] font-bold text-gray-400 mt-4 mb-8">
+              การลงประกาศถือว่าคุณยอมรับเงื่อนไขการให้บริการของแพลตฟอร์มแล้ว
+            </p>
+
+          </form>
+        </main>
       </div>
     </div>
   );
