@@ -69,7 +69,7 @@ export default async function AdminDashboardPage() {
   return (
     <div className="max-w-6xl mx-auto p-6 space-y-8 animate-in fade-in duration-500 pb-20">
       
-      {/* 🌟 Header ศูนย์บัญชาการ */}
+      {/* Header และ ปุ่มลัด */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h1 className="text-4xl font-black text-gray-900 tracking-tight">
@@ -93,7 +93,7 @@ export default async function AdminDashboardPage() {
         </div>
       </div>
 
-      {/* 🌟 สถิติหลัก */}
+      {/* สถิติหลัก */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
           <h3 className="text-gray-500 font-medium mb-2">จำนวนผู้ใช้งานทั้งหมด</h3>
@@ -108,6 +108,8 @@ export default async function AdminDashboardPage() {
           <p className="text-3xl font-black text-gray-900">{stats?.total_jobs || 0} งาน</p>
         </div>
       </div>
+
+      <hr className="border-gray-200" />
 
       {/* 🌟 Dashboard สรุปรายได้ 5 กองทุน */}
       <div className="bg-white p-6 md:p-8 rounded-[2rem] shadow-sm border border-gray-200">
@@ -175,16 +177,17 @@ export default async function AdminDashboardPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {slips?.map(slip => (
+            {slips?.map((slip: any) => (
               <div key={slip.id} className="bg-white p-5 rounded-[2rem] border border-gray-200 shadow-sm flex flex-col justify-between">
                 <div className="flex justify-between items-start mb-4">
                   <div>
-                    <h3 className="font-black text-gray-800 text-base line-clamp-1">{slip.job?.title}</h3>
+                    {/* แก้ไขการเรียก job ให้รองรับกรณีที่มันคืนมาเป็น array */}
+                    <h3 className="font-black text-gray-800 text-base line-clamp-1">{Array.isArray(slip.job) ? slip.job[0]?.title : slip.job?.title}</h3>
                     <p className="text-xs font-bold text-gray-500 mt-1">
-                      โดย: {slip.employer?.full_name} | ⏰ {new Date(slip.created_at).toLocaleTimeString('th-TH')}
+                      โดย: {Array.isArray(slip.employer) ? slip.employer[0]?.full_name : slip.employer?.full_name} | ⏰ {new Date(slip.created_at).toLocaleTimeString('th-TH')}
                     </p>
                     <p className="text-xl font-black text-[#EE4D2D] mt-1 tracking-tight">
-                      ฿{slip.job?.budget?.toLocaleString()}
+                      ฿{Array.isArray(slip.job) ? slip.job[0]?.budget?.toLocaleString() : slip.job?.budget?.toLocaleString()}
                     </p>
                   </div>
                   {/* ลิงก์ไปดูรูปสลิปใน Storage */}
@@ -197,7 +200,7 @@ export default async function AdminDashboardPage() {
                   </a>
                 </div>
                 {/* ปุ่ม Actions อนุมัติสลิป */}
-                <SlipActions slipId={slip.id} jobTitle={slip.job?.title} />
+                <SlipActions slipId={slip.id} jobTitle={Array.isArray(slip.job) ? slip.job[0]?.title : slip.job?.title} />
               </div>
             ))}
           </div>
@@ -224,10 +227,10 @@ export default async function AdminDashboardPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4">
-            {withdrawals?.map(req => (
+            {withdrawals?.map((req: any) => (
               <div key={req.id} className="bg-white p-5 rounded-[2rem] border border-gray-200 shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
                 <div className="w-full md:w-auto">
-                  <h3 className="font-black text-gray-800 text-base">{req.worker?.full_name}</h3>
+                  <h3 className="font-black text-gray-800 text-base">{Array.isArray(req.worker) ? req.worker[0]?.full_name : req.worker?.full_name}</h3>
                   <div className="flex flex-wrap gap-2 mt-1">
                     <span className="text-xs font-bold text-gray-600 bg-gray-50 border border-gray-100 px-3 py-1 rounded-lg">
                       🏦 {req.bank_name}
@@ -247,7 +250,7 @@ export default async function AdminDashboardPage() {
                   {/* ปุ่ม Actions ยืนยันการโอนเงิน */}
                   <WithdrawalActions 
                     withdrawalId={req.id} 
-                    workerName={req.worker?.full_name} 
+                    workerName={Array.isArray(req.worker) ? req.worker[0]?.full_name : req.worker?.full_name} 
                     amount={req.amount_satang / 100}
                     bankInfo={`${req.bank_name} ${req.account_no}`} 
                   />
