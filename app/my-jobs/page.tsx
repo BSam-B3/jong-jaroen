@@ -195,32 +195,71 @@ export default function MyJobsPage() {
                     </div>
                   )}
 
-                  {/* ส่วนแสดงรายชื่อผู้เสนอตัว (ฝั่งผู้จ้าง) */}
+                  {/* ส่วนแสดงรายชื่อผู้เสนอตัว (ฝั่งผู้จ้าง) แบบเลื่อนซ้าย-ขวา */}
                   {isHired && job.status === 'open' && proposals.length > 0 && (
-                    <div className="mt-4 pt-4 border-t border-gray-100 space-y-3">
-                      <p className="text-[11px] font-black text-[#EE4D2D] flex items-center gap-1">👥 มีผู้ยื่นข้อเสนอ {proposals.length} คน:</p>
-                      {proposals.map((p: any) => (
-                        <div key={p.id} className="bg-orange-50/50 rounded-2xl p-4 border border-orange-100/50 relative">
-                          <div className="flex justify-between items-start mb-2">
-                            <div className="flex items-center gap-2">
-                              <div className="w-6 h-6 bg-white rounded-full flex items-center justify-center text-[10px] shadow-sm border border-orange-200">👤</div>
-                              <p className="text-[11px] font-black text-gray-800">{p.worker?.full_name}</p>
+                    <div className="mt-4 pt-4 border-t border-gray-100">
+                      <div className="flex justify-between items-end mb-3">
+                        <p className="text-[11px] font-black text-[#EE4D2D] flex items-center gap-1.5">
+                          <span className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-[#EE4D2D]"></span>
+                          </span>
+                          มีข้อเสนอใหม่ {proposals.length} รายการ
+                        </p>
+                        <span className="text-[9px] font-bold text-gray-400">ปัดขวาเพื่อดูเพิ่มเติม 👉</span>
+                      </div>
+                      
+                      {/* กล่องเลื่อนซ้ายขวา (Horizontal Scroll) */}
+                      <div className="flex overflow-x-auto gap-3 pb-4 snap-x snap-mandatory scrollbar-hide -mx-5 px-5">
+                        {proposals.map((p: any) => (
+                          <div key={p.id} className="min-w-[260px] max-w-[260px] snap-center bg-white rounded-2xl p-4 border-2 border-orange-100 shadow-sm relative shrink-0 flex flex-col">
+                            <div className="flex justify-between items-start mb-2">
+                              <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 bg-gray-50 rounded-full flex items-center justify-center text-sm shadow-sm border border-gray-100 overflow-hidden shrink-0">
+                                  {p.worker?.avatar_url ? (
+                                    <img src={p.worker.avatar_url} className="w-full h-full object-cover" />
+                                  ) : ('👤')}
+                                </div>
+                                <div>
+                                  <p className="text-xs font-black text-gray-800 line-clamp-1">{p.worker?.full_name}</p>
+                                  <p className="text-[9px] font-bold text-gray-400 mt-0.5">⭐ 5.0 (รีวิว 12)</p>
+                                </div>
+                              </div>
+                              <p className="text-sm font-black text-[#EE4D2D] bg-orange-50 px-2 py-1 rounded-lg">{p.proposed_price?.toLocaleString('th-TH')} บาท</p>
                             </div>
-                            <p className="text-[12px] font-black text-[#EE4D2D]">{p.proposed_price?.toLocaleString('th-TH')} บาท</p>
+                            
+                            <div className="bg-gray-50 rounded-xl p-2.5 mb-3 flex-1 border border-gray-100">
+                              <p className="text-[10px] text-gray-600 font-medium leading-relaxed line-clamp-2">"{p.cover_letter}"</p>
+                            </div>
+                            
+                            <div className="flex flex-col gap-2 mt-auto">
+                              <div className="flex gap-2">
+                                {/* 🌟 ปุ่มทักแชท */}
+                                <Link 
+                                  href={`/chat/proposal/${p.id}`} 
+                                  className="flex-1 bg-blue-50 text-blue-600 py-2.5 rounded-xl text-[11px] font-black shadow-sm flex justify-center items-center gap-1 active:scale-95 transition-all"
+                                >
+                                  💬 คุยก่อนจ้าง
+                                </Link>
+                                <button className="w-10 h-10 bg-white text-gray-400 border border-gray-200 rounded-xl flex items-center justify-center text-sm active:scale-95 transition-all hover:bg-gray-50">✕</button>
+                              </div>
+                              <button 
+                                disabled={!!actionLoading}
+                                onClick={() => handleAcceptProposal(job, p)}
+                                className="w-full bg-[#EE4D2D] text-white py-2.5 rounded-xl text-[11px] font-black shadow-sm active:scale-95 transition-all disabled:opacity-50 flex justify-center items-center"
+                              >
+                                {actionLoading === p.id ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : '✅ ยืนยันจ้างคนนี้'}
+                              </button>
+                            </div>
                           </div>
-                          <p className="text-[10px] text-gray-600 font-medium leading-relaxed mb-3 italic">"{p.cover_letter}"</p>
-                          <div className="flex gap-2">
-                            <button 
-                              disabled={!!actionLoading}
-                              onClick={() => handleAcceptProposal(job, p)}
-                              className="flex-1 bg-[#EE4D2D] text-white py-2 rounded-xl text-[10px] font-black shadow-sm active:scale-95 transition-all disabled:opacity-50 flex justify-center items-center"
-                            >
-                              {actionLoading === p.id ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : 'จ้างงานคนนี้'}
-                            </button>
-                            <button className="px-4 py-2 bg-white text-gray-400 border border-gray-200 rounded-xl text-[10px] font-black active:scale-95 transition-all hover:bg-gray-50">ไม่สนใจ</button>
-                          </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
+                      
+                      {/* ซ่อน Scrollbar ของ Container นี้ */}
+                      <style dangerouslySetInnerHTML={{__html: `
+                        .scrollbar-hide::-webkit-scrollbar { display: none; }
+                        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+                      `}} />
                     </div>
                   )}
 
