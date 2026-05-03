@@ -25,8 +25,14 @@ export async function POST(req: Request) {
 
     const slipData = result.data;
 
-    // 2. ตรวจสอบว่ายอดเงินในสลิป ตรงกับยอดใน Job ไหม?
-    const { data: job } = await supabase.from('jobs').select('budget').eq('id', jobId).single();
+    // 2. ตรวจสอบว่ามีงานนี้อยู่จริง และยอดเงินในสลิปตรงกับยอดใน Job ไหม?
+    const { data: job, error: jobError } = await supabase.from('jobs').select('budget').eq('id', jobId).single();
+    
+    // 🌟 เพิ่มตัวดักจับตรงนี้: ถ้าไม่พบงาน หรือ job เป็น null ให้เด้งออกเลย
+    if (jobError || !job) {
+      return NextResponse.json({ error: 'ไม่พบข้อมูลงานนี้ในระบบค่ะ' }, { status: 404 });
+    }
+
     if (slipData.amount.amount !== job.budget) {
       return NextResponse.json({ error: 'ยอดเงินในสลิปไม่ตรงกับยอดงานค่ะ' }, { status: 400 });
     }
