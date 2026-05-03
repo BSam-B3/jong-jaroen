@@ -1,5 +1,4 @@
 import Link from "next/link";
-// ✅ แก้ไข: เปลี่ยนกุญแจเป็น sbServer
 import { sbServer } from "@/lib/supabase/server";
 
 export const dynamic = 'force-dynamic';
@@ -50,14 +49,12 @@ export default async function ServicesPage({ searchParams }: PageProps) {
   const category = params.category || "all";
   const search = params.q || "";
 
-  // ✅ แก้ไข: เรียกใช้ sbServer() โดยไม่ต้องมี await
   const supabase = sbServer();
   const { data, error } = await supabase.rpc("get_active_services", {
     p_category: category === "all" ? null : category,
     p_search: search || null,
   });
 
-  // ✅ [Audit Fix] Handle error ให้ปลอดภัยขึ้น
   if (error) console.error("[services] rpc failed:", error.message);
   const services: Service[] = error ? [] : ((data ?? []) as Service[]);
 
@@ -68,12 +65,13 @@ export default async function ServicesPage({ searchParams }: PageProps) {
         <div className="bg-gradient-to-b from-[#EE4D2D] to-[#FF7337] rounded-[2.5rem] p-6 pt-8 shadow-md relative z-20 m-3 mt-4">
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-white text-2xl font-black tracking-tight">ค้นหาช่าง / บริการ</h1>
+            
+            {/* 🌟 เปลี่ยนจากกระดิ่ง เป็นปุ่มโพสต์งาน (Job Board CTA) */}
             <Link
-              href="/notifications"
-              className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-sm hover:bg-white/30 transition"
-              aria-label="แจ้งเตือน"
+              href="/jobs/create"
+              className="bg-white text-[#EE4D2D] px-4 py-2.5 rounded-full text-xs font-black shadow-lg hover:bg-orange-50 active:scale-95 transition-all flex items-center gap-1.5"
             >
-              <span className="text-xl">🔔</span>
+              <span>📝</span> โพสต์หาช่าง
             </Link>
           </div>
 
@@ -128,10 +126,16 @@ export default async function ServicesPage({ searchParams }: PageProps) {
           )}
 
           {!error && services.length === 0 && (
-            <div className="text-center py-20">
+            <div className="text-center py-16 bg-white rounded-3xl border border-dashed border-gray-200 mt-2 mx-2">
               <div className="text-6xl mb-4">🤷‍♂️</div>
-              <p className="text-xl font-black text-slate-800">ยังไม่มีช่างในหมวดนี้</p>
-              <p className="text-sm font-bold text-slate-400 mt-2">ลองเลือกหมวดหมู่อื่นดูนะคะ</p>
+              <p className="text-lg font-black text-slate-800">ยังไม่มีช่างในหมวดนี้</p>
+              <p className="text-sm font-bold text-slate-400 mt-2 mb-6">แต่คุณสามารถโพสต์งานให้ช่างเข้ามาหาได้นะ!</p>
+              <Link 
+                href="/jobs/create" 
+                className="inline-block bg-[#EE4D2D] text-white font-black px-6 py-3 rounded-xl shadow-md active:scale-95 transition-transform"
+              >
+                📝 โพสต์งานฟรี
+              </Link>
             </div>
           )}
 
