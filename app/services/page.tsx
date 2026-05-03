@@ -25,19 +25,14 @@ interface PageProps {
 
 const CATEGORIES = [
   { key: "all", label: "ทั้งหมด", icon: "✨" },
-  { key: "แม่บ้าน", label: "แม่บ้าน/ทำความสะอาด", icon: "🧹" },
-  { key: "ช่างแอร์", label: "ช่างล้างแอร์", icon: "❄️" },
+  { key: "แม่บ้าน", label: "ทำความสะอาด", icon: "🧹" },
+  { key: "ช่างแอร์", label: "ช่างแอร์", icon: "❄️" },
   { key: "ช่างซ่อม", label: "ช่างไฟ/ประปา", icon: "🔧" },
   { key: "ขนย้าย", label: "รับจ้างขนย้าย", icon: "🚚" },
   { key: "วินส่งของ", label: "วิน/ส่งของ", icon: "🛵" },
-  { key: "ทำสวน", label: "ดูแลสวน/ตัดหญ้า", icon: "🌿" },
-  { key: "ผู้สูงอายุ", label: "ดูแลผู้สูงอายุ/เด็ก", icon: "👵" },
-  { key: "สัตว์เลี้ยง", label: "ดูแลสัตว์เลี้ยง", icon: "🐶" },
-  { key: "นวด", label: "นวดแผนไทย", icon: "💆‍♀️" },
-  { key: "เสริมสวย", label: "ตัดผม/เสริมสวย", icon: "✂️" },
-  { key: "ทำอาหาร", label: "ทำอาหาร/จัดเลี้ยง", icon: "🍳" },
-  { key: "เอกสาร", label: "เอกสาร/แอดมิน", icon: "💻" },
-  { key: "อื่นๆ", label: "อื่นๆ / จิปาถะ", icon: "📌" },
+  { key: "ทำสวน", label: "ดูแลสวน", icon: "🌿" },
+  { key: "เอกสาร", label: "ทำเว็บ/กราฟิก", icon: "💻" },
+  { key: "อื่นๆ", label: "จิปาถะ", icon: "📌" },
 ];
 
 function formatPrice(n: number): string {
@@ -59,34 +54,29 @@ export default async function ServicesPage({ searchParams }: PageProps) {
   const services: Service[] = error ? [] : ((data ?? []) as Service[]);
 
   return (
-    <div className="min-h-screen bg-gray-100 flex justify-center pb-24 font-sans">
-      <div className="w-full sm:max-w-2xl md:max-w-3xl bg-[#F4F6F8] min-h-screen relative flex flex-col shadow-xl overflow-x-hidden">
+    <div className="min-h-screen bg-gray-50 flex justify-center pb-24 font-sans">
+      <div className="w-full sm:max-w-3xl bg-white min-h-screen relative flex flex-col shadow-xl overflow-x-hidden">
         
-        <div className="bg-gradient-to-b from-[#EE4D2D] to-[#FF7337] rounded-[2.5rem] p-6 pt-8 shadow-md relative z-20 m-3 mt-4">
+        {/* 🌟 Header Search & Filters (สไตล์ Marketplace) */}
+        <div className="bg-white px-4 pt-8 pb-3 sticky top-0 z-30 shadow-[0_4px_20px_rgba(0,0,0,0.03)] border-b border-gray-100">
           <div className="flex items-center justify-between mb-4">
-            <h1 className="text-white text-2xl font-black tracking-tight">ค้นหาช่าง / บริการ</h1>
-            
-            {/* 🌟 เปลี่ยนจากกระดิ่ง เป็นปุ่มโพสต์งาน (Job Board CTA) */}
-            <Link
-              href="/jobs/create"
-              className="bg-white text-[#EE4D2D] px-4 py-2.5 rounded-full text-xs font-black shadow-lg hover:bg-orange-50 active:scale-95 transition-all flex items-center gap-1.5"
-            >
-              <span>📝</span> โพสต์หาช่าง
-            </Link>
+            <h1 className="text-2xl font-black text-gray-900 tracking-tight">เลือกจ้างฟรีแลนซ์ / ช่าง</h1>
           </div>
 
-          <form action="/services" method="GET" className="relative bg-white rounded-2xl p-1.5 flex items-center shadow-lg shadow-black/5 mb-4">
+          <form action="/services" method="GET" className="relative bg-gray-100 rounded-xl p-1 flex items-center mb-4 border border-gray-200 focus-within:border-[#EE4D2D] focus-within:bg-white transition-colors">
             {category !== "all" && <input type="hidden" name="category" value={category} />}
             <div className="pl-3 pr-2 text-gray-400">🔍</div>
             <input
               name="q"
               defaultValue={search}
-              placeholder="ค้นหาชื่อช่าง, บริการ..."
-              className="w-full bg-transparent text-sm py-2 outline-none font-medium placeholder:text-gray-400 text-gray-800"
+              placeholder="ค้นหาบริการ, ช่าง, แพ็กเกจ..."
+              className="w-full bg-transparent text-sm py-2.5 outline-none font-bold placeholder:text-gray-400 text-gray-800"
             />
+            <button type="submit" className="bg-[#EE4D2D] text-white px-4 py-2 rounded-lg text-xs font-black shadow-sm">ค้นหา</button>
           </form>
 
-          <div className="-mx-6 px-6 overflow-x-auto scrollbar-hide">
+          {/* Categories Horizontal Scroll */}
+          <div className="-mx-4 px-4 overflow-x-auto scrollbar-hide">
             <div className="flex gap-2 w-max pb-2">
               {CATEGORIES.map((c) => {
                 const active = category === c.key;
@@ -98,13 +88,13 @@ export default async function ServicesPage({ searchParams }: PageProps) {
                     key={c.key}
                     href={href}
                     scroll={false}
-                    className={`shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full text-[12px] font-black transition-all shadow-sm ${
+                    className={`shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full text-[12px] font-bold transition-all border ${
                       active
-                        ? "bg-white text-[#EE4D2D]"
-                        : "bg-white/20 text-white border border-white/30 hover:bg-white/30"
+                        ? "bg-[#EE4D2D] text-white border-[#EE4D2D] shadow-md"
+                        : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
                     }`}
                   >
-                    <span className="text-base">{c.icon}</span>
+                    <span>{c.icon}</span>
                     {c.label}
                   </Link>
                 );
@@ -113,33 +103,32 @@ export default async function ServicesPage({ searchParams }: PageProps) {
           </div>
         </div>
 
-        <div className="px-6 pt-2 pb-1">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-            พบ <span className="text-[#EE4D2D]">{services.length}</span> บริการที่พร้อมดูแลคุณ
-            {search && (<span> สำหรับ "<span className="text-[#EE4D2D] font-bold">{search}</span>"</span>)}
+        {/* 🌟 Result Count & Sorting */}
+        <div className="px-5 py-4 bg-gray-50 flex justify-between items-center border-b border-gray-100">
+          <p className="text-xs font-bold text-gray-500">
+            พบ <span className="text-gray-900">{services.length}</span> บริการ
+            {search && (<span> สำหรับ "<span className="text-[#EE4D2D]">{search}</span>"</span>)}
           </p>
+          <div className="text-[11px] font-bold text-gray-500 flex items-center gap-1 bg-white px-3 py-1.5 rounded-lg border border-gray-200 cursor-pointer">
+            <span>เรียงตาม: แนะนำ</span> <span>▼</span>
+          </div>
         </div>
 
-        <main className="px-4 py-3">
+        <main className="px-4 py-5 bg-gray-50 flex-1">
           {error && (
-            <div className="bg-red-50 text-red-600 p-4 rounded-2xl text-xs font-bold text-center border border-red-100">เกิดข้อผิดพลาดในการดึงข้อมูล</div>
+            <div className="bg-red-50 text-red-600 p-4 rounded-xl text-xs font-bold text-center border border-red-100">เกิดข้อผิดพลาดในการดึงข้อมูล</div>
           )}
 
           {!error && services.length === 0 && (
-            <div className="text-center py-16 bg-white rounded-3xl border border-dashed border-gray-200 mt-2 mx-2">
-              <div className="text-6xl mb-4">🤷‍♂️</div>
-              <p className="text-lg font-black text-slate-800">ยังไม่มีช่างในหมวดนี้</p>
-              <p className="text-sm font-bold text-slate-400 mt-2 mb-6">แต่คุณสามารถโพสต์งานให้ช่างเข้ามาหาได้นะ!</p>
-              <Link 
-                href="/jobs/create" 
-                className="inline-block bg-[#EE4D2D] text-white font-black px-6 py-3 rounded-xl shadow-md active:scale-95 transition-transform"
-              >
-                📝 โพสต์งานฟรี
-              </Link>
+            <div className="text-center py-20 bg-white rounded-2xl border border-gray-200">
+              <div className="text-6xl mb-4 grayscale opacity-40">🛍️</div>
+              <p className="text-lg font-black text-gray-800">ยังไม่มีแพ็กเกจบริการในหมวดนี้</p>
+              <p className="text-sm font-bold text-gray-400 mt-1">ลองเปลี่ยนคำค้นหา หรือเลือกหมวดหมู่อื่นดูนะคะ</p>
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-4">
+          {/* 🌟 Service Cards Grid (สไตล์ Fastwork) */}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
             {services.map((s) => (
               <ServiceCard key={s.id} service={s} />
             ))}
@@ -155,59 +144,68 @@ export default async function ServicesPage({ searchParams }: PageProps) {
   );
 }
 
+// 🌟 Component การ์ดบริการ (Fastwork Style)
 function ServiceCard({ service }: { service: Service }) {
   const isVerified = service.provider_kyc_status === "approved";
 
   return (
     <Link
       href={`/services/${service.id}`}
-      className="flex flex-col bg-white rounded-[1.5rem] overflow-hidden border border-slate-100 shadow-sm hover:border-[#EE4D2D]/30 hover:shadow-md transition-all active:scale-[0.98] group"
+      className="flex flex-col bg-white rounded-xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-md hover:border-[#EE4D2D]/40 transition-all duration-200 group"
     >
-      <div className="relative w-full aspect-[4/3] bg-slate-200 overflow-hidden">
-        {service.cover_image_url ? (
-          <img src={service.cover_image_url} alt={service.title} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-4xl bg-slate-100 text-slate-300">🛠️</div>
-        )}
-      </div>
-
-      <div className="p-3.5 flex flex-col flex-1">
-        <div className="flex items-center gap-1.5 mb-2">
-          <div className="w-5 h-5 rounded-full overflow-hidden bg-slate-200 shrink-0 border border-slate-50">
-            {service.provider_avatar ? (
-              <img src={service.provider_avatar} alt="Provider" className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-[8px] font-black text-slate-500">
-                {service.provider_name?.charAt(0).toUpperCase() || "?"}
-              </div>
-            )}
-          </div>
-          <span className="text-[10px] font-bold text-slate-500 truncate flex-1">{service.provider_name || "ไม่ระบุชื่อช่าง"}</span>
+      {/* 1. Header: ข้อมูลช่าง (อยู่บนรูป) */}
+      <div className="p-2.5 flex items-center gap-2">
+        <div className="w-6 h-6 rounded-full overflow-hidden bg-gray-100 border border-gray-200 shrink-0 relative">
+          {service.provider_avatar ? (
+            <img src={service.provider_avatar} alt="Provider" className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-[10px] font-black text-gray-500">
+              {service.provider_name?.charAt(0).toUpperCase() || "?"}
+            </div>
+          )}
           {isVerified && (
-            <span className="w-3.5 h-3.5 rounded-full bg-green-500 flex items-center justify-center shadow-sm">
-              <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" strokeWidth={4} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-            </span>
+            <div className="absolute -bottom-0.5 -right-0.5 bg-green-500 rounded-full w-2.5 h-2.5 border border-white"></div>
           )}
         </div>
+        <div className="flex flex-col">
+          <span className="text-[11px] font-black text-gray-800 truncate max-w-[100px] sm:max-w-[140px]">
+            {service.provider_name || "ไม่ระบุชื่อ"}
+          </span>
+          <span className="text-[8px] font-bold text-emerald-600">ตอบกลับไวมาก</span>
+        </div>
+      </div>
 
-        <h3 className="text-[13px] font-black text-slate-800 line-clamp-2 leading-relaxed min-h-[38px] mb-2">
+      {/* 2. รูปผลงาน / หน้าปกบริการ */}
+      <div className="relative w-full aspect-video bg-gray-100 overflow-hidden">
+        {service.cover_image_url ? (
+          <img src={service.cover_image_url} alt={service.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-3xl bg-gray-50 text-gray-300">🛠️</div>
+        )}
+        {/* ป้าย Category เล็กๆ บนรูป */}
+        <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-sm text-white text-[8px] font-bold px-2 py-0.5 rounded-sm">
+          {service.category}
+        </div>
+      </div>
+
+      {/* 3. เนื้อหาการ์ด */}
+      <div className="p-3 flex flex-col flex-1">
+        {/* ชื่องาน */}
+        <h3 className="text-[12px] font-bold text-gray-900 line-clamp-2 leading-snug mb-2 min-h-[34px] group-hover:text-[#EE4D2D] transition-colors">
           {service.title}
         </h3>
 
+        {/* เรตติ้ง */}
         <div className="flex items-center gap-1 mb-3">
-          <span className="text-yellow-400 text-xs">⭐</span>
-          <span className="text-[11px] font-black text-slate-700">{Number(service.rating || 0).toFixed(1)}</span>
-          <span className="text-[10px] font-bold text-slate-400">({service.review_count || 0})</span>
+          <span className="text-amber-400 text-xs">★</span>
+          <span className="text-[11px] font-black text-gray-700">{Number(service.rating || 0).toFixed(1)}</span>
+          <span className="text-[10px] font-medium text-gray-400">({service.review_count || 0})</span>
         </div>
 
-        <div className="mt-auto pt-2.5 border-t border-slate-50 flex flex-col">
-          <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter mb-0.5">เริ่มต้นที่</span>
-          <div className="flex items-baseline gap-0.5">
-            <span className="text-sm font-black text-[#EE4D2D]">{formatPrice(service.starting_price)}</span>
-            <span className="text-[10px] font-black text-[#EE4D2D]">บาท</span>
-          </div>
+        {/* ราคา */}
+        <div className="mt-auto pt-2 border-t border-gray-100 flex flex-col items-end">
+          <span className="text-[9px] font-bold text-gray-400">เริ่มต้น</span>
+          <span className="text-sm font-black text-[#EE4D2D]">฿{formatPrice(service.starting_price)}</span>
         </div>
       </div>
     </Link>
