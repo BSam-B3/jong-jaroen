@@ -75,6 +75,7 @@ export default function MyJobsPage() {
     return () => { supabase.removeChannel(channel); };
   }, [fetchMyJobs, supabase, userId]);
 
+  // แอคชัน: ลูกค้าเลือกล็อกคิวช่าง
   const handleAcceptProposal = async (job: any, proposal: any) => {
     if (!confirm(`ยืนยันเลือกล็อกคิว ${proposal.worker?.full_name} ใช่ไหมคะ? (ระบบจะพาไปหน้าชำระเงิน)`)) return;
     setActionLoading(proposal.id);
@@ -94,6 +95,28 @@ export default function MyJobsPage() {
       alert('เกิดข้อผิดพลาดในการจ้างงานค่ะ: ' + err.message);
       setActionLoading(null);
     }
+  };
+
+  // 🌟 แอคชันใหม่: ควบคุมสถานะงาน 3 สเต็ป
+  const handleAdminApprove = async (jobId: string) => {
+    if (!confirm('จำลอง: แอดมินตรวจสอบสลิปผ่านแล้ว ใช่หรือไม่?')) return;
+    setActionLoading(jobId);
+    await supabase.rpc('admin_approve_job_slip', { p_job_id: jobId });
+    setActionLoading(null);
+  };
+
+  const handleDeliverJob = async (jobId: string) => {
+    if (!confirm('ยืนยันส่งมอบงานให้ลูกค้าใช่ไหมคะ?')) return;
+    setActionLoading(jobId);
+    await supabase.rpc('provider_deliver_job', { p_job_id: jobId });
+    setActionLoading(null);
+  };
+
+  const handleCompleteJob = async (jobId: string) => {
+    if (!confirm('ตรวจสอบงานเรียบร้อย และยืนยันปล่อยเงินให้ช่างใช่ไหมคะ?')) return;
+    setActionLoading(jobId);
+    await supabase.rpc('buyer_complete_job', { p_job_id: jobId });
+    setActionLoading(null);
   };
 
   const isHired = mode === 'hired';
@@ -137,6 +160,7 @@ export default function MyJobsPage() {
             displayJobs.map((job) => {
               const s = STATUS_META[job.status as Status] || STATUS_META.open;
               const proposals = job.proposals?.filter((p: any) => p.status === 'pending') || [];
+              const acceptedProposal = job.proposals?.find((p: any) => p.status === 'accepted') || job.proposals?.[0];
 
               // คำนวณ Progress Bar
               let progressIndex = 0;
@@ -263,7 +287,7 @@ export default function MyJobsPage() {
                     </div>
                   )}
 
-                  {/* ราคา & แอคชัน */}
+                  {/* 🌟 ราคา & แอคชันควบคุมสถานะงาน */}
                   <div className="flex justify-between items-end pt-4 border-t border-gray-100 mt-3">
                     <div>
                       <p className="text-[10px] text-gray-400 font-bold uppercase">งบประมาณ/ค่าบริการ</p>
@@ -273,18 +297,48 @@ export default function MyJobsPage() {
                     </div>
                     
                     <div className="flex gap-2">
-                      {job.status === 'verifying_slip' && (
-                        <span className="bg-orange-100 text-orange-600 px-5 py-2.5 rounded-xl text-[11px] font-black shadow-sm flex items-center gap-1">
-                          <span className="animate-spin text-sm">⏳</span> รอตรวจสลิป
-                        </span>
+                      {/* --- โหมดลูกค้า (isHired = true) --- */}
+                      {isHired && job.status === 'verifying_slip' && (
+                        <button onClick={() => handleAdminApprove(job.id)} disabled={actionLoading === job.id} className="bg-orange-100 hover:bg-orange-200 text-orange-700 px-4 py-2.5 rounded-xl text-[10px] font-black shadow-sm flex items-center gap-1 transition-colors">
+                          {actionLoading === job.id ? <span className="animate-spin text-sm">⏳</span> : '⏳ จำลองแอดมินอนุมัติ'}
+                        </button>
                       )}
-                      {(job.status === 'in_progress' || job.status === 'delivered') && (
-                        <Link href={`/chat/${job.id}`} className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-5 py-2.5 rounded-xl text-[11px] font-black shadow-md active:scale-95 transition-transform">
-                          {job.status === 'delivered' ? '📦 ตรวจรับงาน' : '💬 คุยรายละเอียด'}
+                      
+                      {isHired && job.status === 'in_progress' && (
+                        <span className="bg-blue-50 text-blue-600 px-4 py-2.5 rounded-xl text-[11px] font-black shadow-sm">⏳ ช่างกำลังทำ...</span>
+                      )}
+
+                      {isHired && job.status === 'delivered' && (
+                        <button onClick={() => handleCompleteJob(job.id)} disabled={actionLoading === job.id} className="bg-emerald-500 text-white px-4 py-2.5 rounded-xl text-[11px] font-black shadow-md active:scale-95 transition-transform">
+                          {actionLoading === job.id ? <span className="animate-spin">⏳</span> : '✅ ตรวจรับ & ปล่อยเงิน'}
+                        </button>
+                      )}
+
+                      {/* --- โหมดช่าง (!isHired = false) --- */}
+                      {!isHired && job.status === 'verifying_slip' && (
+                        <span className="bg-orange-50 text-orange-600 px-4 py-2.5 rounded-xl text-[11px] font-black shadow-sm">⏳ รอลูกค้าชำระเงิน</span>
+                      )}
+
+                      {!isHired && job.status === 'in_progress' && (
+                        <button onClick={() => handleDeliverJob(job.id)} disabled={actionLoading === job.id} className="bg-purple-500 text-white px-4 py-2.5 rounded-xl text-[11px] font-black shadow-md active:scale-95 transition-transform">
+                          {actionLoading === job.id ? <span className="animate-spin">⏳</span> : '📦 กดส่งมอบงาน'}
+                        </button>
+                      )}
+
+                      {!isHired && job.status === 'delivered' && (
+                        <span className="bg-purple-50 text-purple-600 px-4 py-2.5 rounded-xl text-[11px] font-black shadow-sm">⏳ รอลูกค้าตรวจรับ</span>
+                      )}
+
+                      {/* --- ปุ่มแชท มีทั้งสองฝั่ง (ถ้ารับงานแล้ว) --- */}
+                      {(job.status === 'in_progress' || job.status === 'delivered') && acceptedProposal && (
+                        <Link href={`/chat/proposal/${acceptedProposal.id}`} className="bg-gray-100 text-gray-700 hover:bg-gray-200 px-4 py-2.5 rounded-xl text-[11px] font-black shadow-sm active:scale-95 transition-transform">
+                          💬 แชท
                         </Link>
                       )}
+
+                      {/* --- จบงาน --- */}
                       {job.status === 'completed' && (
-                        <span className="bg-gray-100 text-gray-400 px-4 py-2 rounded-xl text-[10px] font-black">งานสำเร็จแล้ว</span>
+                        <span className="bg-emerald-100 text-emerald-700 px-4 py-2.5 rounded-xl text-[10px] font-black">🎉 งานสำเร็จแล้ว</span>
                       )}
                     </div>
                   </div>
