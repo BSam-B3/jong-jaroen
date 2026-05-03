@@ -6,11 +6,12 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 
 type Mode = 'hired' | 'received';
-// 🌟 เพิ่มสถานะ 'delivered' เข้าไป
-type Status = 'open' | 'in_progress' | 'delivered' | 'completed' | 'cancelled';
+// 🌟 1. เพิ่มสถานะ 'verifying_slip' (รอตรวจสลิป) เข้าไปในระบบ
+type Status = 'open' | 'verifying_slip' | 'in_progress' | 'delivered' | 'completed' | 'cancelled';
 
 const STATUS_META: Record<Status, { label: string; icon: string; bg: string; text: string; ring: string }> = {
   open: { label: 'รอคนรับงาน', icon: '🟡', bg: 'bg-amber-50', text: 'text-amber-700', ring: 'ring-amber-200' },
+  verifying_slip: { label: 'กำลังตรวจสลิป', icon: '⏳', bg: 'bg-orange-50', text: 'text-orange-700', ring: 'ring-orange-200' }, // 👈 เพิ่มการตั้งค่าสีและไอคอน
   in_progress: { label: 'กำลังดำเนินการ', icon: '🛵', bg: 'bg-blue-50', text: 'text-blue-700', ring: 'ring-blue-200' },
   delivered: { label: 'ส่งมอบแล้ว', icon: '📦', bg: 'bg-purple-50', text: 'text-purple-700', ring: 'ring-purple-200' },
   completed: { label: 'เสร็จสิ้น', icon: '✅', bg: 'bg-emerald-50', text: 'text-emerald-700', ring: 'ring-emerald-200' },
@@ -65,10 +66,12 @@ export default function MyJobsPage() {
   }, [fetchMyJobs, supabase.auth]);
 
   const handleAcceptProposal = async (job: any, proposal: any) => {
-    if (!confirm(`ยืนยันการจ้างงาน ${proposal.worker?.full_name} ใช่ไหมคะ?`)) return;
+    if (!confirm(`ยืนยันเลือกล็อกคิว ${proposal.worker?.full_name} ใช่ไหมคะ? (ระบบจะพาไปหน้าชำระเงิน)`)) return;
     setActionLoading(proposal.id);
 
     try {
+      // 💡 อนาคตเราจะแก้ RPC ตัวนี้ให้เปลี่ยนสถานะเป็น awaiting_payment แทน 
+      // แต่ตอนนี้เราใช้ของเดิมไปก่อน แล้วพา User ไปจ่ายเงินค่ะ
       const { error } = await supabase.rpc('accept_proposal', {
         p_job_id: job.id,
         p_proposal_id: proposal.id,
@@ -77,8 +80,9 @@ export default function MyJobsPage() {
 
       if (error) throw error;
 
-      alert('จ้างงานสำเร็จ! 🎉 พาท่านไปยังห้องแชทค่ะ');
-      router.push(`/chat/${job.id}`);
+      alert('ล็อกคิวสำเร็จ! พาท่านไปชำระเงินเข้า Escrow ค่ะ 🚀');
+      // 🌟 2. เปลี่ยนจุดหมายจากหน้า Chat ให้ไปหน้า Checkout แทน
+      router.push(`/checkout/${job.id}`); 
     } catch (err: any) {
       alert('เกิดข้อผิดพลาดในการจ้างงานค่ะ: ' + err.message);
     }
@@ -125,8 +129,9 @@ export default function MyJobsPage() {
               const s = STATUS_META[job.status as Status] || STATUS_META.open;
               const proposals = job.proposals?.filter((p: any) => p.status === 'pending') || [];
 
-              // 🌟 คำนวณความคืบหน้าของ Status Tracker
+              // 🌟 3. อัปเดตการคำนวณ Progress Bar ให้รู้จักสถานะกำลังตรวจสลิป
               let progressIndex = 0;
+              if (job.status === 'verifying_slip') progressIndex = 1;
               if (job.status === 'in_progress') progressIndex = 2;
               if (job.status === 'delivered') progressIndex = 3;
               if (job.status === 'completed') progressIndex = 4;
@@ -146,7 +151,7 @@ export default function MyJobsPage() {
                   <h3 className="font-black text-gray-800 text-base leading-tight">{job.title}</h3>
                   <p className="text-[10px] text-gray-400 font-bold mt-1 mb-2">⏰ {formatDate(job.created_at)}</p>
 
-                  {/* 🌟 1. Status Tracker Progress Bar */}
+                  {/* Status Tracker Progress Bar */}
                   {job.status !== 'cancelled' && (
                     <div className="mt-3 mb-4">
                       <div className="flex items-center gap-1">
@@ -156,28 +161,32 @@ export default function MyJobsPage() {
                       </div>
                       <div className="flex justify-between mt-1 px-1">
                         <span className="text-[8px] font-black text-emerald-600">จองงาน</span>
-                        <span className={`text-[8px] font-black ${progressIndex >= 2 ? 'text-emerald-600' : 'text-gray-300'}`}>พักเงิน/ทำ</span>
+                        <span className={`text-[8px] font-black ${progressIndex >= 1 ? 'text-emerald-600' : 'text-gray-300'}`}>พักเงิน/ทำ</span>
                         <span className={`text-[8px] font-black ${progressIndex >= 4 ? 'text-emerald-600' : 'text-gray-300'}`}>ปล่อยเงิน</span>
                       </div>
                     </div>
                   )}
 
-                  {/* 🌟 2. Escrow Trust Badge (โชว์เฉพาะตอนพักเงิน) */}
-                  {(job.status === 'in_progress' || job.status === 'delivered') && (
-                    <div className="mb-4 bg-emerald-50/80 border border-emerald-100 rounded-2xl p-3 flex items-start gap-3 shadow-sm">
-                      <div className="text-xl">🔒</div>
+                  {/* 🌟 4. ป้ายสถานะ Escrow (แยกสีระหว่าง รอตรวจสลิป กับ ตรวจผ่านแล้ว) */}
+                  {(job.status === 'verifying_slip' || job.status === 'in_progress' || job.status === 'delivered') && (
+                    <div className={`mb-4 border rounded-2xl p-3 flex items-start gap-3 shadow-sm ${job.status === 'verifying_slip' ? 'bg-orange-50/80 border-orange-100' : 'bg-emerald-50/80 border-emerald-100'}`}>
+                      <div className="text-xl">{job.status === 'verifying_slip' ? '⏳' : '🔒'}</div>
                       <div>
-                        <p className="text-[11px] font-black text-emerald-800 tracking-wide">เงิน ฿{job.budget?.toLocaleString() || '0'} ถูกพักไว้ในระบบอย่างปลอดภัย</p>
-                        <p className="text-[10px] text-emerald-600/80 font-bold mt-0.5 leading-tight">
-                          {isHired 
-                            ? 'ระบบจะโอนให้ช่าง ก็ต่อเมื่อคุณตรวจสอบและกดยืนยันรับงานเท่านั้น' 
-                            : 'ผู้จ้างชำระเงินเรียบร้อยแล้ว ลุยงานและส่งมอบผ่านระบบได้เลย'}
+                        <p className={`text-[11px] font-black tracking-wide ${job.status === 'verifying_slip' ? 'text-orange-800' : 'text-emerald-800'}`}>
+                          {job.status === 'verifying_slip' 
+                            ? `กำลังตรวจสอบสลิป ฿${job.budget?.toLocaleString() || '0'}` 
+                            : `เงิน ฿${job.budget?.toLocaleString() || '0'} ถูกพักไว้ในระบบอย่างปลอดภัย`}
+                        </p>
+                        <p className={`text-[10px] font-bold mt-0.5 leading-tight ${job.status === 'verifying_slip' ? 'text-orange-600/80' : 'text-emerald-600/80'}`}>
+                          {job.status === 'verifying_slip' 
+                            ? 'แอดมินกำลังตรวจสอบสลิปโอนเงิน เมื่อผ่านแล้วช่างจะเริ่มงานทันที'
+                            : (isHired ? 'ระบบจะโอนให้ช่าง ก็ต่อเมื่อคุณตรวจสอบและกดยืนยันรับงานเท่านั้น' : 'ผู้จ้างชำระเงินเรียบร้อยแล้ว ลุยงานและส่งมอบผ่านระบบได้เลย')}
                         </p>
                       </div>
                     </div>
                   )}
 
-                  {/* ส่วนแสดงรายชื่อผู้เสนอตัว (ซ่อนไว้ถ้ารับงานไปแล้ว) */}
+                  {/* ส่วนแสดงรายชื่อผู้เสนอตัว */}
                   {isHired && job.status === 'open' && proposals.length > 0 && (
                     <div className="mt-4 pt-4 border-t border-gray-100 space-y-3">
                       <p className="text-[11px] font-black text-[#EE4D2D] flex items-center gap-1">👥 มีผู้ยื่นข้อเสนอ {proposals.length} คน:</p>
@@ -215,6 +224,12 @@ export default function MyJobsPage() {
                     
                     {/* เปลี่ยนปุ่มตามสถานะ */}
                     <div className="flex gap-2">
+                      {/* 🌟 5. ปุ่มสำหรับสถานะรอตรวจสลิป */}
+                      {job.status === 'verifying_slip' && (
+                        <span className="bg-orange-100 text-orange-600 px-5 py-2.5 rounded-xl text-[11px] font-black shadow-sm">
+                          ⏳ รอตรวจสลิป
+                        </span>
+                      )}
                       {(job.status === 'in_progress' || job.status === 'delivered') && (
                         <Link href={`/chat/${job.id}`} className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-5 py-2.5 rounded-xl text-[11px] font-black shadow-md active:scale-95 transition-transform">
                           {job.status === 'delivered' ? '📦 ตรวจรับงาน' : '💬 คุยรายละเอียด'}
