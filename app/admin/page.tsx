@@ -17,19 +17,38 @@ export default async function AdminDashboardPage() {
   // 3. ดึงข้อมูลสถิติจาก RPC
   const { data: stats, error: statsError } = await sb.rpc('admin_dashboard_stats');
 
-  // 4. ดึงข้อมูลสลิปที่รอตรวจสอบ (Real Data)
+  // 4. ดึงข้อมูลกระเป๋าเงินแพลตฟอร์มทั้ง 5 กอง (Real Data)
+  const { data: revenueWallets } = await sb
+    .from('wallets')
+    .select('kind, balance_satang')
+    .in('kind', ['revenue_app', 'revenue_pg', 'revenue_invest', 'revenue_dividend', 'revenue_social']);
+
+  // คำนวณยอดเงินแต่ละกอง (แปลงจากสตางค์เป็นบาท)
+  const rev = { app: 0, pg: 0, invest: 0, dividend: 0, social: 0, total: 0 };
+  revenueWallets?.forEach(w => {
+    const amount = w.balance_satang / 100;
+    rev.total += amount;
+    if (w.kind === 'revenue_app') rev.app = amount;
+    if (w.kind === 'revenue_pg') rev.pg = amount;
+    if (w.kind === 'revenue_invest') rev.invest = amount;
+    if (w.kind === 'revenue_dividend') rev.dividend = amount;
+    if (w.kind === 'revenue_social') rev.social = amount;
+  });
+
+  // 5. ดึงข้อมูลสลิปที่รอตรวจสอบ (Real Data)
   const { data: slips } = await sb
     .from('slip_uploads')
     .select(`
       id,
       created_at,
+      storage_path,
       job:jobs ( id, title, budget ),
       employer:profiles!uploader_id ( full_name )
     `)
     .eq('status', 'pending')
     .order('created_at', { ascending: true });
 
-  // 5. ดึงข้อมูลคำขอถอนเงิน (Real Data)
+  // 6. ดึงข้อมูลคำขอถอนเงิน (Real Data)
   const { data: withdrawals } = await sb
     .from('withdrawals')
     .select(`
@@ -50,7 +69,7 @@ export default async function AdminDashboardPage() {
   return (
     <div className="max-w-6xl mx-auto p-6 space-y-8 animate-in fade-in duration-500 pb-20">
       
-      {/* Header และ ปุ่มลัด */}
+      {/* 🌟 Header ศูนย์บัญชาการ */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h1 className="text-4xl font-black text-gray-900 tracking-tight">
@@ -74,7 +93,7 @@ export default async function AdminDashboardPage() {
         </div>
       </div>
 
-      {/* สถิติหลัก */}
+      {/* 🌟 สถิติหลัก */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
           <h3 className="text-gray-500 font-medium mb-2">จำนวนผู้ใช้งานทั้งหมด</h3>
@@ -90,9 +109,51 @@ export default async function AdminDashboardPage() {
         </div>
       </div>
 
+      {/* 🌟 Dashboard สรุปรายได้ 5 กองทุน */}
+      <div className="bg-white p-6 md:p-8 rounded-[2rem] shadow-sm border border-gray-200">
+        <h2 className="text-xl font-black text-gray-900 mb-6 flex items-center gap-2">
+          <span>📊</span> ผลประกอบการแพลตฟอร์ม (10%)
+        </h2>
+        <div className="flex flex-col lg:flex-row gap-6 items-center">
+          
+          {/* กล่องรายได้รวม */}
+          <div className="w-full lg:w-1/3 bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl p-6 text-center shadow-lg relative overflow-hidden">
+            <div className="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-white opacity-5 rounded-full blur-2xl"></div>
+            <p className="text-gray-400 font-bold text-sm uppercase tracking-widest">รายได้สะสมทั้งหมด</p>
+            <p className="text-5xl font-black text-emerald-400 mt-2 tracking-tight">
+              ฿{rev.total.toLocaleString('th-TH', { minimumFractionDigits: 2 })}
+            </p>
+          </div>
+
+          {/* กล่องแยก 5 กอง */}
+          <div className="w-full lg:w-2/3 grid grid-cols-2 md:grid-cols-3 gap-3">
+            <div className="p-4 bg-blue-50/50 rounded-2xl border border-blue-100 transition-colors hover:bg-blue-50">
+              <p className="text-[10px] font-black text-blue-500 uppercase tracking-wider mb-1">เข้าแอป (5%)</p>
+              <p className="text-xl font-black text-blue-900">฿{rev.app.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</p>
+            </div>
+            <div className="p-4 bg-purple-50/50 rounded-2xl border border-purple-100 transition-colors hover:bg-purple-50">
+              <p className="text-[10px] font-black text-purple-500 uppercase tracking-wider mb-1">ค่าระบบ PG (3%)</p>
+              <p className="text-xl font-black text-purple-900">฿{rev.pg.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</p>
+            </div>
+            <div className="p-4 bg-orange-50/50 rounded-2xl border border-orange-100 transition-colors hover:bg-orange-50">
+              <p className="text-[10px] font-black text-orange-500 uppercase tracking-wider mb-1">กองทุนลงทุน (0.5%)</p>
+              <p className="text-xl font-black text-orange-900">฿{rev.invest.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</p>
+            </div>
+            <div className="p-4 bg-pink-50/50 rounded-2xl border border-pink-100 transition-colors hover:bg-pink-50">
+              <p className="text-[10px] font-black text-pink-500 uppercase tracking-wider mb-1">ปันผล (0.5%)</p>
+              <p className="text-xl font-black text-pink-900">฿{rev.dividend.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</p>
+            </div>
+            <div className="p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100 transition-colors hover:bg-emerald-50 md:col-span-2 lg:col-span-1">
+              <p className="text-[10px] font-black text-emerald-500 uppercase tracking-wider mb-1">คืนสังคม (1%)</p>
+              <p className="text-xl font-black text-emerald-900">฿{rev.social.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <hr className="border-gray-200" />
 
-      {/* 🌟 ส่วนที่ 1: ตรวจสลิปเงินเข้า (เชื่อมต่อ RPC: approve_slip) */}
+      {/* 🌟 ส่วนที่ 1: ตรวจสลิปเงินเข้า */}
       <section>
         <div className="mb-6 flex justify-between items-end">
           <div>
@@ -143,7 +204,7 @@ export default async function AdminDashboardPage() {
         )}
       </section>
 
-      {/* 🌟 ส่วนที่ 2: คิวโอนเงินให้ช่าง (เชื่อมต่อ RPC: approve_withdrawal) */}
+      {/* 🌟 ส่วนที่ 2: คิวโอนเงินให้ช่าง */}
       <section className="pb-10">
         <div className="mb-6">
           <h2 className="text-2xl font-black text-gray-900 flex items-center gap-2">
