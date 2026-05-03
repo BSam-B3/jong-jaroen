@@ -14,7 +14,10 @@ export default function ChatPage({ params }: { params: { id: string } }) {
   const [loading, setLoading] = useState(true);
   const [isActionLoading, setIsActionLoading] = useState(false);
   
-  // 🌟 ตัวอ้างอิงสำหรับซ่อน Input อัปโหลดไฟล์รูปภาพ
+  // State สำหรับระบบรีวิว
+  const [rating, setRating] = useState(5);
+  const [reviewText, setReviewText] = useState('');
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -23,7 +26,6 @@ export default function ChatPage({ params }: { params: { id: string } }) {
       if (!session) return router.push('/auth/login');
       setCurrentUser(session.user);
 
-      // ดึงข้อมูลงานและคู่สัญญา (รวมถึงลิงก์รูปผลงาน ถ้ามี)
       const { data } = await supabase
         .from('jobs')
         .select('*, employer:profiles!employer_id(full_name), worker:profiles!worker_id(full_name)')
@@ -36,58 +38,57 @@ export default function ChatPage({ params }: { params: { id: string } }) {
     initChat();
   }, [jobId, router, supabase]);
 
-  // 📸 1. ฟังก์ชันช่างแนบรูปและกดส่งงาน
+  // 📦 1. ช่างกดส่งงานแนบรูป
   const handleUploadAndSubmit = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
     if (!confirm('ช่างทำเสร็จแล้วโว้ย 🔧 ยืนยันการแนบรูปนี้เพื่อส่งมอบงานใช่ไหมคะ?')) return;
     setIsActionLoading(true);
-    
     try {
-      // 1.1 อัปโหลดรูปลง Bucket 'job-proofs' ที่เราเพิ่งสร้าง
       const fileExt = file.name.split('.').pop();
       const fileName = `${jobId}-proof-${Date.now()}.${fileExt}`;
-      const { error: uploadError } = await supabase.storage
-        .from('job-proofs')
-        .upload(fileName, file);
-
+      const { error: uploadError } = await supabase.storage.from('job-proofs').upload(fileName, file);
       if (uploadError) throw uploadError;
 
-      // 1.2 ดึง Public URL ของรูปมาใช้งาน
       const { data: publicUrlData } = supabase.storage.from('job-proofs').getPublicUrl(fileName);
-
-      // 1.3 อัปเดตสถานะงานและบันทึกลิงก์รูปลงตาราง jobs
       const { error } = await supabase
         .from('jobs')
-        .update({ 
-          status: 'delivered', 
-          delivery_image_url: publicUrlData.publicUrl,
-          updated_at: new Date().toISOString() 
-        })
+        .update({ status: 'delivered', delivery_image_url: publicUrlData.publicUrl, updated_at: new Date().toISOString() })
         .eq('id', jobId);
-        
       if (error) throw error;
       
-      alert('ส่งงานและแนบรูปเรียบร้อย! ✨\nแจ้งเตือนลูกค้า: "งานเสร็จแล้ว! ช่างส่งงานพร้อมรูปให้ตรวจ แวะกดรับงานหน่อยจ้า"');
+      alert('ส่งงานและแนบรูปเรียบร้อย! ✨');
       window.location.reload();
-    } catch (err: any) { 
-      alert('เกิดข้อผิดพลาด: ' + err.message); 
-    } finally { 
-      setIsActionLoading(false); 
-    }
+    } catch (err: any) { alert('เกิดข้อผิดพลาด: ' + err.message); } 
+    finally { setIsActionLoading(false); }
   };
 
-  // 💸 2. ฟังก์ชันผู้จ้างกดรับงานและปล่อยเงิน
+  // 💸 2. ลูกค้ากดรับงานและปล่อยเงิน
   const handleReleaseFunds = async () => {
     if (!confirm('เฮ! ตรวจรูปงานเรียบร้อยแล้ว ยืนยันการปล่อยเงินให้ช่างใช่ไหมคะ?')) return;
     setIsActionLoading(true);
     try {
       const { error } = await supabase.rpc('release_escrow', { p_job_id: jobId });
       if (error) throw error;
-      
-      alert('ปล่อยเงินสำเร็จ! 🎉\nแจ้งเตือนช่าง: "ตังค์เข้าเป๋าแล้วนายช่าง! 💸 งานผ่านฉลุย"');
-      router.push('/my-jobs');
+      alert('ปล่อยเงินสำเร็จ! 🎉\nอย่าลืมให้คะแนนช่างด้านล่างด้วยนะคะ!');
+      window.location.reload(); // โหลดหน้าใหม่เพื่อให้แสดงกล่องรีวิว
+    } catch (err: any) { alert(err.message); }
+    finally { setIsActionLoading(false); }
+  };
+
+  // ⭐ 3. ลูกค้ากดส่งรีวิว
+  const handleSubmitReview = async () => {
+    if (!confirm('ยืนยันการให้คะแนนช่างใช่ไหมคะ?')) return;
+    setIsActionLoading(true);
+    try {
+      const { error } = await supabase.rpc('submit_review', {
+        p_job_id: jobId,
+        p_rating: rating,
+        p_review_text: reviewText
+      });
+      if (error) throw error;
+      alert('ขอบคุณสำหรับรีวิวค่ะ! 🌟 ช่างได้คะแนนเรียบร้อยแล้ว');
+      window.location.reload();
     } catch (err: any) { alert(err.message); }
     finally { setIsActionLoading(false); }
   };
@@ -100,7 +101,7 @@ export default function ChatPage({ params }: { params: { id: string } }) {
   return (
     <div className="min-h-screen bg-[#F4F6F8] flex flex-col font-sans">
       
-      {/* 🟢 Action Header (ศูนย์บัญชาการปิดงาน) */}
+      {/* 🟢 Action Header */}
       <div className="bg-white border-b border-gray-200 p-4 sticky top-0 z-30 shadow-sm">
         <div className="flex items-center justify-between max-w-2xl mx-auto">
           <button onClick={() => router.back()} className="text-gray-400 text-2xl active:scale-95 transition-transform">←</button>
@@ -113,41 +114,49 @@ export default function ChatPage({ params }: { params: { id: string } }) {
           <div className="w-8"></div>
         </div>
 
-        {/* ปุ่มตามหน้าที่ (Role-based Actions) */}
         <div className="max-w-2xl mx-auto mt-4">
-          
-          {/* 🌟 ซ่อน Input รับไฟล์เอาไว้ เพื่อให้กดผ่านปุ่มแทน */}
-          <input 
-            type="file" 
-            accept="image/*" 
-            ref={fileInputRef} 
-            onChange={handleUploadAndSubmit} 
-            className="hidden" 
-          />
+          <input type="file" accept="image/*" ref={fileInputRef} onChange={handleUploadAndSubmit} className="hidden" />
 
           {isWorker && job?.status === 'in_progress' && (
-            <button 
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isActionLoading}
-              className="w-full bg-[#EE4D2D] text-white py-3 rounded-2xl font-black text-sm shadow-md active:scale-95 transition-transform disabled:opacity-50"
-            >
-              {isActionLoading ? 'กำลังอัปโหลดรูปและส่งงาน...' : '📸 ถ่ายรูปผลงาน & ส่งมอบ (เก็บตังค์!)'}
+            <button onClick={() => fileInputRef.current?.click()} disabled={isActionLoading} className="w-full bg-[#EE4D2D] text-white py-3 rounded-2xl font-black text-sm shadow-md active:scale-95 transition-transform disabled:opacity-50">
+              {isActionLoading ? 'กำลังอัปโหลดรูป...' : '📸 ถ่ายรูปผลงาน & ส่งมอบ (เก็บตังค์!)'}
             </button>
           )}
 
           {isEmployer && job?.status === 'delivered' && (
-            <button 
-              onClick={handleReleaseFunds}
-              disabled={isActionLoading}
-              className="w-full bg-emerald-500 text-white py-3 rounded-2xl font-black text-sm shadow-md active:scale-95 transition-transform disabled:opacity-50"
-            >
-              {isActionLoading ? 'กำลังประมวลผลการเงิน...' : '✅ ตรวจรูปผลงาน & ปล่อยเงิน 💸'}
+            <button onClick={handleReleaseFunds} disabled={isActionLoading} className="w-full bg-emerald-500 text-white py-3 rounded-2xl font-black text-sm shadow-md active:scale-95 transition-transform disabled:opacity-50">
+              {isActionLoading ? 'กำลังประมวลผล...' : '✅ ตรวจรูปผลงาน & ปล่อยเงิน 💸'}
             </button>
           )}
 
-          {job?.status === 'completed' && (
-            <div className="w-full bg-emerald-50 text-emerald-600 py-3 rounded-2xl font-black text-xs text-center border border-emerald-100">
-              🎉 งานนี้สำเร็จเรียบร้อยแล้ว เงินเข้ากระเป๋าช่างแล้วค่ะ!
+          {/* กล่องรีวิว (แสดงเฉพาะฝั่งผู้ว่าจ้างที่จ่ายเงินแล้วแต่ยังไม่ได้รีวิว) */}
+          {job?.status === 'completed' && isEmployer && !job?.rating && (
+            <div className="w-full bg-white p-4 rounded-2xl border border-orange-200 shadow-sm animate-in fade-in slide-in-from-top-2">
+              <p className="text-sm font-black text-gray-800 text-center mb-2">ให้คะแนนช่างหน่อยค่ะ 🌟</p>
+              <div className="flex justify-center gap-2 mb-3">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button key={star} onClick={() => setRating(star)} className={`text-3xl transition-transform active:scale-75 ${rating >= star ? 'text-orange-400' : 'text-gray-200'}`}>
+                    ★
+                  </button>
+                ))}
+              </div>
+              <textarea 
+                value={reviewText} onChange={(e) => setReviewText(e.target.value)}
+                placeholder="ประทับใจตรงไหน พิมพ์ชมช่างได้เลย..." 
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs mb-3 focus:ring-2 focus:ring-orange-400 outline-none"
+                rows={2}
+              />
+              <button onClick={handleSubmitReview} disabled={isActionLoading} className="w-full bg-gray-900 text-white py-2.5 rounded-xl font-black text-xs shadow-md">
+                {isActionLoading ? 'กำลังบันทึก...' : 'ส่งรีวิว'}
+              </button>
+            </div>
+          )}
+
+          {/* ป้ายแสดงเมื่อจบงานและรีวิวแล้ว */}
+          {job?.status === 'completed' && (job?.rating || isWorker) && (
+            <div className="w-full bg-emerald-50 text-emerald-600 py-3 rounded-2xl font-black text-xs text-center border border-emerald-100 flex flex-col gap-1">
+              <span>🎉 งานนี้สำเร็จเรียบร้อยแล้ว</span>
+              {job?.rating && <span className="text-orange-500 text-lg">{'★'.repeat(job.rating)}</span>}
             </div>
           )}
         </div>
@@ -155,52 +164,13 @@ export default function ChatPage({ params }: { params: { id: string } }) {
 
       {/* 💬 Chat Area */}
       <main className="flex-1 p-6 space-y-4 max-w-2xl mx-auto w-full">
-        <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 self-start max-w-[80%]">
-          <p className="text-xs font-bold text-[#EE4D2D] mb-1">จงเจริญ AI 🤖</p>
-          <p className="text-sm text-gray-700 leading-relaxed">
-            ยินดีด้วยค่ะ! ห้องแชทเปิดแล้ว คุยรายละเอียดงานกันที่นี่ได้เลยนะ<br/>
-            <span className="font-bold">ช่าง:</span> เมื่อทำงานเสร็จ ให้กดปุ่มถ่ายรูปด้านบนเพื่อส่งงานนะคะ
-          </p>
-        </div>
-
-        {/* 📸 แสดงรูปผลงานที่ช่างอัปโหลด (ถ้ามี) */}
         {job?.delivery_image_url && (
-          <div className="flex flex-col items-center mt-6 p-4 bg-white rounded-[2rem] border border-emerald-100 shadow-sm animate-in zoom-in duration-300">
+          <div className="flex flex-col items-center mt-2 p-4 bg-white rounded-[2rem] border border-emerald-100 shadow-sm">
             <p className="text-xs font-black text-emerald-600 mb-3 uppercase tracking-widest">📦 รูปหลักฐานการส่งมอบงาน</p>
-            <img 
-              src={job.delivery_image_url} 
-              alt="Proof of work" 
-              className="rounded-2xl w-full max-w-sm object-cover border border-gray-100 shadow-sm" 
-            />
-            {isEmployer && job.status === 'delivered' && (
-              <p className="text-[10px] text-gray-400 mt-3 font-bold text-center">
-                กรุณาตรวจสอบผลงานก่อนกดปล่อยเงินด้านบนนะคะ
-              </p>
-            )}
+            <img src={job.delivery_image_url} alt="Proof of work" className="rounded-2xl w-full max-w-sm object-cover border border-gray-100 shadow-sm" />
           </div>
         )}
-
-        {/* ตัวอย่างแชทจากคู่สัญญา */}
-        <div className="flex flex-col gap-2">
-           <div className={`p-4 rounded-2xl shadow-sm max-w-[80%] ${isWorker ? 'bg-[#EE4D2D] text-white self-end' : 'bg-white text-gray-800 self-start border border-gray-100'}`}>
-              <p className="text-sm font-medium">สวัสดีครับ พร้อมลุยงานแล้วครับ!</p>
-           </div>
-        </div>
       </main>
-
-      {/* ⌨️ Input Area */}
-      <div className="p-4 bg-white border-t border-gray-100 sticky bottom-0">
-        <div className="max-w-2xl mx-auto flex gap-2">
-          <input 
-            type="text" 
-            placeholder="พิมพ์ข้อความที่นี่..." 
-            className="flex-1 bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-[#EE4D2D] focus:border-transparent outline-none transition-all"
-          />
-          <button className="bg-[#EE4D2D] text-white w-12 h-12 rounded-2xl flex items-center justify-center shadow-md active:scale-95 transition-transform">
-            🚀
-          </button>
-        </div>
-      </div>
 
     </div>
   );
