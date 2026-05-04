@@ -51,8 +51,8 @@ function ServicesContent() {
   const [allServices, setAllServices] = useState<Service[]>([]);
   const [isFetching, setIsFetching] = useState(true);
 
-  // 🌟 ปรับให้แสดง 16 งานต่อหน้า ตามที่บีสามต้องการค่ะ
-  const itemsPerPage = 16;
+  // 🌟 ปรับให้แสดง 12 งานต่อหน้า เพื่อความสวยงามในทุกขนาดหน้าจอ
+  const itemsPerPage = 12;
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // ดึงข้อมูลจากฐานข้อมูลทันทีเมื่อ Category หรือ Search เปลี่ยน
