@@ -51,10 +51,11 @@ function ServicesContent() {
   const [allServices, setAllServices] = useState<Service[]>([]);
   const [isFetching, setIsFetching] = useState(true);
 
-  const itemsPerPage = 10;
+  // 🌟 ปรับให้แสดง 16 งานต่อหน้า ตามที่บีสามต้องการค่ะ
+  const itemsPerPage = 16;
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // 🌟 ดึงข้อมูลจากฐานข้อมูลทันทีเมื่อ Category หรือ Search เปลี่ยน
+  // ดึงข้อมูลจากฐานข้อมูลทันทีเมื่อ Category หรือ Search เปลี่ยน
   useEffect(() => {
     const fetchServices = async () => {
       setIsFetching(true);
@@ -94,7 +95,7 @@ function ServicesContent() {
     router.push(buildUrl(category, localSearch, 1));
   };
 
-  // 🌟 ฟังก์ชันเลื่อนปุ่มหมวดหมู่ซ้ายขวา (สำหรับคอมพิวเตอร์)
+  // ฟังก์ชันเลื่อนปุ่มหมวดหมู่ซ้ายขวา (สำหรับคอมพิวเตอร์)
   const scrollCategory = (direction: 'left' | 'right') => {
     if (scrollRef.current) {
       const scrollAmount = 300;
@@ -136,7 +137,7 @@ function ServicesContent() {
             </button>
           </form>
 
-          {/* 🌟 หมวดหมู่ (ปัดซ้ายขวาได้ พร้อมปุ่ม < > สำหรับคอมพิวเตอร์) */}
+          {/* หมวดหมู่ (ปัดซ้ายขวาได้ พร้อมปุ่ม < > สำหรับคอมพิวเตอร์) */}
           <div className="relative flex items-center group/slider">
             {/* ปุ่มเลื่อนซ้าย (ซ่อนในมือถือ) */}
             <button onClick={() => scrollCategory('left')} className="hidden md:flex absolute -left-4 z-30 w-10 h-10 items-center justify-center bg-white text-[#EE4D2D] rounded-full shadow-lg opacity-0 group-hover/slider:opacity-100 transition-opacity hover:bg-orange-50 hover:scale-110">
@@ -186,10 +187,10 @@ function ServicesContent() {
           )}
         </div>
 
-        {/* 🌟 แสดง Skeleton ตอนกำลังโหลด (เปลี่ยนหมวดหมู่) */}
+        {/* แสดง Skeleton ตอนกำลังโหลด (เปลี่ยนหมวดหมู่) */}
         {isFetching ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 md:gap-5">
-            {[1, 2, 3, 4].map(i => (
+            {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
               <div key={i} className="bg-white rounded-[1.5rem] border border-slate-100 shadow-sm h-[260px] md:h-[300px] animate-pulse flex flex-col overflow-hidden">
                 <div className="w-full aspect-[4/3] bg-slate-200"></div>
                 <div className="p-4 flex-1 flex flex-col"><div className="w-full h-4 bg-slate-200 rounded-full mb-3"></div><div className="w-2/3 h-4 bg-slate-200 rounded-full"></div></div>
@@ -210,7 +211,7 @@ function ServicesContent() {
           </div>
         )}
 
-        {/* 🌟 ระบบแบ่งหน้า (Pagination UI) */}
+        {/* ระบบแบ่งหน้า (Pagination UI) */}
         {!isFetching && totalPages > 1 && (
           <div className="flex justify-center items-center gap-2 mt-10 mb-6">
             <Link
@@ -253,7 +254,7 @@ function ServicesContent() {
   );
 }
 
-// 🌟 ห่อด้วย Suspense เพื่อป้องกันปัญหา Build Error ใน Next.js (เพราะใช้ useSearchParams)
+// ห่อด้วย Suspense เพื่อป้องกันปัญหา Build Error ใน Next.js
 export default function ServicesPage() {
   return (
     <Suspense fallback={<div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center font-bold text-gray-400">กำลังเตรียมหน้าร้านค้า...</div>}>
