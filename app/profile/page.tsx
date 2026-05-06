@@ -62,122 +62,157 @@ export default function ProfilePage() {
   );
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex justify-center font-sans pb-10">
-      <div className="w-full sm:max-w-2xl md:max-w-3xl bg-[#F8FAFC] min-h-screen relative flex flex-col shadow-xl overflow-x-hidden">
+    <div className="min-h-screen bg-[#F4F6F8] flex justify-center font-sans pb-24 md:pb-10">
+      {/* 🌟 ปรับขนาดจอให้รองรับ Deivce ต่างๆ (เหมือนหน้าแรก) */}
+      <div className="w-full lg:max-w-5xl xl:max-w-6xl bg-[#F8FAFC] min-h-screen relative flex flex-col md:shadow-2xl overflow-x-hidden md:border-x border-gray-200/50">
         
-        {/* 🟠 Header โฉมใหม่ (จัดกลาง + ไล่สีนุ่มขึ้น) */}
-        <div className="bg-gradient-to-br from-[#EE4D2D] via-[#FF6243] to-[#FF8A65] rounded-b-[3rem] px-6 pt-12 pb-20 shadow-lg relative z-10 flex flex-col items-center text-center">
+        {/* 🟠 Header ปรับขนาดให้เต็มตาขึ้นบนจอคอม */}
+        <div className="bg-gradient-to-br from-[#EE4D2D] via-[#FF6243] to-[#FF8A65] rounded-b-[3rem] md:rounded-b-[4rem] px-6 pt-12 pb-24 md:pb-32 shadow-lg relative z-10 flex flex-col items-center text-center">
           
-          {/* 🚪 ปุ่มออกจากระบบ (ย้ายไปมุมซ้ายให้บาลานซ์ หรือไว้ขวาเหมือนเดิม) */}
           <button 
             onClick={handleSignOut}
-            className="absolute top-6 right-6 text-white bg-white/20 hover:bg-white/30 active:scale-95 transition-all text-xs font-bold px-4 py-2 rounded-full backdrop-blur-md shadow-sm flex items-center gap-2"
+            className="absolute top-6 right-6 md:top-10 md:right-10 text-white bg-white/20 hover:bg-red-500 active:scale-95 transition-all text-xs font-black px-5 py-2.5 rounded-full backdrop-blur-md shadow-sm flex items-center gap-2"
           >
             ออกจากระบบ 🚪
           </button>
 
-          {/* 👤 รูปโปรไฟล์ */}
-          <div className="relative mb-4">
-            <div className="w-24 h-24 bg-white p-1 rounded-full shadow-xl">
-              <div className="w-full h-full bg-gray-100 rounded-full flex items-center justify-center text-4xl overflow-hidden">
+          <div className="relative mb-6">
+            <div className="w-28 h-28 md:w-36 md:h-36 bg-white p-1.5 rounded-full shadow-2xl">
+              <div className="w-full h-full bg-gray-100 rounded-full flex items-center justify-center text-5xl md:text-6xl overflow-hidden">
                 {profile?.avatar_url ? (
                   <img src={profile.avatar_url} className="w-full h-full object-cover" alt="profile" />
                 ) : '👤'}
               </div>
             </div>
-            {/* จุด Online สีเขียว */}
-            <div className="absolute bottom-1 right-1 w-5 h-5 bg-emerald-500 border-4 border-white rounded-full"></div>
+            <div className="absolute bottom-2 right-2 w-6 h-6 md:w-8 md:h-8 bg-emerald-500 border-4 border-white rounded-full shadow-lg"></div>
           </div>
 
-          {/* 📝 ชื่อและข้อมูล */}
-          <h1 className="text-white text-2xl font-black tracking-tight drop-shadow-sm mb-1">
+          <h1 className="text-white text-3xl md:text-5xl font-black tracking-tight drop-shadow-md mb-2">
             {profile?.full_name || 'สมาชิกจงเจริญ'}
           </h1>
-          <div className="flex items-center gap-2 mt-1">
-            <span className="bg-white text-[#EE4D2D] text-[10px] font-black px-3 py-1 rounded-full shadow-sm">
+          
+          <div className="flex flex-wrap justify-center gap-2 mt-2">
+            <span className="bg-white text-[#EE4D2D] text-[10px] md:text-xs font-black px-4 py-1.5 rounded-full shadow-sm">
               👑 สมาชิก Classic
             </span>
-            <span className="text-white/90 text-xs font-bold tracking-wider uppercase bg-black/10 px-3 py-1 rounded-full backdrop-blur-sm">
+            <span className="text-white/90 text-[10px] md:text-xs font-bold tracking-wider uppercase bg-black/10 px-4 py-1.5 rounded-full backdrop-blur-sm">
               ID: {profile?.id?.slice(0, 8)}
             </span>
           </div>
         </div>
 
-        {/* 💳 การ์ดกระเป๋าเงิน (ดันขึ้นไปเกยทับ Header) */}
-        <div 
-          onClick={() => router.push('/wallet')}
-          className="mx-5 -mt-12 bg-gradient-to-br from-gray-900 via-gray-800 to-black rounded-[2rem] p-6 text-white shadow-2xl cursor-pointer active:scale-95 transition-transform relative z-20 overflow-hidden border border-gray-700/50"
-        >
-          {/* แสงสะท้อนบนการ์ด */}
-          <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl -mr-10 -mt-10"></div>
-          <div className="absolute bottom-0 left-0 w-24 h-24 bg-[#EE4D2D]/20 rounded-full blur-xl -ml-10 -mb-10"></div>
-
-          <div className="flex justify-between items-center mb-4 relative z-10">
-            <div className="flex items-center gap-2">
-              <span className="text-xl">💸</span>
-              <span className="font-bold text-gray-300 text-sm tracking-wide">กระเป๋าตังค์ของฉัน</span>
+        {/* 💳 การ์ดกระเป๋าเงิน (Responsive Max-width) */}
+        <div className="px-5 md:px-20 -mt-16 md:-mt-20 relative z-20 w-full max-w-4xl mx-auto">
+          <div 
+            onClick={() => router.push('/wallet')}
+            className="bg-gradient-to-br from-gray-900 via-gray-800 to-black rounded-[2.5rem] p-8 md:p-12 text-white shadow-[0_20px_50px_rgba(0,0,0,0.3)] cursor-pointer active:scale-[0.98] transition-all relative overflow-hidden border border-gray-700/50 group"
+          >
+            <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -mr-20 -mt-20 group-hover:bg-[#EE4D2D]/10 transition-colors"></div>
+            
+            <div className="flex justify-between items-center mb-6 relative z-10">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center text-2xl backdrop-blur-sm">💰</div>
+                <div className="flex flex-col">
+                  <span className="font-bold text-gray-400 text-xs uppercase tracking-[0.2em]">ยอดเงินคงเหลือ</span>
+                  <span className="font-black text-gray-200 text-sm">กระเป๋าเงินจงเจริญ</span>
+                </div>
+              </div>
+              <div className="flex items-center text-gray-900 bg-[#00C300] px-6 py-2.5 rounded-full text-sm font-black shadow-[0_0_20px_rgba(0,195,0,0.4)] group-hover:scale-105 transition-transform">
+                ถอนเงิน <span className="ml-2 text-xl leading-none">›</span>
+              </div>
             </div>
-            <div className="flex items-center text-gray-900 bg-emerald-400 px-4 py-1.5 rounded-full text-xs font-black shadow-lg">
-              ถอนเงิน <span className="ml-1 text-lg leading-none">›</span>
+            
+            <div className="flex items-baseline gap-2 relative z-10">
+              <span className="text-gray-400 text-2xl font-bold">฿</span>
+              <span className="text-5xl md:text-7xl font-black tracking-tighter">
+                {isLoadingWallet ? '...' : walletBalance.toLocaleString('th-TH', { minimumFractionDigits: 2 })}
+              </span>
             </div>
-          </div>
-          
-          <div className="flex items-baseline gap-1 relative z-10">
-            <span className="text-4xl font-black tracking-tight">
-              {isLoadingWallet ? '...' : `฿${walletBalance.toLocaleString('th-TH', { minimumFractionDigits: 2 })}`}
-            </span>
           </div>
         </div>
 
-        {/* ✅ ปรับ UI เมนูต่างๆ ให้เป็นสไตล์ Card */}
-        <main className="flex-1 relative z-10 px-5 mt-6 pb-32 space-y-4">
+        {/* ✅ Main Menu */}
+        <main className="flex-1 relative z-10 px-5 md:px-20 mt-8 pb-32 space-y-6 w-full max-w-4xl mx-auto">
           
-          {/* 🌟 Section 1: ระบบแจ้งเตือน */}
-          <div className="bg-white rounded-[1.5rem] shadow-sm border border-gray-100 p-2">
+          {/* 🔔 Section 1: Notifications */}
+          <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 p-2 md:p-4">
             <PushToggle />
           </div>
 
-          {/* 🌟 Section 2: เมนูการจัดการ */}
-          <div className="bg-white rounded-[1.5rem] shadow-sm border border-gray-100 overflow-hidden divide-y divide-gray-50">
+          {/* 📇 Section 2: กระเป๋า Jobs-Card (เพิ่มใหม่ตามคำสั่ง) */}
+          <div className="bg-white rounded-[2rem] shadow-md border-2 border-emerald-50 overflow-hidden">
+            <div className="bg-emerald-50 px-6 py-3 border-b border-emerald-100 flex items-center justify-between">
+              <span className="text-[11px] font-black text-emerald-700 uppercase tracking-widest">การนำเสนอของฉัน</span>
+              <span className="bg-emerald-500 text-white text-[10px] font-black px-2 py-0.5 rounded-md animate-pulse">LIVE</span>
+            </div>
             
-            <Link href="/my-jobs" className="flex items-center justify-between p-4 hover:bg-orange-50/50 transition-colors active:bg-gray-50 group">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">💼</div>
-                <span className="font-bold text-gray-800 text-sm">งานของฉัน</span>
+            <Link href="/profile/jobs-cards" className="flex items-center justify-between p-6 hover:bg-emerald-50/30 transition-all active:bg-emerald-50 group">
+              <div className="flex items-center gap-5">
+                <div className="w-14 h-14 rounded-2xl bg-emerald-500 text-white flex items-center justify-center text-3xl shadow-lg shadow-emerald-100 group-hover:rotate-6 transition-transform">
+                  📇
+                </div>
+                <div className="flex flex-col">
+                  <span className="font-black text-gray-800 text-lg">กระเป๋า Jobs-Card ของฉัน</span>
+                  <span className="text-xs font-bold text-gray-400 mt-0.5">สร้างและแก้ไขนามบัตรบริการเพื่อใช้โพสต์งาน</span>
+                </div>
               </div>
-              <span className="text-gray-300 text-xl font-bold group-hover:text-[#EE4D2D] transition-colors">›</span>
+              <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center group-hover:bg-emerald-500 group-hover:text-white transition-all text-emerald-500">
+                <span className="text-2xl font-bold">›</span>
+              </div>
+            </Link>
+          </div>
+
+          {/* ⚙️ Section 3: General Menus */}
+          <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 overflow-hidden divide-y divide-gray-50">
+            
+            <Link href="/my-jobs" className="flex items-center justify-between p-5 hover:bg-orange-50/50 transition-colors active:bg-gray-50 group">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-blue-50 text-2xl flex items-center justify-center group-hover:scale-110 transition-transform">💼</div>
+                <div className="flex flex-col">
+                  <span className="font-bold text-gray-800 text-base">งานของฉัน</span>
+                  <span className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">Track your works</span>
+                </div>
+              </div>
+              <span className="text-gray-300 text-2xl font-bold group-hover:text-[#EE4D2D] transition-colors pr-2">›</span>
             </Link>
 
-            <Link href="/profile/edit" className="flex items-center justify-between p-4 hover:bg-orange-50/50 transition-colors active:bg-gray-50 group">
+            <Link href="/profile/edit" className="flex items-center justify-between p-5 hover:bg-orange-50/50 transition-colors active:bg-gray-50 group">
               <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-full bg-purple-50 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">⚙️</div>
-                <span className="font-bold text-gray-800 text-sm">จัดการข้อมูลส่วนตัว</span>
+                <div className="w-12 h-12 rounded-2xl bg-purple-50 text-2xl flex items-center justify-center group-hover:scale-110 transition-transform">⚙️</div>
+                <div className="flex flex-col">
+                  <span className="font-bold text-gray-800 text-base">จัดการข้อมูลส่วนตัว</span>
+                  <span className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">Profile Settings</span>
+                </div>
               </div>
-              <span className="text-gray-300 text-xl font-bold group-hover:text-[#EE4D2D] transition-colors">›</span>
+              <span className="text-gray-300 text-2xl font-bold group-hover:text-[#EE4D2D] transition-colors pr-2">›</span>
             </Link>
             
-            <Link href="/support" className="flex items-center justify-between p-4 hover:bg-orange-50/50 transition-colors active:bg-gray-50 group">
+            <Link href="/support" className="flex items-center justify-between p-5 hover:bg-orange-50/50 transition-colors active:bg-gray-50 group">
               <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">🎧</div>
-                <span className="font-bold text-gray-800 text-sm">ศูนย์ช่วยเหลือ (Help Center)</span>
+                <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-2xl flex items-center justify-center group-hover:scale-110 transition-transform">🎧</div>
+                <div className="flex flex-col">
+                  <span className="font-bold text-gray-800 text-base">ศูนย์ช่วยเหลือ (Help Center)</span>
+                  <span className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">Get Support</span>
+                </div>
               </div>
-              <span className="text-gray-300 text-xl font-bold group-hover:text-[#EE4D2D] transition-colors">›</span>
+              <span className="text-gray-300 text-2xl font-bold group-hover:text-[#EE4D2D] transition-colors pr-2">›</span>
             </Link>
 
-            <Link href="/about" className="flex items-center justify-between p-4 hover:bg-orange-50/50 transition-colors active:bg-gray-50 group">
+            <Link href="/about" className="flex items-center justify-between p-5 hover:bg-orange-50/50 transition-colors active:bg-gray-50 group">
               <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-full bg-orange-50 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">ℹ️</div>
-                <span className="font-bold text-gray-800 text-sm">เกี่ยวกับจงเจริญ</span>
+                <div className="w-12 h-12 rounded-2xl bg-orange-50 text-2xl flex items-center justify-center group-hover:scale-110 transition-transform">ℹ️</div>
+                <div className="flex flex-col">
+                  <span className="font-bold text-gray-800 text-base">เกี่ยวกับจงเจริญ</span>
+                  <span className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">About App</span>
+                </div>
               </div>
-              <span className="text-gray-300 text-xl font-bold group-hover:text-[#EE4D2D] transition-colors">›</span>
+              <span className="text-gray-300 text-2xl font-bold group-hover:text-[#EE4D2D] transition-colors pr-2">›</span>
             </Link>
           </div>
 
         </main>
 
-        {/* ✅ BottomNav */}
         <BottomNav />
-
       </div>
     </div>
   );
