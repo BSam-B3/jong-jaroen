@@ -116,8 +116,9 @@ function ServicesContent() {
         <div className="max-w-5xl mx-auto px-5 pt-8 md:pt-12">
           <div className="flex items-center justify-between mb-6 md:mb-8">
             <h1 className="text-white text-2xl md:text-3xl font-black tracking-tight">ค้นหาช่าง / บริการ</h1>
+            {/* 🌟 เปลี่ยนข้อความเป็น สร้าง Jobs-Card */}
             <Link href="/jobs/create" className="bg-white/10 hover:bg-white/20 border border-white/20 backdrop-blur-md text-white px-5 py-2.5 md:py-3 rounded-full text-xs md:text-sm font-black shadow-sm active:scale-95 transition-all flex items-center gap-2">
-              <span>📝</span> โพสต์หาช่าง
+              <span>📝</span> สร้าง Jobs-Card
             </Link>
           </div>
 
