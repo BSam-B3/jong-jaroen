@@ -63,7 +63,6 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-[#F4F6F8] flex justify-center font-sans pb-24 md:pb-10">
-      {/* 🌟 ปรับขนาดจอให้รองรับ Deivce ต่างๆ (เหมือนหน้าแรก) */}
       <div className="w-full lg:max-w-5xl xl:max-w-6xl bg-[#F8FAFC] min-h-screen relative flex flex-col md:shadow-2xl overflow-x-hidden md:border-x border-gray-200/50">
         
         {/* 🟠 Header ปรับขนาดให้เต็มตาขึ้นบนจอคอม */}
@@ -131,15 +130,36 @@ export default function ProfilePage() {
           </div>
         </div>
 
+        {/* 📊 Section สถิติ Dashboard (เพิ่มใหม่ตามคำแนะนำ) */}
+        <div className="px-5 md:px-20 mt-6 relative z-20 w-full max-w-4xl mx-auto">
+          <div className="grid grid-cols-3 gap-3 md:gap-5">
+            <div className="bg-white rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center hover:shadow-md transition-shadow">
+              <span className="text-2xl md:text-3xl mb-1 md:mb-2">⭐</span>
+              <span className="font-black text-gray-800 text-lg md:text-2xl">5.0</span>
+              <span className="text-[9px] md:text-xs font-bold text-gray-400 uppercase tracking-wider">คะแนนรีวิว</span>
+            </div>
+            <div className="bg-white rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center hover:shadow-md transition-shadow">
+              <span className="text-2xl md:text-3xl mb-1 md:mb-2">🏆</span>
+              <span className="font-black text-[#00C300] text-lg md:text-2xl">12</span>
+              <span className="text-[9px] md:text-xs font-bold text-gray-400 uppercase tracking-wider">งานสำเร็จ</span>
+            </div>
+            <div className="bg-white rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center hover:shadow-md transition-shadow">
+              <span className="text-2xl md:text-3xl mb-1 md:mb-2">⚡</span>
+              <span className="font-black text-[#EE4D2D] text-lg md:text-2xl">100%</span>
+              <span className="text-[9px] md:text-xs font-bold text-gray-400 uppercase tracking-wider">ตอบกลับ</span>
+            </div>
+          </div>
+        </div>
+
         {/* ✅ Main Menu */}
-        <main className="flex-1 relative z-10 px-5 md:px-20 mt-8 pb-32 space-y-6 w-full max-w-4xl mx-auto">
+        <main className="flex-1 relative z-10 px-5 md:px-20 mt-6 pb-32 space-y-6 w-full max-w-4xl mx-auto">
           
           {/* 🔔 Section 1: Notifications */}
           <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 p-2 md:p-4">
             <PushToggle />
           </div>
 
-          {/* 📇 Section 2: กระเป๋า Jobs-Card (เพิ่มใหม่ตามคำสั่ง) */}
+          {/* 📇 Section 2: กระเป๋า Jobs-Card */}
           <div className="bg-white rounded-[2rem] shadow-md border-2 border-emerald-50 overflow-hidden">
             <div className="bg-emerald-50 px-6 py-3 border-b border-emerald-100 flex items-center justify-between">
               <span className="text-[11px] font-black text-emerald-700 uppercase tracking-widest">การนำเสนอของฉัน</span>
