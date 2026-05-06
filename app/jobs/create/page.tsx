@@ -3,9 +3,25 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import Link from 'next/link';
 
-const CATEGORIES = ["เกษตรกรรม", "งานใช้แรง", "ช่างชุมชน", "ปศุสัตว์", "ขนส่ง", "รับเหมา", "แม่บ้าน", "อื่นๆ"];
+// 🌟 เพิ่มหมวดหมู่ให้หลากหลายและครอบคลุมมากขึ้น เพื่อให้ค้นหาได้ง่าย
+const CATEGORIES = [
+  "ทำสวน/เกษตรกรรม", 
+  "ช่างแอร์/เครื่องใช้ไฟฟ้า", 
+  "ช่างไฟ/ประปา", 
+  "รับเหมาก่อสร้าง",
+  "ซ่อมยานพาหนะ", 
+  "ดูแลปศุสัตว์", 
+  "ขนส่ง/ย้ายของ", 
+  "แม่บ้าน/ทำความสะอาด",
+  "ดูแลเด็ก/ผู้สูงอายุ", 
+  "นวด/สปา", 
+  "ทำอาหาร/จัดเลี้ยง", 
+  "เอกสาร/แอดมิน",
+  "ออกแบบ/ไอที", 
+  "งานใช้แรงทั่วไป",
+  "อื่นๆ"
+];
 
 export default function CreateJobsCardPage() {
   const router = useRouter();
@@ -16,15 +32,15 @@ export default function CreateJobsCardPage() {
 
   // 🌟 Form States
   const [title, setTitle] = useState('');
-  const [category, setCategory] = useState(CATEGORIES[2]);
+  const [category, setCategory] = useState(CATEGORIES[0]);
   const [description, setDescription] = useState('');
   const [images, setImages] = useState<string[]>(['', '', '', '', '']); // สูงสุด 5 รูป
   
-  // 🌟 แพ็กเกจ 3 ระดับ (Basic, Standard, Premium)
+  // 🌟 แพ็กเกจ 3 ระดับ พร้อมช่องแก้ไขงาน (revisions)
   const [packages, setPackages] = useState([
-    { name: 'เริ่มต้น (Basic)', price: '', delivery: '', content: '' },
-    { name: 'มาตรฐาน (Standard)', price: '', delivery: '', content: '' },
-    { name: 'พรีเมียม (Premium)', price: '', delivery: '', content: '' },
+    { name: 'เริ่มต้น (Basic)', price: '', delivery: '', revisions: 'ไม่จำกัด', content: '' },
+    { name: 'มาตรฐาน (Standard)', price: '', delivery: '', revisions: 'ไม่จำกัด', content: '' },
+    { name: 'พรีเมียม (Premium)', price: '', delivery: '', revisions: 'ไม่จำกัด', content: '' },
   ]);
 
   useEffect(() => {
@@ -92,21 +108,9 @@ export default function CreateJobsCardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F4F6F8] flex justify-center font-sans pb-32">
+    <div className="min-h-screen bg-[#F4F6F8] flex justify-center font-sans pb-40 md:pb-32">
       <div className="w-full max-w-4xl bg-white min-h-screen shadow-xl relative flex flex-col">
         
-        {/* 🟢 Sticky Menu สไตล์ Fastwork */}
-        <div className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm px-4 md:px-8 py-3 flex items-center justify-between">
-          <div className="flex gap-4 md:gap-8 overflow-x-auto scrollbar-hide text-sm font-bold text-gray-500 whitespace-nowrap">
-            <button onClick={() => scrollTo('gallery')} className="hover:text-[#00C300] transition-colors focus:text-[#00C300]">รูปภาพ</button>
-            <button onClick={() => scrollTo('overview')} className="hover:text-[#00C300] transition-colors focus:text-[#00C300]">ภาพรวม</button>
-            <button onClick={() => scrollTo('packages')} className="hover:text-[#00C300] transition-colors focus:text-[#00C300]">แพ็กเกจ</button>
-            <button onClick={() => scrollTo('profile')} className="hover:text-[#00C300] transition-colors focus:text-[#00C300]">ฟรีแลนซ์</button>
-            <button onClick={() => scrollTo('reviews')} className="hover:text-[#00C300] transition-colors focus:text-[#00C300]">รีวิว</button>
-          </div>
-          <button onClick={() => router.back()} className="hidden md:block w-8 h-8 bg-gray-100 rounded-full text-gray-500 font-bold hover:bg-gray-200">✕</button>
-        </div>
-
         <form onSubmit={handleSubmit} className="p-4 md:p-8 space-y-12">
           
           {/* --- 1. Gallery Block --- */}
@@ -116,13 +120,10 @@ export default function CreateJobsCardPage() {
                 <span className="text-[#00C300]">1.</span> อัปโหลดรูปภาพผลงาน <span className="text-xs font-medium text-gray-400 font-normal ml-2">(สูงสุด 5 รูป)</span>
               </h2>
               
-              {/* แกลเลอรีจำลองเหมือนหน้าแสดงผลจริง */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
-                {/* รูปปกใหญ่ */}
                 <div className="md:col-span-3 aspect-video md:aspect-[21/9] bg-gray-200 rounded-2xl overflow-hidden relative border-2 border-dashed border-gray-300">
                   {images[0] ? <img src={images[0]} className="w-full h-full object-cover" /> : <div className="absolute inset-0 flex items-center justify-center text-gray-400 font-bold text-sm">รูปปกหลัก (รูปที่ 1)</div>}
                 </div>
-                {/* รูปเล็ก 4 รูป */}
                 <div className="grid grid-cols-4 md:grid-cols-1 gap-3">
                   {[1, 2, 3, 4].map(idx => (
                     <div key={idx} className="aspect-square md:aspect-auto md:h-full bg-gray-200 rounded-2xl overflow-hidden relative border-2 border-dashed border-gray-300">
@@ -132,7 +133,6 @@ export default function CreateJobsCardPage() {
                 </div>
               </div>
 
-              {/* ช่องใส่ URL รูป */}
               <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
                 {images.map((img, idx) => (
                   <input key={idx} type="url" placeholder={`ลิงก์รูปที่ ${idx + 1}`} value={img} onChange={(e) => handleImageChange(idx, e.target.value)} className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs outline-none focus:border-[#00C300]" />
@@ -140,6 +140,17 @@ export default function CreateJobsCardPage() {
               </div>
             </div>
           </section>
+
+          {/* 🌟 Sticky Menu (ย้ายมาไว้ใต้ส่วน Gallery) */}
+          <div className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-y border-gray-200 shadow-sm px-4 md:px-8 py-3 flex items-center justify-between -mx-4 md:-mx-8">
+            <div className="flex gap-4 md:gap-8 overflow-x-auto scrollbar-hide text-sm font-bold text-gray-500 whitespace-nowrap">
+              <button type="button" onClick={() => scrollTo('gallery')} className="hover:text-[#00C300] transition-colors focus:text-[#00C300]">รูปภาพ</button>
+              <button type="button" onClick={() => scrollTo('overview')} className="hover:text-[#00C300] transition-colors focus:text-[#00C300]">ภาพรวม</button>
+              <button type="button" onClick={() => scrollTo('packages')} className="hover:text-[#00C300] transition-colors focus:text-[#00C300]">แพ็กเกจ</button>
+              <button type="button" onClick={() => scrollTo('profile')} className="hover:text-[#00C300] transition-colors focus:text-[#00C300]">ฟรีแลนซ์</button>
+              <button type="button" onClick={() => scrollTo('reviews')} className="hover:text-[#00C300] transition-colors focus:text-[#00C300]">รีวิว</button>
+            </div>
+          </div>
 
           {/* --- 2. Overview Block --- */}
           <section id="overview" className="scroll-mt-24">
@@ -151,7 +162,7 @@ export default function CreateJobsCardPage() {
                 <label className="text-xs font-bold text-gray-500">หัวข้อ Jobs-Card ของคุณ</label>
                 <input 
                   type="text" 
-                  placeholder="เช่น รับทำเว็บไซต์ ระดับ Production ดีไซน์พรีเมียม..." 
+                  placeholder="เช่น รับทำสวนทุเรียน ครบวงจร วางระบบน้ำ ตัดแต่งกิ่ง..." 
                   value={title} onChange={(e) => setTitle(e.target.value)}
                   className="w-full border-b-2 border-gray-200 py-3 text-xl md:text-3xl font-black text-gray-800 outline-none focus:border-[#00C300] transition-colors placeholder:text-gray-300"
                   required
@@ -176,7 +187,7 @@ export default function CreateJobsCardPage() {
             </div>
           </section>
 
-          {/* --- 3. Packages Block (แบบ 3 ช่อง) --- */}
+          {/* --- 3. Packages Block --- */}
           <section id="packages" className="scroll-mt-24">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-black text-gray-800 flex items-center gap-2">
@@ -194,10 +205,31 @@ export default function CreateJobsCardPage() {
                       <label className="text-[10px] font-bold text-gray-400">ราคา (บาท)</label>
                       <input type="number" placeholder="เช่น 1500" value={pkg.price} onChange={e => handlePackageChange(idx, 'price', e.target.value)} className={`w-full bg-transparent border-b border-gray-300 py-2 text-xl font-black outline-none text-center ${idx === 0 ? 'focus:border-gray-500' : idx === 1 ? 'focus:border-[#00C300]' : 'focus:border-[#F59E0B]'}`} required={idx === 0} />
                     </div>
-                    <div>
-                      <label className="text-[10px] font-bold text-gray-400">ระยะเวลา (วัน)</label>
-                      <input type="number" placeholder="เช่น 3" value={pkg.delivery} onChange={e => handlePackageChange(idx, 'delivery', e.target.value)} className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm font-bold outline-none text-center" />
+                    
+                    {/* 🌟 แบ่งช่องเป็น 2 ส่วน (ระยะเวลา / แก้ไขงาน) */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[10px] font-bold text-gray-400">ระยะเวลา (วัน)</label>
+                        <input type="number" placeholder="เช่น 3" value={pkg.delivery} onChange={e => handlePackageChange(idx, 'delivery', e.target.value)} className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm font-bold outline-none text-center" />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-gray-400">แก้ไขงาน (ครั้ง)</label>
+                        <select 
+                          value={pkg.revisions} 
+                          onChange={e => handlePackageChange(idx, 'revisions', e.target.value)} 
+                          className="w-full bg-white border border-gray-200 rounded-xl px-2 py-2 text-sm font-bold outline-none text-center appearance-none"
+                        >
+                          <option value="0">0</option>
+                          <option value="1">1</option>
+                          <option value="2">2</option>
+                          <option value="3">3</option>
+                          <option value="4">4</option>
+                          <option value="5">5</option>
+                          <option value="ไม่จำกัด">ไม่จำกัด</option>
+                        </select>
+                      </div>
                     </div>
+
                     <div>
                       <label className="text-[10px] font-bold text-gray-400">รายละเอียดที่ได้รับ</label>
                       <textarea rows={4} placeholder={`รายละเอียดแพ็กเกจ ${pkg.name}...`} value={pkg.content} onChange={e => handlePackageChange(idx, 'content', e.target.value)} className="w-full bg-white border border-gray-200 rounded-xl p-3 text-xs outline-none resize-none" />
@@ -218,8 +250,6 @@ export default function CreateJobsCardPage() {
               <div className="text-center md:text-left flex-1">
                 <h3 className="text-xl font-black text-gray-800">{profile?.full_name || 'ชื่อของคุณ'}</h3>
                 <p className="text-sm font-bold text-gray-500 mt-1">{profile?.bio || 'เพิ่มคำอธิบายตัวเองในหน้าโปรไฟล์เพื่อสร้างความน่าเชื่อถือ'}</p>
-                
-                {/* 🌟 สถิติแบบ Fastwork (Mockup โชว์เป็น 0 สำหรับงานใหม่) */}
                 <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 mt-4">
                   <div className="bg-gray-50 px-4 py-2 rounded-xl text-center"><p className="text-xs text-gray-400 font-bold">รีวิว</p><p className="font-black text-gray-800">⭐ 0.0</p></div>
                   <div className="bg-gray-50 px-4 py-2 rounded-xl text-center"><p className="text-xs text-gray-400 font-bold">ขายได้</p><p className="font-black text-gray-800">0 ครั้ง</p></div>
@@ -233,7 +263,6 @@ export default function CreateJobsCardPage() {
           <section id="reviews" className="scroll-mt-24 pt-4">
             <h2 className="text-sm font-black text-gray-400 uppercase tracking-widest mb-4">รีวิวจากผู้ว่าจ้าง</h2>
             <div className="space-y-3 opacity-60 pointer-events-none">
-              {/* Mock Comment 1 */}
               <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
@@ -245,7 +274,6 @@ export default function CreateJobsCardPage() {
                 <div className="h-3 w-3/4 bg-gray-200 rounded-full mb-1"></div>
                 <div className="h-3 w-1/2 bg-gray-200 rounded-full"></div>
               </div>
-              {/* Mock Comment 2 */}
               <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
@@ -263,8 +291,8 @@ export default function CreateJobsCardPage() {
 
         </form>
 
-        {/* 🌟 Floating Bottom Bar สำหรับปุ่ม Submit */}
-        <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-gray-200 p-4 md:px-8 z-50 flex justify-center shadow-[0_-10px_20px_rgba(0,0,0,0.05)]">
+        {/* 🌟 Floating Bottom Bar (ปรับระยะ bottom-20 สำหรับมือถือเพื่อหลบ Navigation Bar) */}
+        <div className="fixed bottom-[80px] md:bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-gray-200 p-4 md:px-8 z-[100] flex justify-center shadow-[0_-10px_20px_rgba(0,0,0,0.05)]">
           <div className="w-full max-w-4xl flex items-center justify-between gap-4">
             <div className="hidden md:block">
               <p className="text-xs font-bold text-gray-500">ตรวจสอบข้อมูลให้ครบถ้วนก่อนบันทึก</p>
