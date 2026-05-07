@@ -38,7 +38,6 @@ export default function MyJobsPage() {
 
       try {
         if (activeTab === 'employer') {
-          // 💼 ดึงงานที่ฉันเป็นคน "จ้าง"
           const { data } = await supabase
             .from('jobs')
             .select(`*, proposals:job_proposals(*, profiles(*))`)
@@ -46,14 +45,12 @@ export default function MyJobsPage() {
             .order('created_at', { ascending: false });
           if (data) setJobs(data);
         } else {
-          // 🛵 ดึงงานที่ฉัน "รับทำ" (ส่ง proposal ไปแล้ว)
           const { data } = await supabase
             .from('job_proposals')
             .select(`*, job:jobs(*)`)
             .eq('freelancer_id', session.user.id);
           
           if (data) {
-            // ดึงข้อมูล job ออกมาเป็นตัวหลัก
             const mappedJobs = data.map(p => ({ ...p.job, my_proposal: p }));
             setJobs(mappedJobs as any);
           }
@@ -122,7 +119,6 @@ export default function MyJobsPage() {
     <div className="min-h-screen bg-[#F4F6F8] flex justify-center font-sans pb-24 md:pb-10">
       <div className="w-full lg:max-w-5xl xl:max-w-6xl bg-[#F8FAFC] min-h-screen relative flex flex-col md:shadow-2xl overflow-x-hidden md:border-x border-gray-200/50">
         
-        {/* 🟠 Header */}
         <header className="bg-gradient-to-br from-[#EE4D2D] to-[#FF7337] px-6 pt-12 pb-16 md:pb-24 rounded-b-[2.5rem] md:rounded-b-[4rem] text-white shadow-lg relative z-20">
           <div className="flex items-center gap-4 max-w-4xl mx-auto">
             <button onClick={() => router.back()} className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 active:scale-95 transition-all backdrop-blur-md shrink-0">
@@ -135,7 +131,6 @@ export default function MyJobsPage() {
           </div>
         </header>
 
-        {/* 🌟 Tab Switcher */}
         <div className="flex justify-center -mt-6 md:-mt-8 relative z-30 px-5 w-full max-w-4xl mx-auto">
            <div className="bg-white p-1.5 rounded-full shadow-lg border border-gray-100 flex gap-1 w-full max-w-md">
              <button 
@@ -153,14 +148,13 @@ export default function MyJobsPage() {
            </div>
         </div>
 
-        {/* 🌟 เปลี่ยนกลับเป็นแนวยาว (flex-col) ตามที่บีสามต้องการ */}
-        <main className="flex-1 p-4 md:p-8 mt-4 w-full max-w-4xl mx-auto">
+        <main className="flex-1 p-4 md:p-8 mt-4 w-full mx-auto">
           {loading ? (
-            <div className="flex flex-col gap-4 md:gap-6 animate-pulse">
-               {[1, 2, 3].map(i => <div key={i} className="h-48 bg-white rounded-3xl border border-gray-100 shadow-sm" />)}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 animate-pulse">
+               {[1, 2, 3, 4].map(i => <div key={i} className="h-64 bg-white rounded-3xl border border-gray-100 shadow-sm" />)}
             </div>
           ) : jobs.length === 0 ? (
-            <div className="bg-white rounded-3xl p-10 text-center border border-gray-100 shadow-sm mt-4 mx-auto">
+            <div className="bg-white rounded-3xl p-10 text-center border border-gray-100 shadow-sm mt-4 max-w-2xl mx-auto">
               <div className="text-5xl mb-3 opacity-50 grayscale">📭</div>
               <h3 className="font-black text-gray-800 text-base">ยังไม่มีรายการงาน</h3>
               <p className="text-[11px] text-gray-400 font-bold mt-1">
@@ -171,16 +165,15 @@ export default function MyJobsPage() {
               </Link>
             </div>
           ) : (
-            <div className="flex flex-col gap-4 md:gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 items-start">
               {jobs.map((job) => {
                 const proposals = job.proposals?.filter((p: any) => p.status === 'pending') || [];
                 const acceptedProposal = job.proposals?.find((p: any) => p.status === 'accepted') || job.proposals?.[0];
 
                 return (
-                  <article key={job.id} className={`bg-white rounded-[2rem] p-5 md:p-6 shadow-sm border-l-4 border-y border-r border-gray-100 hover:shadow-md transition-shadow relative overflow-hidden ${isHired ? 'border-l-[#EE4D2D]' : 'border-l-[#0047FF]'}`}>
+                  <article key={job.id} className={`bg-white rounded-[2rem] p-6 shadow-sm border-l-4 border-y border-r border-gray-100 hover:shadow-md transition-shadow relative overflow-hidden flex flex-col h-full ${isHired ? 'border-l-[#EE4D2D]' : 'border-l-[#0047FF]'}`}>
                     
-                    {/* Badge & Date */}
-                    <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-1.5">
                         <span className={`text-[8px] md:text-[9px] font-black px-2 py-1 rounded text-white shadow-sm tracking-widest ${job.job_type === 'onsite' ? 'bg-[#EE4D2D]' : 'bg-[#0047FF]'}`}>
                           {job.job_type === 'onsite' ? '📍 ONSITE' : '💻 ONLINE'}
@@ -195,31 +188,30 @@ export default function MyJobsPage() {
                       </p>
                     </div>
 
-                    <h2 className="text-base md:text-xl font-black text-gray-900 mb-2 leading-snug">{job.title}</h2>
+                    <h2 className="text-base md:text-xl font-black text-gray-900 mb-4 leading-snug">{job.title}</h2>
                     
-                    {/* Progress Tracker (ย่อส่วนลงแนวตั้งกระชับขึ้น) */}
-                    <div className="relative mb-4 mt-2 px-2 mx-auto w-full">
+                    <div className="relative mb-6 mt-2 px-2 max-w-sm mx-auto w-full">
                       <div className="absolute left-6 right-6 top-2 h-1 bg-gray-100 rounded-full -z-10"></div>
                       {job.status === 'in_progress' && <div className="absolute left-6 right-1/2 top-2 h-1 bg-[#00C300] rounded-full -z-10"></div>}
                       {job.status === 'completed' && <div className="absolute left-6 right-6 top-2 h-1 bg-[#00C300] rounded-full -z-10"></div>}
                       
                       <div className="flex justify-between">
                         <div className="flex flex-col items-center gap-1">
-                          <div className="w-5 h-5 rounded-full bg-[#00C300] text-white flex items-center justify-center font-black text-[9px] shadow-sm shadow-green-200">1</div>
+                          <div className="w-6 h-6 rounded-full bg-[#00C300] text-white flex items-center justify-center font-black text-[10px] shadow-sm shadow-green-200">1</div>
                           <span className="text-[9px] font-bold text-[#00C300]">จองงาน</span>
                         </div>
                         <div className="flex flex-col items-center gap-1">
-                          <div className={`w-5 h-5 rounded-full flex items-center justify-center font-black text-[9px] shadow-sm ${(job.status === 'in_progress' || job.status === 'completed') ? 'bg-[#0047FF] text-white' : 'bg-gray-200 text-gray-400'}`}>2</div>
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center font-black text-[10px] shadow-sm ${(job.status === 'in_progress' || job.status === 'completed') ? 'bg-[#0047FF] text-white' : 'bg-gray-200 text-gray-400'}`}>2</div>
                           <span className={`text-[9px] font-bold ${(job.status === 'in_progress' || job.status === 'completed') ? 'text-[#0047FF]' : 'text-gray-400'}`}>ทำ/พักเงิน</span>
                         </div>
                         <div className="flex flex-col items-center gap-1">
-                          <div className={`w-5 h-5 rounded-full flex items-center justify-center font-black text-[9px] shadow-sm ${job.status === 'completed' ? 'bg-[#00C300] text-white' : 'bg-gray-200 text-gray-400'}`}>3</div>
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center font-black text-[10px] shadow-sm ${job.status === 'completed' ? 'bg-[#00C300] text-white' : 'bg-gray-200 text-gray-400'}`}>3</div>
                           <span className={`text-[9px] font-bold ${job.status === 'completed' ? 'text-[#00C300]' : 'text-gray-400'}`}>ปล่อยเงิน</span>
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex justify-between items-end border-t border-gray-50 pt-3">
+                    <div className="flex justify-between items-end border-t border-gray-50 pt-4 mt-auto">
                       <div>
                         <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-0.5">งบประมาณ</p>
                         <p className="text-xl font-black text-gray-800">{job.budget ? `฿${job.budget.toLocaleString()}` : 'รอเสนอราคา'}</p>
@@ -231,13 +223,19 @@ export default function MyJobsPage() {
 
                     {/* 🌟 Proposals */}
                     {isHired && job.status === 'open' && proposals.length > 0 && (
-                      <div className="mt-4 bg-gray-50 -mx-5 md:-mx-6 -mb-5 md:-mb-6 px-5 md:px-6 py-4 border-t border-gray-100 rounded-b-[2rem]">
+                      <div className="mt-4 bg-gray-50 -mx-6 -mb-6 px-6 py-5 border-t border-gray-100 rounded-b-[2rem]">
                         <div className="flex items-center justify-between mb-3">
                           <p className={`text-[11px] font-black ${themeText} flex items-center gap-1.5`}>
                             <span className={`w-2 h-2 ${themeColor} rounded-full animate-pulse`}></span>
                             ข้อเสนอใหม่ ({proposals.length})
                           </p>
-                          <span className="text-[9px] font-bold text-gray-400">ปัดขวาเพื่อดูเพิ่มเติม 👉</span>
+                          {/* 🌟 เปลี่ยนไอคอน เลื่อนขวา */}
+                          {proposals.length > 1 && (
+                            <div className="flex items-center gap-1 text-[10px] font-black text-gray-400 bg-gray-200/50 px-2 py-1 rounded-full animate-pulse">
+                              <span>เลื่อน</span>
+                              <span className="text-xs">›</span>
+                            </div>
+                          )}
                         </div>
 
                         <div className="flex gap-3 overflow-x-auto scrollbar-hide snap-x pb-2">
@@ -282,7 +280,7 @@ export default function MyJobsPage() {
                     )}
 
                     {/* 🌟 ปุ่มสถานะงาน */}
-                    <div className="flex gap-2 mt-4 border-t border-gray-50 pt-3">
+                    <div className="flex gap-2 mt-4 border-t border-gray-50 pt-4">
                       {isHired && job.status === 'verifying_slip' && (
                         <>
                           <span className="bg-orange-100 text-orange-600 px-4 py-2.5 rounded-xl text-[10px] font-black shadow-sm flex items-center gap-1">
