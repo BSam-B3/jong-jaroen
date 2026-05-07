@@ -20,7 +20,6 @@ interface Service {
   provider_kyc_status: string | null;
 }
 
-// 🌟 อัปเดตหมวดหมู่ให้ตรงกับหน้าสร้าง Jobs-Card
 const CATEGORIES = [
   { key: "all", label: "ทั้งหมด", icon: "✨" },
   { key: "ทำสวน/เกษตรกรรม", label: "ทำสวน/เกษตรกรรม", icon: "🚜" },
@@ -74,17 +73,65 @@ function ServicesContent() {
   useEffect(() => {
     const fetchServices = async () => {
       setIsFetching(true);
-      const { data, error } = await supabase.rpc("get_active_services", {
-        p_category: category === "all" ? null : category,
-        p_search: search || null,
-      });
+      try {
+        // 🌟 เปลี่ยนจากการใช้ RPC เป็น Query โดยตรง เพื่อความเสถียรเมื่อมีการเปลี่ยนฐานข้อมูล
+        let query = supabase
+          .from('services')
+          .select(`
+            id,
+            title,
+            category,
+            cover_image_url,
+            starting_price,
+            rating,
+            review_count,
+            created_at,
+            provider_id,
+            profiles (
+              full_name,
+              avatar_url,
+              kyc_status
+            )
+          `)
+          .eq('is_active', true);
 
-      if (!error && data) {
-        setAllServices(data as Service[]);
-      } else {
+        if (category && category !== 'all') {
+          query = query.eq('category', category);
+        }
+
+        if (search) {
+          query = query.ilike('title', `%${search}%`);
+        }
+
+        const { data, error } = await query;
+
+        if (!error && data) {
+          // แมปข้อมูลให้เข้ากับ Interface
+          const formattedData: Service[] = data.map((item: any) => ({
+            id: item.id,
+            title: item.title,
+            category: item.category,
+            cover_image_url: item.cover_image_url,
+            starting_price: item.starting_price,
+            rating: item.rating || 0,
+            review_count: item.review_count || 0,
+            created_at: item.created_at,
+            provider_id: item.provider_id,
+            provider_name: item.profiles?.full_name || 'ช่างผู้เชี่ยวชาญ',
+            provider_avatar: item.profiles?.avatar_url || null,
+            provider_kyc_status: item.profiles?.kyc_status || null,
+          }));
+          setAllServices(formattedData);
+        } else {
+          console.error("Supabase Error:", error);
+          setAllServices([]);
+        }
+      } catch (err) {
+        console.error("Fetch Error:", err);
         setAllServices([]);
+      } finally {
+        setIsFetching(false);
       }
-      setIsFetching(false);
     };
 
     fetchServices();
@@ -139,7 +186,6 @@ function ServicesContent() {
           <div className="flex items-center justify-between mb-6 md:mb-8">
             <h1 className="text-white text-2xl md:text-3xl font-black tracking-tight">ค้นหาช่าง / บริการ</h1>
             
-            {/* 🌟 เปลี่ยนลิงก์และตกแต่งปุ่มด้วยโทน Emerald โปร่งแสง */}
             <Link 
               href="/profile/jobs-cards" 
               className="bg-emerald-500/20 hover:bg-emerald-500 border border-emerald-400/50 backdrop-blur-md text-white px-4 py-2.5 md:px-5 md:py-3 rounded-full text-xs md:text-sm font-black shadow-lg shadow-black/10 active:scale-95 transition-all flex items-center gap-2 group"
