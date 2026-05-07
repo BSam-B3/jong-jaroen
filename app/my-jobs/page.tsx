@@ -112,6 +112,7 @@ export default function MyJobsPage() {
     setActionLoading(null);
   };
 
+  // 🌟 ตัวแปรช่วยเรื่องสี ให้ตรงกับแท็บที่เลือก
   const isHired = activeTab === 'employer';
   const themeColor = isHired ? 'bg-[#EE4D2D]' : 'bg-[#0047FF]';
   const themeText = isHired ? 'text-[#EE4D2D]' : 'text-[#0047FF]';
@@ -262,7 +263,7 @@ export default function MyJobsPage() {
                               
                               <div className="flex gap-2">
                                 <Link 
-                                  href={`/chat?job=${job.id}&provider=${prop.freelancer_id}`}
+                                  href={`/chat/${job.id}`}
                                   className="flex-1 py-2 bg-gray-100 text-gray-600 rounded-xl text-[10px] font-black hover:bg-gray-200 transition-colors flex items-center justify-center"
                                 >
                                   💬 คุยรายละเอียด
@@ -320,7 +321,7 @@ export default function MyJobsPage() {
 
                       {(job.status === 'in_progress' || job.status === 'delivered') && acceptedProposal && (
                         <Link 
-                          href={`/chat?job=${job.id}&provider=${acceptedProposal.freelancer_id}`} 
+                          href={`/chat/${job.id}`} 
                           className="bg-gray-100 text-gray-700 hover:bg-gray-200 px-4 py-2.5 rounded-xl text-[11px] font-black active:scale-95 shrink-0 flex items-center justify-center"
                         >
                           💬 แชท
