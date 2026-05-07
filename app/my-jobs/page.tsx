@@ -120,7 +120,7 @@ export default function MyJobsPage() {
       <div className="w-full lg:max-w-5xl xl:max-w-6xl bg-[#F8FAFC] min-h-screen relative flex flex-col md:shadow-2xl overflow-x-hidden md:border-x border-gray-200/50">
         
         <header className="bg-gradient-to-br from-[#EE4D2D] to-[#FF7337] px-6 pt-12 pb-16 md:pb-24 rounded-b-[2.5rem] md:rounded-b-[4rem] text-white shadow-lg relative z-20">
-          <div className="flex items-center gap-4 max-w-4xl mx-auto">
+          <div className="flex items-center gap-4 max-w-3xl mx-auto w-full">
             <button onClick={() => router.back()} className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 active:scale-95 transition-all backdrop-blur-md shrink-0">
               ←
             </button>
@@ -131,7 +131,7 @@ export default function MyJobsPage() {
           </div>
         </header>
 
-        <div className="flex justify-center -mt-6 md:-mt-8 relative z-30 px-5 w-full max-w-4xl mx-auto">
+        <div className="flex justify-center -mt-6 md:-mt-8 relative z-30 px-5 w-full max-w-3xl mx-auto">
            <div className="bg-white p-1.5 rounded-full shadow-lg border border-gray-100 flex gap-1 w-full max-w-md">
              <button 
                onClick={() => setActiveTab('employer')}
@@ -148,13 +148,14 @@ export default function MyJobsPage() {
            </div>
         </div>
 
-        <main className="flex-1 p-4 md:p-8 mt-4 w-full mx-auto">
+        {/* 🌟 ปรับ Layout กลับมาเป็นแถวเดียว และบีบความกว้างของการ์ดด้วย max-w-3xl เพื่อไม่ให้การ์ดยืดกว้างเกินไปในหน้าจอคอมพิวเตอร์ */}
+        <main className="flex-1 p-4 md:p-8 mt-4 w-full max-w-3xl mx-auto">
           {loading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 animate-pulse">
-               {[1, 2, 3, 4].map(i => <div key={i} className="h-64 bg-white rounded-3xl border border-gray-100 shadow-sm" />)}
+            <div className="flex flex-col gap-4 md:gap-6 animate-pulse">
+               {[1, 2, 3].map(i => <div key={i} className="h-48 bg-white rounded-3xl border border-gray-100 shadow-sm" />)}
             </div>
           ) : jobs.length === 0 ? (
-            <div className="bg-white rounded-3xl p-10 text-center border border-gray-100 shadow-sm mt-4 max-w-2xl mx-auto">
+            <div className="bg-white rounded-3xl p-10 text-center border border-gray-100 shadow-sm mt-4 w-full mx-auto">
               <div className="text-5xl mb-3 opacity-50 grayscale">📭</div>
               <h3 className="font-black text-gray-800 text-base">ยังไม่มีรายการงาน</h3>
               <p className="text-[11px] text-gray-400 font-bold mt-1">
@@ -165,13 +166,13 @@ export default function MyJobsPage() {
               </Link>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 items-start">
+            <div className="flex flex-col gap-4 md:gap-6 w-full">
               {jobs.map((job) => {
                 const proposals = job.proposals?.filter((p: any) => p.status === 'pending') || [];
                 const acceptedProposal = job.proposals?.find((p: any) => p.status === 'accepted') || job.proposals?.[0];
 
                 return (
-                  <article key={job.id} className={`bg-white rounded-[2rem] p-6 shadow-sm border-l-4 border-y border-r border-gray-100 hover:shadow-md transition-shadow relative overflow-hidden flex flex-col h-full ${isHired ? 'border-l-[#EE4D2D]' : 'border-l-[#0047FF]'}`}>
+                  <article key={job.id} className={`bg-white rounded-[2rem] p-6 shadow-sm border-l-4 border-y border-r border-gray-100 hover:shadow-md transition-shadow relative overflow-hidden flex flex-col w-full ${isHired ? 'border-l-[#EE4D2D]' : 'border-l-[#0047FF]'}`}>
                     
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-1.5">
@@ -190,7 +191,7 @@ export default function MyJobsPage() {
 
                     <h2 className="text-base md:text-xl font-black text-gray-900 mb-4 leading-snug">{job.title}</h2>
                     
-                    <div className="relative mb-6 mt-2 px-2 max-w-sm mx-auto w-full">
+                    <div className="relative mb-6 mt-2 px-2 mx-auto w-full max-w-sm">
                       <div className="absolute left-6 right-6 top-2 h-1 bg-gray-100 rounded-full -z-10"></div>
                       {job.status === 'in_progress' && <div className="absolute left-6 right-1/2 top-2 h-1 bg-[#00C300] rounded-full -z-10"></div>}
                       {job.status === 'completed' && <div className="absolute left-6 right-6 top-2 h-1 bg-[#00C300] rounded-full -z-10"></div>}
@@ -229,7 +230,6 @@ export default function MyJobsPage() {
                             <span className={`w-2 h-2 ${themeColor} rounded-full animate-pulse`}></span>
                             ข้อเสนอใหม่ ({proposals.length})
                           </p>
-                          {/* 🌟 เปลี่ยนไอคอน เลื่อนขวา */}
                           {proposals.length > 1 && (
                             <div className="flex items-center gap-1 text-[10px] font-black text-gray-400 bg-gray-200/50 px-2 py-1 rounded-full animate-pulse">
                               <span>เลื่อน</span>
