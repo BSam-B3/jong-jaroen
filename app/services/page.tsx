@@ -20,15 +20,23 @@ interface Service {
   provider_kyc_status: string | null;
 }
 
+// 🌟 อัปเดตหมวดหมู่ให้ตรงกับหน้าสร้าง Jobs-Card
 const CATEGORIES = [
   { key: "all", label: "ทั้งหมด", icon: "✨" },
-  { key: "เกษตรกรรม", label: "เกษตรกรรม/พ่นยา", icon: "🚜" },
-  { key: "งานใช้แรง", label: "งานใช้แรง/ทำสวน", icon: "🌴" },
-  { key: "ช่างชุมชน", label: "ช่างเฉพาะทางชุมชน", icon: "🔧" },
-  { key: "ปศุสัตว์", label: "ดูแลปศุสัตว์", icon: "🐂" },
-  { key: "ขนส่ง", label: "ขนส่งท้องถิ่น", icon: "🚚" },
-  { key: "รับเหมา", label: "รับเหมา/ต่อเติม", icon: "🛠️" },
-  { key: "แม่บ้าน", label: "แม่บ้าน/ทำความสะอาด", icon: "🧹" },
+  { key: "ทำสวน/เกษตรกรรม", label: "ทำสวน/เกษตรกรรม", icon: "🚜" },
+  { key: "ช่างแอร์/เครื่องใช้ไฟฟ้า", label: "แอร์/เครื่องใช้ไฟฟ้า", icon: "❄️" },
+  { key: "ช่างไฟ/ประปา", label: "ช่างไฟ/ประปา", icon: "💧" },
+  { key: "รับเหมาก่อสร้าง", label: "รับเหมาก่อสร้าง", icon: "🏗️" },
+  { key: "ซ่อมยานพาหนะ", label: "ซ่อมยานพาหนะ", icon: "🔧" },
+  { key: "ดูแลปศุสัตว์", label: "ดูแลปศุสัตว์", icon: "🐂" },
+  { key: "ขนส่ง/ย้ายของ", label: "ขนส่ง/ย้ายของ", icon: "🚚" },
+  { key: "แม่บ้าน/ทำความสะอาด", label: "แม่บ้าน/ทำความสะอาด", icon: "🧹" },
+  { key: "ดูแลเด็ก/ผู้สูงอายุ", label: "ดูแลเด็ก/ผู้สูงอายุ", icon: "👵" },
+  { key: "นวด/สปา", label: "นวด/สปา", icon: "💆" },
+  { key: "ทำอาหาร/จัดเลี้ยง", label: "ทำอาหาร/จัดเลี้ยง", icon: "🍳" },
+  { key: "เอกสาร/แอดมิน", label: "เอกสาร/แอดมิน", icon: "📄" },
+  { key: "ออกแบบ/ไอที", label: "ออกแบบ/ไอที", icon: "💻" },
+  { key: "งานใช้แรงทั่วไป", label: "งานใช้แรงทั่วไป", icon: "💪" },
   { key: "อื่นๆ", label: "อื่นๆ / จิปาถะ", icon: "📌" },
 ];
 
@@ -50,13 +58,11 @@ function ServicesContent() {
   const [allServices, setAllServices] = useState<Service[]>([]);
   const [isFetching, setIsFetching] = useState(true);
   
-  // 🌟 เพิ่ม State สำหรับระบบจัดเรียง (Sort By)
   const [sortBy, setSortBy] = useState("newest");
 
   const itemsPerPage = 12;
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // ฟังก์ชันสร้าง URL (ใช้ useCallback เพื่อให้ใช้ใน useEffect ได้อย่างปลอดภัย)
   const buildUrl = useCallback((cat: string, query: string, pageNum: number) => {
     const p = new URLSearchParams();
     if (cat !== 'all') p.set('category', cat);
@@ -65,7 +71,6 @@ function ServicesContent() {
     return `${pathname}?${p.toString()}`;
   }, [pathname]);
 
-  // ดึงข้อมูลจากฐานข้อมูลทันทีเมื่อ Category หรือ Search เปลี่ยน
   useEffect(() => {
     const fetchServices = async () => {
       setIsFetching(true);
@@ -85,23 +90,19 @@ function ServicesContent() {
     fetchServices();
   }, [category, search, supabase]);
 
-  // 🌟 ฟีเจอร์ Auto-Search (Debounce): รอ 0.5 วิ หลังจากหยุดพิมพ์แล้วค่อยค้นหาอัตโนมัติ
   useEffect(() => {
     const timer = setTimeout(() => {
       if (localSearch !== search) {
         router.push(buildUrl(category, localSearch, 1));
       }
     }, 500);
-
     return () => clearTimeout(timer);
   }, [localSearch, search, category, router, buildUrl]);
 
-  // ซิงค์ค่าช่องค้นหากับ URL (เผื่อถูกเคลียร์)
   useEffect(() => {
     setLocalSearch(search);
   }, [search]);
 
-  // กดยืนยันการค้นหา (ผ่านปุ่ม Enter หรือปุ่มค้นหา)
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     router.push(buildUrl(category, localSearch, 1));
@@ -114,15 +115,14 @@ function ServicesContent() {
     }
   };
 
-  // 🌟 ฟีเจอร์เรียงลำดับ (Sorting Logic) ก่อนที่จะทำการแบ่งหน้า (Pagination)
   const sortedServices = [...allServices].sort((a, b) => {
     if (sortBy === 'price_asc') {
-      return a.starting_price - b.starting_price; // ราคาถูกสุด
+      return a.starting_price - b.starting_price; 
     } else if (sortBy === 'rating_desc') {
-      if (b.rating !== a.rating) return b.rating - a.rating; // คะแนนมากสุด
-      return b.review_count - a.review_count; // จำนวนรีวิวมากสุด (กรณีคะแนนเท่ากัน)
+      if (b.rating !== a.rating) return b.rating - a.rating; 
+      return b.review_count - a.review_count; 
     } else {
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime(); // มาใหม่ล่าสุด (Default)
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime(); 
     }
   });
 
@@ -138,9 +138,14 @@ function ServicesContent() {
         <div className="max-w-5xl mx-auto px-5 pt-8 md:pt-12">
           <div className="flex items-center justify-between mb-6 md:mb-8">
             <h1 className="text-white text-2xl md:text-3xl font-black tracking-tight">ค้นหาช่าง / บริการ</h1>
-            {/* 🌟 เปลี่ยนข้อความเป็น เลือก Jobs-Card */}
-            <Link href="/jobs/create" className="bg-white/10 hover:bg-white/20 border border-white/20 backdrop-blur-md text-white px-5 py-2.5 md:py-3 rounded-full text-xs md:text-sm font-black shadow-sm active:scale-95 transition-all flex items-center gap-2">
-              <span>👆</span> เลือก Jobs-Card
+            
+            {/* 🌟 เปลี่ยนลิงก์และตกแต่งปุ่มด้วยโทน Emerald โปร่งแสง */}
+            <Link 
+              href="/profile/jobs-cards" 
+              className="bg-emerald-500/20 hover:bg-emerald-500 border border-emerald-400/50 backdrop-blur-md text-white px-4 py-2.5 md:px-5 md:py-3 rounded-full text-xs md:text-sm font-black shadow-lg shadow-black/10 active:scale-95 transition-all flex items-center gap-2 group"
+            >
+              <span className="group-hover:rotate-12 transition-transform text-base md:text-lg">📇</span> 
+              เลือก Jobs-Card
             </Link>
           </div>
 
@@ -149,7 +154,6 @@ function ServicesContent() {
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
             </div>
             
-            {/* 🌟 ช่องใส่ข้อความ พร้อมฟีเจอร์ปุ่ม Clear (X) */}
             <div className="relative w-full flex items-center">
               <input
                 type="text"
@@ -163,7 +167,7 @@ function ServicesContent() {
                   type="button"
                   onClick={() => {
                     setLocalSearch('');
-                    router.push(buildUrl(category, '', 1)); // สั่งให้ล้าง URL และค้นหาใหม่ทันที
+                    router.push(buildUrl(category, '', 1)); 
                   }}
                   className="absolute right-2 w-6 h-6 flex items-center justify-center bg-gray-100 text-gray-500 hover:bg-red-100 hover:text-red-500 rounded-full text-xs transition-colors active:scale-95"
                   title="ล้างการค้นหา"
@@ -178,7 +182,7 @@ function ServicesContent() {
             </button>
           </form>
 
-          {/* หมวดหมู่ (ปัดซ้ายขวาได้ พร้อมปุ่ม < > สำหรับคอมพิวเตอร์) */}
+          {/* หมวดหมู่ */}
           <div className="relative flex items-center group/slider">
             <button onClick={() => scrollCategory('left')} className="hidden md:flex absolute -left-4 z-30 w-10 h-10 items-center justify-center bg-white text-[#EE4D2D] rounded-full shadow-lg opacity-0 group-hover/slider:opacity-100 transition-opacity hover:bg-orange-50 hover:scale-110">
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7" /></svg>
@@ -214,7 +218,6 @@ function ServicesContent() {
 
       <main className="max-w-5xl mx-auto px-5 pt-6 relative z-10">
         
-        {/* 🌟 Header เหนือการ์ดงาน (มีระบบคัดกรอง) */}
         <div className="mb-4 flex flex-col sm:flex-row sm:items-end justify-between gap-3">
           <p className="text-xs md:text-sm font-bold text-slate-500 uppercase tracking-wider">
             พบ <span className="text-[#EE4D2D] text-sm md:text-base font-black">{allServices.length}</span> บริการ
@@ -223,7 +226,6 @@ function ServicesContent() {
 
           {allServices.length > 0 && (
             <div className="flex items-center gap-2 self-end">
-              {/* Dropdown เลือกลำดับ */}
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
@@ -242,7 +244,6 @@ function ServicesContent() {
           )}
         </div>
 
-        {/* แสดง Skeleton ตอนกำลังโหลด */}
         {isFetching ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 md:gap-5">
             {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
@@ -266,7 +267,6 @@ function ServicesContent() {
           </div>
         )}
 
-        {/* ระบบแบ่งหน้า (Pagination UI) */}
         {!isFetching && totalPages > 1 && (
           <div className="flex justify-center items-center gap-2 mt-10 mb-6">
             <Link
@@ -309,7 +309,6 @@ function ServicesContent() {
   );
 }
 
-// ห่อด้วย Suspense เพื่อป้องกันปัญหา Build Error ใน Next.js
 export default function ServicesPage() {
   return (
     <Suspense fallback={<div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center font-bold text-gray-400">กำลังเตรียมหน้าร้านค้า...</div>}>
