@@ -79,8 +79,8 @@ export default function MyJobsPage() {
       {/* 🌟 ปรับขนาดจอให้รองรับคอมพิวเตอร์ (Responsive) เหมือนหน้าแรก */}
       <div className="w-full lg:max-w-5xl xl:max-w-6xl bg-[#F4F6F8] min-h-screen relative flex flex-col md:shadow-2xl overflow-x-hidden md:border-x border-gray-200/50">
         
-        {/* 🟠 Header ไล่สีน้ำเงิน-ฟ้า ให้ความรู้สึกจัดการงาน (Management) */}
-        <header className="bg-gradient-to-br from-[#0047FF] to-[#0082FA] px-6 pt-12 pb-20 md:pb-28 rounded-b-[2.5rem] md:rounded-b-[4rem] text-white shadow-lg relative z-20 flex flex-col items-center">
+        {/* 🟠 Header ไล่สีส้มแบรนด์จงเจริญ */}
+        <header className="bg-gradient-to-br from-[#EE4D2D] to-[#FF7337] px-6 pt-12 pb-20 md:pb-28 rounded-b-[2.5rem] md:rounded-b-[4rem] text-white shadow-lg relative z-20 flex flex-col items-center">
           
           {/* ปุ่มย้อนกลับมุมซ้าย */}
           <button 
@@ -92,7 +92,7 @@ export default function MyJobsPage() {
 
           <div className="text-center">
             <h1 className="text-3xl md:text-5xl font-black tracking-tight drop-shadow-md">งานของฉัน 📋</h1>
-            <p className="text-xs md:text-sm font-bold text-blue-100 opacity-90 mt-2 uppercase tracking-widest">Job Management Dashboard</p>
+            <p className="text-xs md:text-sm font-bold text-orange-100 opacity-90 mt-2 uppercase tracking-widest">Job Management Dashboard</p>
           </div>
         </header>
 
@@ -101,13 +101,13 @@ export default function MyJobsPage() {
            <div className="bg-white p-1.5 rounded-full shadow-xl border border-gray-100 flex gap-1 w-full max-w-md md:max-w-lg">
              <button 
                onClick={() => setActiveTab('employer')}
-               className={`flex-1 py-3 md:py-4 rounded-full text-xs md:text-sm font-black transition-all ${activeTab === 'employer' ? 'bg-[#0047FF] text-white shadow-lg shadow-blue-200' : 'text-gray-500 hover:bg-gray-50'}`}
+               className={`flex-1 py-3 md:py-4 rounded-full text-xs md:text-sm font-black transition-all ${activeTab === 'employer' ? 'bg-[#EE4D2D] text-white shadow-lg shadow-orange-200' : 'text-gray-500 hover:bg-orange-50 hover:text-[#EE4D2D]'}`}
              >
                💼 งานที่ฉันจ้าง
              </button>
              <button 
                onClick={() => setActiveTab('freelancer')}
-               className={`flex-1 py-3 md:py-4 rounded-full text-xs md:text-sm font-black transition-all ${activeTab === 'freelancer' ? 'bg-[#00C300] text-white shadow-lg shadow-green-200' : 'text-gray-500 hover:bg-gray-50'}`}
+               className={`flex-1 py-3 md:py-4 rounded-full text-xs md:text-sm font-black transition-all ${activeTab === 'freelancer' ? 'bg-[#EE4D2D] text-white shadow-lg shadow-orange-200' : 'text-gray-500 hover:bg-orange-50 hover:text-[#EE4D2D]'}`}
              >
                🛵 งานที่ฉันรับทำ
              </button>
@@ -125,7 +125,7 @@ export default function MyJobsPage() {
               <div className="text-7xl mb-6 opacity-30 grayscale">📭</div>
               <h3 className="font-black text-gray-800 text-xl">ยังไม่มีรายการงานในขณะนี้</h3>
               <p className="text-sm text-gray-400 font-bold mt-2">ไปโพสต์จ้างงาน หรือค้นหาโปรเจกต์ใหม่ๆ กันเถอะค่ะ</p>
-              <Link href="/job-board" className="mt-8 inline-block bg-[#0047FF] text-white font-black px-10 py-4 rounded-full shadow-xl hover:shadow-blue-200 active:scale-95 transition-all">
+              <Link href="/job-board" className="mt-8 inline-block bg-[#EE4D2D] text-white font-black px-10 py-4 rounded-full shadow-xl hover:shadow-orange-200 active:scale-95 transition-all">
                 ไปที่บอร์ดหางาน ➔
               </Link>
             </div>
@@ -136,10 +136,10 @@ export default function MyJobsPage() {
                 {/* Status Badges */}
                 <div className="flex items-center justify-between mb-6">
                   <div className="flex items-center gap-2">
-                    <span className={`text-[10px] font-black px-3 py-1 rounded-lg text-white shadow-sm tracking-wider ${job.job_type === 'onsite' ? 'bg-[#EE4D2D]' : 'bg-[#0047FF]'}`}>
+                    <span className={`text-[10px] font-black px-3 py-1 rounded-lg text-white shadow-sm tracking-wider ${job.job_type === 'onsite' ? 'bg-rose-500' : 'bg-blue-500'}`}>
                       {job.job_type === 'onsite' ? '📍 ONSITE' : '💻 ONLINE'}
                     </span>
-                    <span className="text-[10px] font-black text-yellow-600 bg-yellow-50 px-3 py-1 rounded-lg border border-yellow-100 flex items-center gap-2">
+                    <span className="text-[10px] font-bold text-yellow-600 bg-yellow-50 px-3 py-1 rounded-lg border border-yellow-100 flex items-center gap-2">
                       <span className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></span>
                       {job.status === 'open' ? 'รอคนมาสมัคร' : job.status === 'in_progress' ? 'กำลังทำงาน' : 'เสร็จสิ้น'}
                     </span>
@@ -149,21 +149,21 @@ export default function MyJobsPage() {
                   </p>
                 </div>
 
-                <h2 className="text-xl md:text-3xl font-black text-gray-900 mb-6 leading-tight group-hover:text-[#0047FF] transition-colors">{job.title}</h2>
+                <h2 className="text-xl md:text-3xl font-black text-gray-900 mb-6 leading-tight group-hover:text-[#EE4D2D] transition-colors">{job.title}</h2>
                 
                 {/* 🌟 Premium Progress Tracker */}
                 <div className="relative mb-10 mt-4 px-2 md:px-10">
                   <div className="absolute left-10 right-10 top-4 h-1.5 bg-gray-100 rounded-full -z-10"></div>
                   {/* แถบสีที่จะวิ่งตามสถานะ */}
                   <div 
-                    className="absolute left-10 top-4 h-1.5 bg-[#00C300] rounded-full -z-10 transition-all duration-1000" 
+                    className="absolute left-10 top-4 h-1.5 bg-[#EE4D2D] rounded-full -z-10 transition-all duration-1000" 
                     style={{ width: job.status === 'open' ? '0%' : job.status === 'in_progress' ? '50%' : '100%' }}
                   ></div>
                   
                   <div className="flex justify-between">
-                    <Step node="1" label="โพสต์งาน" active={true} color="bg-[#00C300]" />
-                    <Step node="2" label="พักเงิน/ทำ" active={job.status === 'in_progress' || job.status === 'completed'} color="bg-[#0047FF]" />
-                    <Step node="3" label="ปล่อยเงิน" active={job.status === 'completed'} color="bg-[#F59E0B]" />
+                    <Step node="1" label="โพสต์งาน" active={true} color="bg-[#EE4D2D]" />
+                    <Step node="2" label="พักเงิน/ทำ" active={job.status === 'in_progress' || job.status === 'completed'} color="bg-[#EE4D2D]" />
+                    <Step node="3" label="ปล่อยเงิน" active={job.status === 'completed'} color="bg-[#00C300]" />
                   </div>
                 </div>
 
@@ -177,7 +177,7 @@ export default function MyJobsPage() {
                   </div>
                   <Link 
                     href={`/jobs/${job.id}`}
-                    className="text-xs font-black text-[#0047FF] bg-blue-50 px-6 py-3 rounded-2xl hover:bg-blue-600 hover:text-white transition-all shadow-sm"
+                    className="text-xs font-black text-[#EE4D2D] bg-orange-50 px-6 py-3 rounded-2xl hover:bg-[#EE4D2D] hover:text-white transition-all shadow-sm"
                   >
                     ดูรายละเอียดงาน
                   </Link>
@@ -188,7 +188,7 @@ export default function MyJobsPage() {
                   <div className="mt-8 bg-gray-50 -mx-6 -mb-6 md:-mx-8 md:-mb-8 px-6 md:px-8 py-8 border-t border-gray-100">
                     <div className="flex items-center justify-between mb-5">
                       <div className="flex items-center gap-3">
-                        <span className="flex h-3 w-3 rounded-full bg-blue-500 animate-ping"></span>
+                        <span className="flex h-3 w-3 rounded-full bg-[#EE4D2D] animate-ping"></span>
                         <p className="text-sm font-black text-gray-800">มีข้อเสนอใหม่จากช่าง ({job.proposals.length})</p>
                       </div>
                       <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">ปัดดูข้อเสนอ 👉</span>
@@ -196,7 +196,7 @@ export default function MyJobsPage() {
 
                     <div className="flex gap-4 overflow-x-auto scrollbar-hide snap-x pb-4">
                       {job.proposals.map((prop: any) => (
-                        <div key={prop.id} className="w-[88%] md:w-[340px] shrink-0 snap-center bg-white border border-gray-200 rounded-[2rem] p-5 shadow-sm hover:shadow-lg transition-all border-b-4 border-b-blue-500">
+                        <div key={prop.id} className="w-[88%] md:w-[340px] shrink-0 snap-center bg-white border border-gray-200 rounded-[2rem] p-5 shadow-sm hover:shadow-lg transition-all border-b-4 border-b-[#EE4D2D]">
                           <div className="flex justify-between items-start mb-4">
                             <div className="flex items-center gap-3">
                               <div className="w-12 h-12 rounded-2xl bg-gray-100 overflow-hidden shadow-inner border border-gray-100">
@@ -217,14 +217,18 @@ export default function MyJobsPage() {
                             </div>
                           </div>
                           
-                          <div className="bg-gray-50 p-4 rounded-2xl mb-5">
-                            <p className="text-[11px] font-medium text-gray-600 leading-relaxed italic line-clamp-2">
+                          <div className="bg-orange-50/50 p-4 rounded-2xl mb-5">
+                            <p className="text-[11px] font-medium text-gray-700 leading-relaxed italic line-clamp-2">
                               "{prop.cover_letter || 'พร้อมเริ่มงานทันทีครับ ประสบการณ์ตรงสายงานนี้แน่นอน...'}"
                             </p>
                           </div>
                           
                           <div className="flex gap-2">
-                            <button className="flex-1 py-3 bg-gray-100 text-gray-600 rounded-xl text-[11px] font-black hover:bg-gray-200 active:scale-95 transition-all">
+                            {/* 🌟 ลิงก์ไปยังระบบแชท โดยแนบ ID งาน และ ID ช่างไปกับ URL */}
+                            <button 
+                              onClick={() => router.push(`/chat?job=${job.id}&provider=${prop.freelancer_id}`)}
+                              className="flex-1 py-3 bg-gray-100 text-gray-600 rounded-xl text-[11px] font-black hover:bg-gray-200 hover:text-gray-800 active:scale-95 transition-all"
+                            >
                               💬 คุยรายละเอียด
                             </button>
                             <button 
