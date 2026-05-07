@@ -1,353 +1,269 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import Link from 'next/link';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import Link from 'next/link';
 
-type Mode = 'hired' | 'received';
-// 🌟 สถานะทั้งหมดในระบบ รวมถึงรอตรวจสลิป
-type Status = 'open' | 'verifying_slip' | 'in_progress' | 'delivered' | 'completed' | 'cancelled';
-
-const STATUS_META: Record<Status, { label: string; icon: string; bg: string; text: string; ring: string }> = {
-  open: { label: 'รอคนรับงาน', icon: '🟡', bg: 'bg-amber-50', text: 'text-amber-700', ring: 'ring-amber-200' },
-  verifying_slip: { label: 'กำลังตรวจสลิป', icon: '⏳', bg: 'bg-orange-50', text: 'text-orange-700', ring: 'ring-orange-200' },
-  in_progress: { label: 'กำลังดำเนินการ', icon: '🛵', bg: 'bg-blue-50', text: 'text-blue-700', ring: 'ring-blue-200' },
-  delivered: { label: 'ส่งมอบแล้ว', icon: '📦', bg: 'bg-purple-50', text: 'text-purple-700', ring: 'ring-purple-200' },
-  completed: { label: 'เสร็จสิ้น', icon: '✅', bg: 'bg-emerald-50', text: 'text-emerald-700', ring: 'ring-emerald-200' },
-  cancelled: { label: 'ยกเลิกแล้ว', icon: '❌', bg: 'bg-gray-100', text: 'text-gray-600', ring: 'ring-gray-200' },
-};
-
-const formatDate = (dateString: string) => {
-  const date = new Date(dateString);
-  return date.toLocaleDateString('th-TH', { 
-    year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' 
-  });
-};
+// Interface สำหรับจัดการข้อมูลงาน
+interface Job {
+  id: string;
+  title: string;
+  job_type: 'online' | 'onsite';
+  status: 'open' | 'in_progress' | 'completed' | 'closed';
+  budget: number;
+  created_at: string;
+  category: string;
+  proposals?: any[];
+}
 
 export default function MyJobsPage() {
   const router = useRouter();
-  const supabase = createClient();
-  const [mode, setMode] = useState<Mode>('hired');
-  const [userId, setUserId] = useState<string | null>(null);
-  const [jobs, setJobs] = useState<any[]>([]);
+  const supabase = useMemo(() => createClient(), []);
+  
   const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
-
-  const fetchMyJobs = useCallback(async (uid: string) => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('jobs')
-      .select(`
-        *,
-        employer:profiles!employer_id (id, full_name, avatar_url),
-        worker:profiles!worker_id (id, full_name, avatar_url),
-        proposals:job_proposals (
-          *,
-          worker:profiles!worker_id (id, full_name, avatar_url)
-        )
-      `)
-      .or(`employer_id.eq.${uid},worker_id.eq.${uid}`)
-      .order('created_at', { ascending: false });
-
-    if (!error && data) setJobs(data);
-    setLoading(false);
-  }, [supabase]);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState<'employer' | 'freelancer'>('employer');
+  const [jobs, setJobs] = useState<Job[]>([]);
 
   useEffect(() => {
-    const initSession = async () => {
+    const initPage = async () => {
+      setLoading(true);
       const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        setUserId(session.user.id);
-        fetchMyJobs(session.user.id);
-      } else {
+      
+      if (!session?.user) {
+        router.push('/auth/login?next=/my-jobs');
+        return;
+      }
+      setCurrentUser(session.user);
+
+      try {
+        if (activeTab === 'employer') {
+          // 💼 ดึงงานที่ฉันเป็นคนโพสต์จ้าง
+          const { data } = await supabase
+            .from('jobs')
+            .select(`*, proposals:job_proposals(*, profiles(*))`)
+            .eq('employer_id', session.user.id)
+            .order('created_at', { ascending: false });
+          if (data) setJobs(data);
+        } else {
+          // 🛵 ดึงงานที่ฉันส่งข้อเสนอไปทำ
+          const { data } = await supabase
+            .from('job_proposals')
+            .select(`*, job:jobs(*)`)
+            .eq('freelancer_id', session.user.id);
+          
+          if (data) {
+            const mappedJobs = data.map(p => ({ ...p.job, my_proposal: p }));
+            setJobs(mappedJobs as any);
+          }
+        }
+      } catch (err) {
+        console.error("Fetch Error:", err);
+      } finally {
         setLoading(false);
       }
     };
-    initSession();
 
-    // 🌟 เพิ่ม Realtime: ให้หน้าเว็บรีเฟรชเองเวลามีคนกดรับงานหรือแอดมินอนุมัติสลิป
-    const channel = supabase.channel('my-jobs-updates')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, () => {
-        if (userId) fetchMyJobs(userId);
-      }).subscribe();
+    initPage();
+  }, [activeTab, router, supabase]);
 
-    return () => { supabase.removeChannel(channel); };
-  }, [fetchMyJobs, supabase, userId]);
-
-  // แอคชัน: ลูกค้าเลือกล็อกคิวช่าง
-  const handleAcceptProposal = async (job: any, proposal: any) => {
-    if (!confirm(`ยืนยันเลือกล็อกคิว ${proposal.worker?.full_name} ใช่ไหมคะ? (ระบบจะพาไปหน้าชำระเงิน)`)) return;
-    setActionLoading(proposal.id);
-
-    try {
-      const { error } = await supabase.rpc('accept_proposal', {
-        p_job_id: job.id,
-        p_proposal_id: proposal.id,
-        p_worker_id: proposal.worker_id
-      });
-
-      if (error) throw error;
-
-      alert('ล็อกคิวสำเร็จ! พาท่านไปชำระเงินเข้า Escrow ค่ะ 🚀');
-      router.push(`/checkout/${job.id}`); 
-    } catch (err: any) {
-      alert('เกิดข้อผิดพลาดในการจ้างงานค่ะ: ' + err.message);
-      setActionLoading(null);
-    }
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('th-TH', { 
+      month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' 
+    });
   };
-
-  // 🌟 แอคชันใหม่: ควบคุมสถานะงาน 3 สเต็ป
-  const handleAdminApprove = async (jobId: string) => {
-    if (!confirm('จำลอง: แอดมินตรวจสอบสลิปผ่านแล้ว ใช่หรือไม่?')) return;
-    setActionLoading(jobId);
-    await supabase.rpc('admin_approve_job_slip', { p_job_id: jobId });
-    setActionLoading(null);
-  };
-
-  const handleDeliverJob = async (jobId: string) => {
-    if (!confirm('ยืนยันส่งมอบงานให้ลูกค้าใช่ไหมคะ?')) return;
-    setActionLoading(jobId);
-    await supabase.rpc('provider_deliver_job', { p_job_id: jobId });
-    setActionLoading(null);
-  };
-
-  const handleCompleteJob = async (jobId: string) => {
-    if (!confirm('ตรวจสอบงานเรียบร้อย และยืนยันปล่อยเงินให้ช่างใช่ไหมคะ?')) return;
-    setActionLoading(jobId);
-    await supabase.rpc('buyer_complete_job', { p_job_id: jobId });
-    setActionLoading(null);
-  };
-
-  const isHired = mode === 'hired';
-  const displayJobs = isHired ? jobs.filter(j => j.employer_id === userId) : jobs.filter(j => j.worker_id === userId);
-  const accent = isHired
-    ? { text: 'text-[#EE4D2D]', border: 'border-orange-100', grad: 'from-[#EE4D2D] to-[#FF7337]' }
-    : { text: 'text-[#0082FA]', border: 'border-blue-100', grad: 'from-[#0082FA] to-[#00A3FF]' };
 
   return (
-    <div className="min-h-screen bg-[#F4F6F8] flex justify-center font-sans pb-24">
-      <div className="w-full max-w-2xl flex flex-col relative">
+    <div className="min-h-screen bg-[#F4F6F8] flex justify-center font-sans pb-24 md:pb-10">
+      {/* 🌟 ปรับขนาดจอให้รองรับคอมพิวเตอร์ (Responsive) เหมือนหน้าแรก */}
+      <div className="w-full lg:max-w-5xl xl:max-w-6xl bg-[#F4F6F8] min-h-screen relative flex flex-col md:shadow-2xl overflow-x-hidden md:border-x border-gray-200/50">
         
-        {/* Header */}
-        <div className="bg-gradient-to-b from-[#EE4D2D] to-[#FF7337] rounded-[2.5rem] p-6 pt-10 pb-8 shadow-md relative z-20 m-3 mt-4 flex flex-col">
-          <Link href="/" className="w-11 h-11 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm border border-white/30 text-white text-xl mb-4 active:scale-95 transition-transform">←</Link>
-          <h1 className="text-3xl font-black text-white tracking-tight">งานของฉัน</h1>
-          <p className="text-[11px] font-bold text-white/80 mt-1">จัดการรายการจ้างงานและงานที่รับผิดชอบ</p>
-        </div>
+        {/* 🟠 Header ไล่สีน้ำเงิน-ฟ้า ให้ความรู้สึกจัดการงาน (Management) */}
+        <header className="bg-gradient-to-br from-[#0047FF] to-[#0082FA] px-6 pt-12 pb-20 md:pb-28 rounded-b-[2.5rem] md:rounded-b-[4rem] text-white shadow-lg relative z-20 flex flex-col items-center">
+          
+          {/* ปุ่มย้อนกลับมุมซ้าย */}
+          <button 
+            onClick={() => router.back()} 
+            className="absolute top-6 left-6 md:top-10 md:left-10 w-10 h-10 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 active:scale-95 transition-all backdrop-blur-md"
+          >
+            ←
+          </button>
 
-        {/* Tabs */}
-        <div className="px-5 pt-2 z-10 -mt-2">
-          <div className="relative bg-white rounded-2xl p-1.5 flex shadow-sm border border-gray-100">
-            <span className={`absolute top-1.5 bottom-1.5 w-[calc(50%-0.375rem)] rounded-xl bg-gradient-to-r ${accent.grad} shadow-md transition-all duration-300 ${isHired ? 'left-1.5' : 'left-[calc(50%+0rem)]'}`} />
-            <button onClick={() => setMode('hired')} className={`relative z-10 flex-1 py-3 text-sm font-black transition-colors ${isHired ? 'text-white' : 'text-gray-500'}`}>💼 งานที่ฉันจ้าง</button>
-            <button onClick={() => setMode('received')} className={`relative z-10 flex-1 py-3 text-sm font-black transition-colors ${!isHired ? 'text-white' : 'text-gray-500'}`}>🛵 งานที่ฉันรับ</button>
+          <div className="text-center">
+            <h1 className="text-3xl md:text-5xl font-black tracking-tight drop-shadow-md">งานของฉัน 📋</h1>
+            <p className="text-xs md:text-sm font-bold text-blue-100 opacity-90 mt-2 uppercase tracking-widest">Job Management Dashboard</p>
           </div>
+        </header>
+
+        {/* 🌟 Tab Switcher (ดันขึ้นไปเกย Header) */}
+        <div className="flex justify-center -mt-8 md:-mt-10 relative z-30 px-5">
+           <div className="bg-white p-1.5 rounded-full shadow-xl border border-gray-100 flex gap-1 w-full max-w-md md:max-w-lg">
+             <button 
+               onClick={() => setActiveTab('employer')}
+               className={`flex-1 py-3 md:py-4 rounded-full text-xs md:text-sm font-black transition-all ${activeTab === 'employer' ? 'bg-[#0047FF] text-white shadow-lg shadow-blue-200' : 'text-gray-500 hover:bg-gray-50'}`}
+             >
+               💼 งานที่ฉันจ้าง
+             </button>
+             <button 
+               onClick={() => setActiveTab('freelancer')}
+               className={`flex-1 py-3 md:py-4 rounded-full text-xs md:text-sm font-black transition-all ${activeTab === 'freelancer' ? 'bg-[#00C300] text-white shadow-lg shadow-green-200' : 'text-gray-500 hover:bg-gray-50'}`}
+             >
+               🛵 งานที่ฉันรับทำ
+             </button>
+           </div>
         </div>
 
-        <main className="px-5 mt-6 space-y-4">
+        <main className="flex-1 p-5 md:px-10 mt-6 md:mt-10 w-full max-w-4xl mx-auto space-y-6">
+          
           {loading ? (
-            <div className="text-center py-12">
-              <div className="w-8 h-8 border-4 border-gray-200 border-t-[#EE4D2D] rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="font-bold text-gray-400 text-sm">กำลังโหลดข้อมูล...</p>
+            <div className="space-y-6 animate-pulse">
+               {[1, 2].map(i => <div key={i} className="h-64 bg-white rounded-[2.5rem] border border-gray-100 shadow-sm" />)}
             </div>
-          ) : displayJobs.length === 0 ? (
-            <div className="bg-white rounded-[2rem] p-12 text-center border border-gray-100 shadow-sm mt-4">
-              <div className="text-6xl mb-4 opacity-50">📭</div>
-              <p className="font-black text-gray-800 text-lg">ยังไม่มีรายการงาน</p>
+          ) : jobs.length === 0 ? (
+            <div className="bg-white rounded-[2.5rem] p-16 text-center border border-gray-100 shadow-sm mt-4">
+              <div className="text-7xl mb-6 opacity-30 grayscale">📭</div>
+              <h3 className="font-black text-gray-800 text-xl">ยังไม่มีรายการงานในขณะนี้</h3>
+              <p className="text-sm text-gray-400 font-bold mt-2">ไปโพสต์จ้างงาน หรือค้นหาโปรเจกต์ใหม่ๆ กันเถอะค่ะ</p>
+              <Link href="/job-board" className="mt-8 inline-block bg-[#0047FF] text-white font-black px-10 py-4 rounded-full shadow-xl hover:shadow-blue-200 active:scale-95 transition-all">
+                ไปที่บอร์ดหางาน ➔
+              </Link>
             </div>
           ) : (
-            displayJobs.map((job) => {
-              const s = STATUS_META[job.status as Status] || STATUS_META.open;
-              const proposals = job.proposals?.filter((p: any) => p.status === 'pending') || [];
-              const acceptedProposal = job.proposals?.find((p: any) => p.status === 'accepted') || job.proposals?.[0];
-
-              // คำนวณ Progress Bar
-              let progressIndex = 0;
-              if (job.status === 'verifying_slip') progressIndex = 1;
-              if (job.status === 'in_progress') progressIndex = 2;
-              if (job.status === 'delivered') progressIndex = 3;
-              if (job.status === 'completed') progressIndex = 4;
-              if (job.status === 'cancelled') progressIndex = -1;
-
-              const steps = ['รับงาน', 'พักเงิน', 'กำลังทำ', 'ส่งมอบ', 'จบงาน'];
-
-              return (
-                <article key={job.id} className={`bg-white rounded-[2rem] p-5 shadow-sm border-2 ${accent.border} relative overflow-hidden`}>
-                  <div className={`absolute top-0 left-0 bottom-0 w-1.5 bg-gradient-to-b ${accent.grad}`} />
-
-                  <div className="flex justify-between items-center mb-3">
-                    <span className="text-[10px] font-black uppercase bg-gray-100 text-gray-600 px-3 py-1.5 rounded-full">{job.job_type || 'ทั่วไป'}</span>
-                    <span className={`text-[10px] font-black px-3 py-1.5 rounded-full ${s.bg} ${s.text} border ${s.ring}`}>{s.icon} {s.label}</span>
+            jobs.map((job) => (
+              <article key={job.id} className="bg-white rounded-[2.5rem] p-6 md:p-8 shadow-sm border border-gray-100 hover:shadow-md transition-all relative overflow-hidden group">
+                
+                {/* Status Badges */}
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-2">
+                    <span className={`text-[10px] font-black px-3 py-1 rounded-lg text-white shadow-sm tracking-wider ${job.job_type === 'onsite' ? 'bg-[#EE4D2D]' : 'bg-[#0047FF]'}`}>
+                      {job.job_type === 'onsite' ? '📍 ONSITE' : '💻 ONLINE'}
+                    </span>
+                    <span className="text-[10px] font-black text-yellow-600 bg-yellow-50 px-3 py-1 rounded-lg border border-yellow-100 flex items-center gap-2">
+                      <span className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></span>
+                      {job.status === 'open' ? 'รอคนมาสมัคร' : job.status === 'in_progress' ? 'กำลังทำงาน' : 'เสร็จสิ้น'}
+                    </span>
                   </div>
+                  <p className="text-[11px] text-gray-400 font-bold flex items-center gap-1">
+                    <span className="text-sm">🗓️</span> {formatDate(job.created_at)}
+                  </p>
+                </div>
 
-                  <h3 className="font-black text-gray-800 text-base leading-tight">{job.title}</h3>
-                  <p className="text-[10px] text-gray-400 font-bold mt-1 mb-2">⏰ {formatDate(job.created_at)}</p>
+                <h2 className="text-xl md:text-3xl font-black text-gray-900 mb-6 leading-tight group-hover:text-[#0047FF] transition-colors">{job.title}</h2>
+                
+                {/* 🌟 Premium Progress Tracker */}
+                <div className="relative mb-10 mt-4 px-2 md:px-10">
+                  <div className="absolute left-10 right-10 top-4 h-1.5 bg-gray-100 rounded-full -z-10"></div>
+                  {/* แถบสีที่จะวิ่งตามสถานะ */}
+                  <div 
+                    className="absolute left-10 top-4 h-1.5 bg-[#00C300] rounded-full -z-10 transition-all duration-1000" 
+                    style={{ width: job.status === 'open' ? '0%' : job.status === 'in_progress' ? '50%' : '100%' }}
+                  ></div>
+                  
+                  <div className="flex justify-between">
+                    <Step node="1" label="โพสต์งาน" active={true} color="bg-[#00C300]" />
+                    <Step node="2" label="พักเงิน/ทำ" active={job.status === 'in_progress' || job.status === 'completed'} color="bg-[#0047FF]" />
+                    <Step node="3" label="ปล่อยเงิน" active={job.status === 'completed'} color="bg-[#F59E0B]" />
+                  </div>
+                </div>
 
-                  {/* Status Tracker Progress Bar */}
-                  {job.status !== 'cancelled' && (
-                    <div className="mt-3 mb-4">
-                      <div className="flex items-center gap-1">
-                        {steps.map((step, idx) => (
-                          <div key={step} className={`flex-1 h-1.5 rounded-full transition-colors duration-500 ${idx <= progressIndex ? 'bg-emerald-500' : 'bg-gray-100'}`} />
-                        ))}
+                {/* Footer Info */}
+                <div className="flex justify-between items-end border-t border-gray-50 pt-6">
+                  <div>
+                    <p className="text-[10px] text-gray-400 font-black uppercase tracking-[0.15em] mb-1">งบประมาณที่ตั้งไว้</p>
+                    <p className="text-2xl font-black text-gray-800">
+                      {job.budget ? `฿${job.budget.toLocaleString()}` : 'เสนอราคา'}
+                    </p>
+                  </div>
+                  <Link 
+                    href={`/jobs/${job.id}`}
+                    className="text-xs font-black text-[#0047FF] bg-blue-50 px-6 py-3 rounded-2xl hover:bg-blue-600 hover:text-white transition-all shadow-sm"
+                  >
+                    ดูรายละเอียดงาน
+                  </Link>
+                </div>
+
+                {/* 🌟 Proposals Section (โชว์เฉพาะฝั่งคนจ้าง และเมื่องานยังเปิดอยู่) */}
+                {activeTab === 'employer' && job.proposals && job.proposals.length > 0 && job.status === 'open' && (
+                  <div className="mt-8 bg-gray-50 -mx-6 -mb-6 md:-mx-8 md:-mb-8 px-6 md:px-8 py-8 border-t border-gray-100">
+                    <div className="flex items-center justify-between mb-5">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-3 w-3 rounded-full bg-blue-500 animate-ping"></span>
+                        <p className="text-sm font-black text-gray-800">มีข้อเสนอใหม่จากช่าง ({job.proposals.length})</p>
                       </div>
-                      <div className="flex justify-between mt-1 px-1">
-                        <span className="text-[8px] font-black text-emerald-600">จองงาน</span>
-                        <span className={`text-[8px] font-black ${progressIndex >= 1 ? 'text-emerald-600' : 'text-gray-300'}`}>พักเงิน/ทำ</span>
-                        <span className={`text-[8px] font-black ${progressIndex >= 4 ? 'text-emerald-600' : 'text-gray-300'}`}>ปล่อยเงิน</span>
-                      </div>
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">ปัดดูข้อเสนอ 👉</span>
                     </div>
-                  )}
 
-                  {/* ป้ายสถานะ Escrow */}
-                  {(job.status === 'verifying_slip' || job.status === 'in_progress' || job.status === 'delivered') && (
-                    <div className={`mb-4 border rounded-2xl p-3 flex items-start gap-3 shadow-sm ${job.status === 'verifying_slip' ? 'bg-orange-50/80 border-orange-100' : 'bg-emerald-50/80 border-emerald-100'}`}>
-                      <div className="text-xl">{job.status === 'verifying_slip' ? '⏳' : '🔒'}</div>
-                      <div>
-                        <p className={`text-[11px] font-black tracking-wide ${job.status === 'verifying_slip' ? 'text-orange-800' : 'text-emerald-800'}`}>
-                          {job.status === 'verifying_slip' 
-                            ? `กำลังตรวจสอบสลิป ${job.budget?.toLocaleString('th-TH')} บาท` 
-                            : `เงิน ${job.budget?.toLocaleString('th-TH')} บาท ถูกพักไว้ในระบบอย่างปลอดภัย`}
-                        </p>
-                        <p className={`text-[10px] font-bold mt-0.5 leading-tight ${job.status === 'verifying_slip' ? 'text-orange-600/80' : 'text-emerald-600/80'}`}>
-                          {job.status === 'verifying_slip' 
-                            ? 'แอดมินกำลังตรวจสอบสลิปโอนเงิน เมื่อผ่านแล้วช่างจะเริ่มงานทันที'
-                            : (isHired ? 'ระบบจะโอนให้ช่าง ก็ต่อเมื่อคุณตรวจสอบและกดยืนยันรับงานเท่านั้น' : 'ผู้จ้างชำระเงินเรียบร้อยแล้ว ลุยงานและส่งมอบผ่านระบบได้เลย')}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* ส่วนแสดงรายชื่อผู้เสนอตัว (ฝั่งผู้จ้าง) แบบเลื่อนซ้าย-ขวา */}
-                  {isHired && job.status === 'open' && proposals.length > 0 && (
-                    <div className="mt-4 pt-4 border-t border-gray-100">
-                      <div className="flex justify-between items-end mb-3">
-                        <p className="text-[11px] font-black text-[#EE4D2D] flex items-center gap-1.5">
-                          <span className="relative flex h-2 w-2">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-[#EE4D2D]"></span>
-                          </span>
-                          มีข้อเสนอใหม่ {proposals.length} รายการ
-                        </p>
-                        <span className="text-[9px] font-bold text-gray-400">ปัดขวาเพื่อดูเพิ่มเติม 👉</span>
-                      </div>
-                      
-                      {/* กล่องเลื่อนซ้ายขวา (Horizontal Scroll) */}
-                      <div className="flex overflow-x-auto gap-3 pb-4 snap-x snap-mandatory scrollbar-hide -mx-5 px-5">
-                        {proposals.map((p: any) => (
-                          <div key={p.id} className="min-w-[260px] max-w-[260px] snap-center bg-white rounded-2xl p-4 border-2 border-orange-100 shadow-sm relative shrink-0 flex flex-col">
-                            <div className="flex justify-between items-start mb-2">
-                              <div className="flex items-center gap-2">
-                                <div className="w-8 h-8 bg-gray-50 rounded-full flex items-center justify-center text-sm shadow-sm border border-gray-100 overflow-hidden shrink-0">
-                                  {p.worker?.avatar_url ? (
-                                    <img src={p.worker.avatar_url} className="w-full h-full object-cover" />
-                                  ) : ('👤')}
-                                </div>
-                                <div>
-                                  <p className="text-xs font-black text-gray-800 line-clamp-1">{p.worker?.full_name}</p>
-                                  <p className="text-[9px] font-bold text-gray-400 mt-0.5">⭐ 5.0 (รีวิว 12)</p>
-                                </div>
+                    <div className="flex gap-4 overflow-x-auto scrollbar-hide snap-x pb-4">
+                      {job.proposals.map((prop: any) => (
+                        <div key={prop.id} className="w-[88%] md:w-[340px] shrink-0 snap-center bg-white border border-gray-200 rounded-[2rem] p-5 shadow-sm hover:shadow-lg transition-all border-b-4 border-b-blue-500">
+                          <div className="flex justify-between items-start mb-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-12 h-12 rounded-2xl bg-gray-100 overflow-hidden shadow-inner border border-gray-100">
+                                {prop.profiles?.avatar_url ? (
+                                  <img src={prop.profiles.avatar_url} className="w-full h-full object-cover" />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center text-xl">👤</div>
+                                )}
                               </div>
-                              <p className="text-sm font-black text-[#EE4D2D] bg-orange-50 px-2 py-1 rounded-lg">{p.proposed_price?.toLocaleString('th-TH')} บาท</p>
-                            </div>
-                            
-                            <div className="bg-gray-50 rounded-xl p-2.5 mb-3 flex-1 border border-gray-100">
-                              <p className="text-[10px] text-gray-600 font-medium leading-relaxed line-clamp-2">"{p.cover_letter}"</p>
-                            </div>
-                            
-                            <div className="flex flex-col gap-2 mt-auto">
-                              <div className="flex gap-2">
-                                {/* 🌟 ปุ่มทักแชท */}
-                                <Link 
-                                  href={`/chat/proposal/${p.id}`} 
-                                  className="flex-1 bg-blue-50 text-blue-600 py-2.5 rounded-xl text-[11px] font-black shadow-sm flex justify-center items-center gap-1 active:scale-95 transition-all"
-                                >
-                                  💬 คุยก่อนจ้าง
-                                </Link>
-                                <button className="w-10 h-10 bg-white text-gray-400 border border-gray-200 rounded-xl flex items-center justify-center text-sm active:scale-95 transition-all hover:bg-gray-50">✕</button>
+                              <div>
+                                <p className="text-sm font-black text-gray-800">{prop.profiles?.full_name || 'ช่างนิรนาม'}</p>
+                                <p className="text-xs font-bold text-yellow-500">⭐ 5.0 <span className="text-gray-300 ml-1">| 12 งาน</span></p>
                               </div>
-                              <button 
-                                disabled={!!actionLoading}
-                                onClick={() => handleAcceptProposal(job, p)}
-                                className="w-full bg-[#EE4D2D] text-white py-2.5 rounded-xl text-[11px] font-black shadow-sm active:scale-95 transition-all disabled:opacity-50 flex justify-center items-center"
-                              >
-                                {actionLoading === p.id ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : '✅ ยืนยันจ้างคนนี้'}
-                              </button>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-lg font-black text-[#00C300]">฿{Number(prop.proposed_price).toLocaleString()}</p>
+                              <p className="text-[9px] text-gray-400 font-bold uppercase tracking-tighter">เสนอราคามาที่</p>
                             </div>
                           </div>
-                        ))}
-                      </div>
-                      
-                      {/* ซ่อน Scrollbar ของ Container นี้ */}
-                      <style dangerouslySetInnerHTML={{__html: `
-                        .scrollbar-hide::-webkit-scrollbar { display: none; }
-                        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
-                      `}} />
-                    </div>
-                  )}
-
-                  {/* 🌟 ราคา & แอคชันควบคุมสถานะงาน */}
-                  <div className="flex justify-between items-end pt-4 border-t border-gray-100 mt-3">
-                    <div>
-                      <p className="text-[10px] text-gray-400 font-bold uppercase">งบประมาณ/ค่าบริการ</p>
-                      <p className={`font-black text-2xl ${accent.text} tracking-tight`}>
-                        {job.budget ? `${job.budget.toLocaleString('th-TH')} บาท` : 'เสนอราคา'}
-                      </p>
-                    </div>
-                    
-                    <div className="flex gap-2">
-                      {/* --- โหมดลูกค้า (isHired = true) --- */}
-                      {isHired && job.status === 'verifying_slip' && (
-                        <button onClick={() => handleAdminApprove(job.id)} disabled={actionLoading === job.id} className="bg-orange-100 hover:bg-orange-200 text-orange-700 px-4 py-2.5 rounded-xl text-[10px] font-black shadow-sm flex items-center gap-1 transition-colors">
-                          {actionLoading === job.id ? <span className="animate-spin text-sm">⏳</span> : '⏳ จำลองแอดมินอนุมัติ'}
-                        </button>
-                      )}
-                      
-                      {isHired && job.status === 'in_progress' && (
-                        <span className="bg-blue-50 text-blue-600 px-4 py-2.5 rounded-xl text-[11px] font-black shadow-sm">⏳ ช่างกำลังทำ...</span>
-                      )}
-
-                      {isHired && job.status === 'delivered' && (
-                        <button onClick={() => handleCompleteJob(job.id)} disabled={actionLoading === job.id} className="bg-emerald-500 text-white px-4 py-2.5 rounded-xl text-[11px] font-black shadow-md active:scale-95 transition-transform">
-                          {actionLoading === job.id ? <span className="animate-spin">⏳</span> : '✅ ตรวจรับ & ปล่อยเงิน'}
-                        </button>
-                      )}
-
-                      {/* --- โหมดช่าง (!isHired = false) --- */}
-                      {!isHired && job.status === 'verifying_slip' && (
-                        <span className="bg-orange-50 text-orange-600 px-4 py-2.5 rounded-xl text-[11px] font-black shadow-sm">⏳ รอลูกค้าชำระเงิน</span>
-                      )}
-
-                      {!isHired && job.status === 'in_progress' && (
-                        <button onClick={() => handleDeliverJob(job.id)} disabled={actionLoading === job.id} className="bg-purple-500 text-white px-4 py-2.5 rounded-xl text-[11px] font-black shadow-md active:scale-95 transition-transform">
-                          {actionLoading === job.id ? <span className="animate-spin">⏳</span> : '📦 กดส่งมอบงาน'}
-                        </button>
-                      )}
-
-                      {!isHired && job.status === 'delivered' && (
-                        <span className="bg-purple-50 text-purple-600 px-4 py-2.5 rounded-xl text-[11px] font-black shadow-sm">⏳ รอลูกค้าตรวจรับ</span>
-                      )}
-
-                      {/* --- ปุ่มแชท มีทั้งสองฝั่ง (ถ้ารับงานแล้ว) --- */}
-                      {(job.status === 'in_progress' || job.status === 'delivered') && acceptedProposal && (
-                        <Link href={`/chat/proposal/${acceptedProposal.id}`} className="bg-gray-100 text-gray-700 hover:bg-gray-200 px-4 py-2.5 rounded-xl text-[11px] font-black shadow-sm active:scale-95 transition-transform">
-                          💬 แชท
-                        </Link>
-                      )}
-
-                      {/* --- จบงาน --- */}
-                      {job.status === 'completed' && (
-                        <span className="bg-emerald-100 text-emerald-700 px-4 py-2.5 rounded-xl text-[10px] font-black">🎉 งานสำเร็จแล้ว</span>
-                      )}
+                          
+                          <div className="bg-gray-50 p-4 rounded-2xl mb-5">
+                            <p className="text-[11px] font-medium text-gray-600 leading-relaxed italic line-clamp-2">
+                              "{prop.cover_letter || 'พร้อมเริ่มงานทันทีครับ ประสบการณ์ตรงสายงานนี้แน่นอน...'}"
+                            </p>
+                          </div>
+                          
+                          <div className="flex gap-2">
+                            <button className="flex-1 py-3 bg-gray-100 text-gray-600 rounded-xl text-[11px] font-black hover:bg-gray-200 active:scale-95 transition-all">
+                              💬 คุยรายละเอียด
+                            </button>
+                            <button 
+                              onClick={() => router.push(`/checkout/${job.id}?proposal_id=${prop.id}`)}
+                              className="flex-1 py-3 bg-[#00C300] text-white rounded-xl text-[11px] font-black shadow-lg shadow-green-100 hover:bg-[#00A300] active:scale-95 transition-all"
+                            >
+                              ✅ จ้างคนนี้
+                            </button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                </article>
-              );
-            })
+                )}
+              </article>
+            ))
           )}
         </main>
       </div>
+
+      {/* Hide Scrollbar CSS */}
+      <style dangerouslySetInnerHTML={{__html: `
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+      `}} />
+    </div>
+  );
+}
+
+// Component ย่อยสำหรับ Progress Step
+function Step({ node, label, active, color }: { node: string, label: string, active: boolean, color: string }) {
+  return (
+    <div className="flex flex-col items-center gap-3 relative">
+      <div className={`w-9 h-9 md:w-10 md:h-10 rounded-full flex items-center justify-center font-black text-sm transition-all duration-500 shadow-md ${active ? `${color} text-white scale-110` : 'bg-white text-gray-300 border-2 border-gray-100'}`}>
+        {active ? '✓' : node}
+      </div>
+      <span className={`text-[10px] md:text-xs font-black transition-colors duration-500 ${active ? 'text-gray-800' : 'text-gray-300'}`}>
+        {label}
+      </span>
     </div>
   );
 }
