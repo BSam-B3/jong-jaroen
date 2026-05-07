@@ -37,7 +37,7 @@ export default function MyJobsPage() {
       }
       setCurrentUser(session.user);
 
-      // 🌟 ดึงข้อมูลงาน 
+      // 🌟 ดึงข้อมูลงาน (ลอจิกนี้เจมเขียนเผื่อไว้ บีสามสามารถปรับให้ตรงกับ Query เดิมที่มีได้เลยค่ะ)
       try {
         if (activeTab === 'employer') {
           // ดึงงานที่ฉันเป็นคนโพสต์จ้าง
@@ -49,6 +49,7 @@ export default function MyJobsPage() {
           if (data) setJobs(data);
         } else {
           // ดึงงานที่ฉันไปเสนอตัวรับทำ (ดึงจากตาราง proposals แล้ว join กลับไปหา jobs)
+          // *สมมติโครงสร้างคร่าวๆ*
           const { data } = await supabase
             .from('job_proposals')
             .select(`*, job:jobs(*)`)
@@ -79,7 +80,7 @@ export default function MyJobsPage() {
       {/* 🌟 ปรับขนาดจอให้รองรับคอมพิวเตอร์ (Responsive) เหมือนหน้า Profile */}
       <div className="w-full lg:max-w-5xl xl:max-w-6xl bg-[#F8FAFC] min-h-screen relative flex flex-col md:shadow-2xl overflow-x-hidden md:border-x border-gray-200/50">
         
-        {/* 🟠 Header คุมโทนน้ำเงิน */}
+        {/* 🟠 Header */}
         <header className="bg-gradient-to-br from-[#0047FF] to-[#0082FA] px-6 pt-12 pb-16 md:pb-24 rounded-b-[2.5rem] md:rounded-b-[4rem] text-white shadow-lg relative z-20">
           <div className="flex items-center gap-4 max-w-4xl mx-auto">
             <button onClick={() => router.back()} className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 active:scale-95 transition-all backdrop-blur-md">
@@ -103,7 +104,7 @@ export default function MyJobsPage() {
              </button>
              <button 
                onClick={() => setActiveTab('freelancer')}
-               className={`flex-1 py-3 rounded-full text-xs md:text-sm font-black transition-all ${activeTab === 'freelancer' ? 'bg-[#0047FF] text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}
+               className={`flex-1 py-3 rounded-full text-xs md:text-sm font-black transition-all ${activeTab === 'freelancer' ? 'bg-[#00C300] text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}
              >
                🛵 งานที่ฉันรับ
              </button>
@@ -137,7 +138,7 @@ export default function MyJobsPage() {
                     </span>
                     <span className="text-[10px] font-bold text-yellow-600 bg-yellow-50 px-2 py-1 rounded-md border border-yellow-100 flex items-center gap-1">
                       <span className="w-1.5 h-1.5 bg-yellow-400 rounded-full animate-pulse"></span>
-                      {job.status === 'open' ? 'รอคนมาสมัคร' : job.status === 'in_progress' ? 'กำลังดำเนินการ' : 'เสร็จสิ้น'}
+                      {job.status === 'open' ? 'รอคนรับงาน' : job.status === 'in_progress' ? 'กำลังดำเนินการ' : 'เสร็จสิ้น'}
                     </span>
                   </div>
                   <p className="text-[10px] text-gray-400 font-bold flex items-center gap-1"><span className="text-sm">⏰</span> {formatDate(job.created_at)}</p>
@@ -170,11 +171,11 @@ export default function MyJobsPage() {
                 <div className="flex justify-between items-end border-t border-gray-50 pt-4">
                   <div>
                     <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">งบประมาณ / ค่าบริการ</p>
-                    <p className="text-xl font-black text-gray-800">{job.budget ? `฿${job.budget.toLocaleString()}` : 'รอเสนอราคา'}</p>
+                    <p className="text-xl font-black text-gray-800">{job.budget ? `${job.budget.toLocaleString()} บาท` : 'รอเสนอราคา'}</p>
                   </div>
-                  <Link href={`/jobs/${job.id}`} className="text-[11px] font-bold text-[#0047FF] bg-blue-50 px-4 py-2 rounded-xl hover:bg-blue-100 transition-colors">
+                  <button className="text-[11px] font-bold text-[#0047FF] bg-blue-50 px-4 py-2 rounded-xl hover:bg-blue-100 transition-colors">
                     ดูรายละเอียด
-                  </Link>
+                  </button>
                 </div>
 
                 {/* 🌟 ส่วนแสดงข้อเสนอจากช่าง (Proposals) */}
@@ -202,8 +203,8 @@ export default function MyJobsPage() {
                               </div>
                             </div>
                             <div className="text-right">
-                              <p className="text-sm font-black text-[#00C300]">฿{Number(prop.proposed_price).toLocaleString()}</p>
-                              <p className="text-[9px] text-gray-400 font-bold uppercase">เสนอราคามาที่</p>
+                              <p className="text-sm font-black text-[#00C300]">{Number(prop.proposed_price).toLocaleString()}</p>
+                              <p className="text-[9px] text-gray-400 font-bold uppercase">บาท</p>
                             </div>
                           </div>
                           
@@ -212,14 +213,9 @@ export default function MyJobsPage() {
                           </p>
                           
                           <div className="flex gap-2">
-                            {/* 🌟 ลิงก์ไปแชททำงานแล้วค่ะ */}
-                            <button 
-                              onClick={() => router.push(`/chat?job=${job.id}&provider=${prop.freelancer_id}`)}
-                              className="flex-1 py-2 bg-gray-100 text-gray-600 rounded-xl text-[10px] font-black hover:bg-gray-200 transition-colors"
-                            >
+                            <button className="flex-1 py-2 bg-gray-100 text-gray-600 rounded-xl text-[10px] font-black hover:bg-gray-200 transition-colors">
                               💬 คุยก่อนจ้าง
                             </button>
-                            {/* 🌟 ลิงก์ไปจ่ายเงิน */}
                             <button 
                               onClick={() => router.push(`/checkout/${job.id}?proposal_id=${prop.id}`)}
                               className="flex-1 py-2 bg-[#00C300] text-white rounded-xl text-[10px] font-black shadow-md hover:bg-[#00A300] transition-colors"
@@ -241,20 +237,6 @@ export default function MyJobsPage() {
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
       `}} />
-    </div>
-  );
-}
-
-// Component ย่อยสำหรับ Progress Step
-function Step({ node, label, active, color }: { node: string, label: string, active: boolean, color: string }) {
-  return (
-    <div className="flex flex-col items-center gap-3 relative">
-      <div className={`w-9 h-9 md:w-10 md:h-10 rounded-full flex items-center justify-center font-black text-sm transition-all duration-500 shadow-md ${active ? `${color} text-white scale-110` : 'bg-white text-gray-300 border-2 border-gray-100'}`}>
-        {active ? '✓' : node}
-      </div>
-      <span className={`text-[10px] md:text-xs font-black transition-colors duration-500 ${active ? 'text-gray-800' : 'text-gray-300'}`}>
-        {label}
-      </span>
     </div>
   );
 }
