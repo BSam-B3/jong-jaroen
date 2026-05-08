@@ -215,6 +215,7 @@ function ChatHubContent() {
   return (
     <div className="min-h-screen bg-[#F4F6F8] font-sans flex flex-col md:flex-row max-w-6xl mx-auto md:p-6 h-screen">
       
+      {/* 📱 Mobile Header */}
       <div className={`md:hidden bg-gradient-to-r from-[#EE4D2D] to-[#FF7337] p-4 text-white shadow-md ${activeChat ? 'hidden' : 'block'}`}>
         <div className="flex items-center gap-3">
           <Link href="/my-jobs" className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center font-black active:scale-95">←</Link>
@@ -222,6 +223,7 @@ function ChatHubContent() {
         </div>
       </div>
 
+      {/* 👥 Sidebar: ลิสต์ห้องแชท */}
       <div className={`w-full md:w-[320px] bg-white md:rounded-l-[2rem] border-r border-gray-100 flex flex-col overflow-hidden shadow-sm ${activeChat ? 'hidden md:flex' : 'flex'} h-[calc(100vh-64px)] md:h-full`}>
         <div className="hidden md:flex bg-gradient-to-r from-[#EE4D2D] to-[#FF7337] p-6 text-white items-center gap-3">
           <Link href="/my-jobs" className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center font-black active:scale-95 hover:bg-white/30 transition-colors">←</Link>
@@ -251,7 +253,6 @@ function ChatHubContent() {
                   </div>
                   <div className="flex-1 truncate">
                     <h3 className="font-black text-gray-800 text-sm truncate">{partner?.full_name || 'ผู้ใช้จงเจริญ'}</h3>
-                    {/* 🌟 แสดง Ref และชื่องานให้ชัดเจน เพื่อกันสับสนตั้งแต่แรกเห็น */}
                     <div className="flex items-center gap-1 mt-0.5">
                       <span className="text-[9px] font-black text-gray-500 bg-white border border-gray-200 px-1.5 rounded">#{shortRef}</span>
                       <p className="text-[10px] text-[#EE4D2D] font-bold truncate">{chat.job?.title}</p>
@@ -264,6 +265,7 @@ function ChatHubContent() {
         </div>
       </div>
 
+      {/* 💬 Main Area: หน้าต่างแชท */}
       {activeChat ? (
         <div className={`flex-1 bg-[#F8FAFC] flex flex-col md:rounded-r-[2rem] shadow-sm relative h-screen md:h-full`}>
           
@@ -275,7 +277,6 @@ function ChatHubContent() {
               </div>
               <div className="flex-1">
                 <h2 className="font-black text-gray-800 leading-tight line-clamp-1">{getChatPartner(activeChat)?.full_name || 'ผู้สนทนา'}</h2>
-                {/* 🌟 ระบบแจ้งเตือนกันสับสน (Anti-Confusion Panel) บนหัวแชท */}
                 <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                   <span className="text-[9px] font-black text-gray-500 bg-gray-100 border border-gray-200 px-1.5 py-0.5 rounded shadow-sm">Ref: #{currentJob?.id.substring(0, 6).toUpperCase()}</span>
                   <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded shadow-sm">฿{currentJob?.budget?.toLocaleString() || '0'}</span>
@@ -287,7 +288,6 @@ function ChatHubContent() {
               </div>
             </div>
 
-            {/* 🌟 Action Panel ควบคุมงานสไตล์ไรเดอร์ */}
             <div className="pt-3 border-t border-gray-50">
               <input type="file" accept="image/*" ref={fileInputRef} onChange={handleUploadAndSubmit} className="hidden" />
               
@@ -382,4 +382,35 @@ function ChatHubContent() {
               <button 
                 type="submit" 
                 disabled={!newMessage.trim()}
-                className="
+                className="w-12 h-12 bg-[#EE4D2D] text-white rounded-full flex items-center justify-center shadow-md active:scale-95 disabled:opacity-50 disabled:active:scale-100 transition-all shrink-0"
+              >
+                <svg className="w-5 h-5 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
+              </button>
+            </form>
+          </div>
+
+        </div>
+      ) : (
+        <div className="hidden md:flex flex-1 bg-[#F8FAFC] items-center justify-center rounded-r-[2rem] border-y border-r border-gray-100 shadow-sm">
+          <div className="text-center opacity-40 grayscale">
+            <div className="text-7xl mb-4">💬</div>
+            <p className="font-black text-gray-800 text-lg">เลือกห้องแชทเพื่อเริ่มสนทนา</p>
+          </div>
+        </div>
+      )}
+
+      <style dangerouslySetInnerHTML={{__html: `
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      `}} />
+    </div>
+  );
+}
+
+export default function ChatPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#F4F6F8] flex items-center justify-center font-black text-[#EE4D2D]">กำลังโหลดห้องแชท...</div>}>
+      <ChatHubContent />
+    </Suspense>
+  );
+}
