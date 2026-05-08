@@ -26,18 +26,29 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       if (session?.user) setCurrentUser(session.user);
 
       try {
-        // ดึงข้อมูลงาน พร้อมข้อมูลลูกค้า และเช็คว่าเราเคยเสนอราคาไปหรือยัง
-        const { data: jobData } = await supabase
+        // 1. ดึงข้อมูลงาน และข้อมูลผู้ว่าจ้างก่อน
+        const { data: jobData, error: jobError } = await supabase
           .from('jobs')
           .select(`
             *,
-            employer:profiles!employer_id(full_name, avatar_url),
-            proposals:job_proposals(freelancer_id)
+            employer:profiles!employer_id(full_name, avatar_url)
           `)
           .eq('id', jobId)
           .single();
         
-        if (jobData) setJob(jobData);
+        if (jobError) throw jobError;
+
+        // 2. ดึงข้อมูลข้อเสนอ (Proposals) แยกต่างหาก เพื่อป้องกันการ Join Table Error
+        const { data: proposalsData } = await supabase
+          .from('job_proposals')
+          .select('freelancer_id')
+          .eq('job_id', jobId);
+
+        // 3. เอาข้อมูลมารวมกันแล้วเซ็ตลง State
+        if (jobData) {
+          setJob({ ...jobData, proposals: proposalsData || [] });
+        }
+
       } catch (error) {
         console.error("Error fetching job details:", error);
       } finally {
@@ -77,7 +88,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       if (error) throw error;
       
       alert('🎉 ส่งข้อเสนอสำเร็จ! รอลูกค้าติดต่อกลับนะคะ');
-      window.location.reload(); // รีเฟรชหน้าเพื่อโชว์ว่าส่งแล้ว
+      window.location.reload(); 
     } catch (err: any) {
       alert('เกิดข้อผิดพลาด: ' + err.message);
     } finally {
