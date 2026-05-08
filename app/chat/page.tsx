@@ -24,34 +24,38 @@ export default function ChatInboxPage() {
       const user = session.user;
       setCurrentUser(user);
 
-      // ✨ เสกข้อมูลจำลอง (Mock Data) ฝั่งหน้าเว็บให้บีสามดู UI ทันที ✨
-      setTimeout(() => {
-        setChatJobs([
-          {
-            id: 'mock-job-111111',
-            title: 'ไปส่งที่หน้าห้างเซ็นทรัล',
-            status: 'in_progress',
-            job_type: 'onsite',
-            updated_at: new Date().toISOString(),
-            employer_id: user.id, // จำลองว่าบีสามเป็นคนจ้าง
-            worker_id: 'fake-worker-id',
-            worker: { full_name: 'พี่สมชาย วินเทอร์โบ', avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Somchai' },
-            unread_count: [{ count: 2 }] // 🔴 แจ้งเตือน 2 ข้อความ
-          },
-          {
-            id: 'mock-job-222222',
-            title: 'ออกแบบโลโก้ร้านกาแฟ',
-            status: 'completed',
-            job_type: 'online',
-            updated_at: new Date(Date.now() - 3600000).toISOString(),
-            employer_id: 'fake-employer-id', 
-            worker_id: user.id, // จำลองว่าบีสามเป็นช่าง
-            employer: { full_name: 'น้องใบบัว กราฟิก', avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Baibua' },
-            unread_count: [{ count: 0 }] // อ่านแล้ว
-          }
-        ]);
+      // ฟังก์ชันดึงรายชื่องานทั้งหมด และนับจำนวนข้อความที่ยังไม่ได้อ่าน (ข้อมูลจริง)
+      const fetchChatList = async () => {
+        const { data } = await supabase
+          .from('jobs')
+          .select(`
+            id, title, status, job_type, budget, updated_at,
+            employer_id, worker_id,
+            employer:profiles!employer_id(full_name, avatar_url),
+            worker:profiles!worker_id(full_name, avatar_url),
+            unread_count:job_chat_messages(count)
+          `)
+          .or(`employer_id.eq.${user.id},worker_id.eq.${user.id}`)
+          .eq('job_chat_messages.is_read', false)
+          .neq('job_chat_messages.sender_id', user.id) // นับเฉพาะที่คนอื่นส่งมา
+          .order('updated_at', { ascending: false });
+
+        if (data) {
+          setChatJobs(data);
+        }
         setLoading(false);
-      }, 500); // ใส่ดีเลย์ 0.5 วินาทีให้ดูเหมือนการดึงข้อมูลจริงๆ
+      };
+
+      fetchChatList();
+
+      // 🌟 Subscribe Real-time เพื่อให้ตัวเลขแจ้งเตือนเด้งทันทีที่มีแชทเข้า
+      const channel = supabase.channel('inbox_updates')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'job_chat_messages' }, () => {
+          fetchChatList();
+        })
+        .subscribe();
+
+      return () => { supabase.removeChannel(channel); };
     }
 
     initInbox();
@@ -92,15 +96,11 @@ export default function ChatInboxPage() {
         ) : (
           <div className="flex flex-col gap-3">
             {chatJobs.map((job) => {
-              // เช็คว่าเราคุยกับใครอยู่
               const isEmployer = currentUser.id === job.employer_id;
               const partner = isEmployer ? job.worker : job.employer;
               const partnerRoleName = isEmployer ? 'ช่าง/ผู้รับจ้าง' : 'ผู้ว่าจ้าง';
               
-              // 🌟 ดึงยอดข้อความที่ยังไม่ได้อ่าน
               const unreadCount = job.unread_count?.[0]?.count || 0;
-
-              // Ref ID
               const shortRef = job.id.substring(0, 6).toUpperCase();
               const isJobOnsite = job.job_type === 'onsite';
 
@@ -119,7 +119,7 @@ export default function ChatInboxPage() {
                         <div className="w-full h-full flex items-center justify-center text-xl">👤</div>
                       )}
                     </div>
-                    {/* 🔴 วงกลมแจ้งเตือน Unread (โชว์เฉพาะเวลามีข้อความใหม่) */}
+                    {/* 🔴 วงกลมแจ้งเตือน Unread */}
                     {unreadCount > 0 && (
                       <div className="absolute -top-1 -right-1 bg-[#EE4D2D] text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-white animate-bounce shadow-sm">
                         {unreadCount > 9 ? '9+' : unreadCount}
@@ -133,7 +133,6 @@ export default function ChatInboxPage() {
                   {/* Info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-start mb-0.5">
-                      {/* 🌟 ถ้ามีข้อความใหม่ ทำตัวหนังสือให้หนาและเข้มขึ้น */}
                       <h3 className={`text-sm truncate pr-2 ${unreadCount > 0 ? 'font-black text-gray-900' : 'font-bold text-gray-700'}`}>
                         {partner?.full_name || `รอ${partnerRoleName}ตอบรับ`}
                       </h3>
