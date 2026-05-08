@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, Suspense, useMemo } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
@@ -8,7 +8,7 @@ import Link from 'next/link';
 function ChatContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const supabase = useMemo(() => createClient(), []);
+  const supabase = createClient();
 
   const urlJobId = searchParams.get('job');
   const urlProviderId = searchParams.get('provider');
@@ -43,12 +43,12 @@ function ChatContent() {
       const user = session.user;
       setCurrentUser(user);
 
-      // 🌟 ดึงรายชื่อห้องแชท (ดึง id, title, status, budget ของงานมาด้วยเพื่อกันสับสน)
+      // 🌟 1. ดึงรายชื่อห้องแชททั้งหมดที่ฉันมีส่วนร่วม
       const { data: chatList } = await supabase
         .from('job_chats')
         .select(`
           *,
-          job:jobs(id, title, status, budget),
+          job:jobs(title, status),
           employer:profiles!employer_id(id, full_name, avatar_url),
           freelancer:profiles!freelancer_id(id, full_name, avatar_url)
         `)
@@ -57,6 +57,7 @@ function ChatContent() {
 
       if (chatList) setChats(chatList);
 
+      // 🌟 2. ถ้าระบุ job และ provider มาใน URL ให้หาหรือสร้างห้องแชทใหม่
       if (urlJobId && urlProviderId) {
         let existingChat = chatList?.find(c => c.job_id === urlJobId && c.freelancer_id === urlProviderId);
         
@@ -68,10 +69,10 @@ function ChatContent() {
             .from('job_chats')
             .insert({
               job_id: urlJobId,
-              employer_id: user.id,
+              employer_id: user.id, // สมมติว่าคนกดเปิดแชทจากหน้า My Jobs คือคนจ้าง
               freelancer_id: urlProviderId
             })
-            .select(`*, job:jobs(id, title, status, budget), employer:profiles!employer_id(id, full_name, avatar_url), freelancer:profiles!freelancer_id(id, full_name, avatar_url)`)
+            .select(`*, job:jobs(title, status), employer:profiles!employer_id(id, full_name, avatar_url), freelancer:profiles!freelancer_id(id, full_name, avatar_url)`)
             .single();
             
           if (newChat) {
@@ -80,6 +81,7 @@ function ChatContent() {
           }
         }
       } else if (chatList && chatList.length > 0) {
+        // ถ้าไม่มี URL Params ให้เปิดห้องแชทล่าสุด
         setActiveChat(chatList[0]);
       }
       
@@ -89,7 +91,7 @@ function ChatContent() {
     initChat();
   }, [supabase, router, urlJobId, urlProviderId]);
 
-  // ดึงข้อความแชท และ Subscribe Realtime
+  // 🌟 3. ดึงข้อความแชท และ Subscribe Realtime เมื่อเลือกห้องแชท
   useEffect(() => {
     if (!activeChat) return;
 
@@ -105,6 +107,7 @@ function ChatContent() {
 
     fetchMessages();
 
+    // ดักฟังข้อความใหม่แบบ Real-time
     const channel = supabase.channel(`chat_${activeChat.id}`)
       .on('postgres_changes', { 
         event: 'INSERT', 
@@ -124,7 +127,7 @@ function ChatContent() {
     if (!newMessage.trim() || !activeChat || !currentUser) return;
 
     const msgText = newMessage.trim();
-    setNewMessage('');
+    setNewMessage(''); // เคลียร์ช่องพิมพ์ทันทีให้รู้สึกเร็ว
 
     await supabase.from('job_chat_messages').insert({
       chat_id: activeChat.id,
@@ -132,6 +135,7 @@ function ChatContent() {
       message: msgText
     });
 
+    // อัปเดตเวลาห้องแชทล่าสุด
     await supabase.from('job_chats').update({ updated_at: new Date().toISOString() }).eq('id', activeChat.id);
   };
 
@@ -151,7 +155,7 @@ function ChatContent() {
   return (
     <div className="min-h-screen bg-[#F4F6F8] font-sans flex flex-col md:flex-row max-w-6xl mx-auto md:p-6 h-screen">
       
-      {/* 📱 Mobile Header */}
+      {/* 📱 Mobile Header (แสดงเฉพาะตอนไม่มี Active Chat ในมือถือ) */}
       <div className={`md:hidden bg-gradient-to-r from-[#EE4D2D] to-[#FF7337] p-4 text-white shadow-md ${activeChat ? 'hidden' : 'block'}`}>
         <div className="flex items-center gap-3">
           <Link href="/my-jobs" className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center font-black active:scale-95">←</Link>
@@ -176,16 +180,11 @@ function ChatContent() {
             chats.map(chat => {
               const partner = getChatPartner(chat);
               const isActive = activeChat?.id === chat.id;
-              // 🌟 ดึง Ref ID สั้นๆ 6 ตัวแรก
-              const shortRef = chat.job_id?.substring(0, 6).toUpperCase() || 'XXX';
               
               return (
                 <button 
                   key={chat.id}
-                  onClick={() => {
-                    setActiveChat(chat);
-                    router.push(`/chat?job=${chat.job_id}&provider=${chat.freelancer_id}`);
-                  }}
+                  onClick={() => setActiveChat(chat)}
                   className={`w-full text-left p-4 border-b border-gray-50 flex items-center gap-3 transition-colors ${isActive ? 'bg-orange-50 border-l-4 border-l-[#EE4D2D]' : 'hover:bg-gray-50 border-l-4 border-l-transparent'}`}
                 >
                   <div className="w-12 h-12 bg-gray-200 rounded-full overflow-hidden shrink-0">
@@ -193,11 +192,7 @@ function ChatContent() {
                   </div>
                   <div className="flex-1 truncate">
                     <h3 className="font-black text-gray-800 text-sm truncate">{partner?.full_name || 'ผู้ใช้จงเจริญ'}</h3>
-                    {/* 🌟 แสดง Ref ID และชื่องานในลิสต์ เพื่อไม่ให้ User สับสน */}
-                    <div className="flex items-center gap-1.5 mt-1">
-                      <span className="text-[9px] font-black text-gray-500 bg-white border border-gray-200 px-1.5 py-0.5 rounded shadow-sm">#{shortRef}</span>
-                      <p className="text-[10px] text-[#EE4D2D] font-bold truncate">{chat.job?.title}</p>
-                    </div>
+                    <p className="text-[10px] text-[#EE4D2D] font-bold truncate mt-0.5">งาน: {chat.job?.title}</p>
                   </div>
                 </button>
               );
@@ -212,26 +207,20 @@ function ChatContent() {
           
           {/* Chat Header */}
           <header className="bg-white p-4 border-b border-gray-100 flex items-center gap-4 shadow-sm z-10 md:rounded-tr-[2rem]">
-            <button onClick={() => { setActiveChat(null); router.push('/chat'); }} className="md:hidden w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-gray-600 font-black shrink-0">←</button>
-            <div className="flex items-center gap-3 flex-1 overflow-hidden">
-              <div className="w-10 h-10 bg-gray-200 rounded-full overflow-hidden shrink-0">
+            <button onClick={() => setActiveChat(null)} className="md:hidden w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-gray-600 font-black">←</button>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gray-200 rounded-full overflow-hidden">
                 {getChatPartner(activeChat)?.avatar_url ? <img src={getChatPartner(activeChat).avatar_url} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center">👤</div>}
               </div>
-              <div className="truncate">
-                <h2 className="font-black text-gray-800 leading-tight truncate">{getChatPartner(activeChat)?.full_name || 'ผู้สนทนา'}</h2>
-                
-                {/* 🌟 แสดง Ref ID, ชื่องาน และสถานะ เพื่อความชัดเจน */}
-                <div className="flex items-center gap-1.5 mt-0.5 overflow-x-auto no-scrollbar">
-                  <span className="text-[9px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full shrink-0">Ref: #{activeChat.job_id?.substring(0, 6).toUpperCase()}</span>
-                  <span className="text-[9px] font-bold text-[#EE4D2D] bg-orange-50 px-2 py-0.5 rounded-full shrink-0">สถานะ: {activeChat.job?.status}</span>
-                  <span className="text-[9px] font-bold text-gray-400 truncate">งาน: {activeChat.job?.title}</span>
-                </div>
+              <div>
+                <h2 className="font-black text-gray-800 leading-tight">{getChatPartner(activeChat)?.full_name || 'ผู้สนทนา'}</h2>
+                <span className="text-[10px] font-bold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full mt-0.5 inline-block">งาน: {activeChat.job?.title}</span>
               </div>
             </div>
             
-            {/* ปุ่มทางลัดพาไปหน้าจ่ายเงิน */}
-            <div className="ml-auto hidden sm:block shrink-0">
-              {activeChat.employer_id === currentUser.id && activeChat.job?.status === 'open' && (
+            {/* ปุ่มทางลัดพาไปหน้าจ่ายเงิน (จำลอง) */}
+            <div className="ml-auto hidden sm:block">
+              {activeChat.employer_id === currentUser.id && (
                 <Link href={`/checkout/${activeChat.job_id}`} className="bg-[#00C300] text-white px-4 py-2 rounded-xl text-xs font-black shadow-md hover:bg-[#00A300] transition-colors">
                   ✅ ยืนยันจ้างงาน
                 </Link>
@@ -269,7 +258,7 @@ function ChatContent() {
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
                 placeholder="พิมพ์ข้อความที่นี่..." 
-                className="flex-1 bg-gray-100 rounded-full px-5 py-3.5 text-sm font-medium outline-none focus:ring-2 focus:ring-[#EE4D2D] transition-shadow"
+                className="flex-1 bg-gray-100 rounded-full px-5 py-3.5 text-sm font-medium outline-none focus:ring-2 focus:ring-orange-200 transition-shadow"
               />
               <button 
                 type="submit" 
@@ -291,17 +280,13 @@ function ChatContent() {
         </div>
       )}
 
-      <style dangerouslySetInnerHTML={{__html: `
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-      `}} />
     </div>
   );
 }
 
 export default function ChatPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#F4F6F8] flex items-center justify-center font-black text-[#EE4D2D]">กำลังโหลดห้องแชท...</div>}>
+    <Suspense fallback={<div className="min-h-screen bg-[#F4F6F8] flex items-center justify-center font-black text-gray-400">กำลังโหลดห้องแชท...</div>}>
       <ChatContent />
     </Suspense>
   );
