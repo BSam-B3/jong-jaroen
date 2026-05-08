@@ -189,8 +189,3 @@ export default function JobBoardPage() {
     </div>
   );
 }
-
-ในส่วนนี้ผมจะทำเป็นบอร์ดประกาศหางาน
-
-- เอาช่องเสริชออก
-- ทำดรอปดาวให้เลือก หมวดหมู่งาน และ ลักษณะการจ้าง ( ดูตัวอย่าง Fastwork https://jobboard.fastwork.co/jobs?order_by[]=inserted_at&order_directions[]=desc&page=1&page_size=20 )
