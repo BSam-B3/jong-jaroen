@@ -24,38 +24,34 @@ export default function ChatInboxPage() {
       const user = session.user;
       setCurrentUser(user);
 
-      // ฟังก์ชันดึงรายชื่องานทั้งหมด และนับจำนวนข้อความที่ยังไม่ได้อ่าน
-      const fetchChatList = async () => {
-        const { data } = await supabase
-          .from('jobs')
-          .select(`
-            id, title, status, job_type, budget, updated_at,
-            employer_id, worker_id,
-            employer:profiles!employer_id(full_name, avatar_url),
-            worker:profiles!worker_id(full_name, avatar_url),
-            unread_count:job_chat_messages(count)
-          `)
-          .or(`employer_id.eq.${user.id},worker_id.eq.${user.id}`)
-          .eq('job_chat_messages.is_read', false)
-          .neq('job_chat_messages.sender_id', user.id) // นับเฉพาะที่คนอื่นส่งมา
-          .order('updated_at', { ascending: false });
-
-        if (data) {
-          setChatJobs(data);
-        }
+      // ✨ เสกข้อมูลจำลอง (Mock Data) ฝั่งหน้าเว็บให้บีสามดู UI ทันที ✨
+      setTimeout(() => {
+        setChatJobs([
+          {
+            id: 'mock-job-111111',
+            title: 'ไปส่งที่หน้าห้างเซ็นทรัล',
+            status: 'in_progress',
+            job_type: 'onsite',
+            updated_at: new Date().toISOString(),
+            employer_id: user.id, // จำลองว่าบีสามเป็นคนจ้าง
+            worker_id: 'fake-worker-id',
+            worker: { full_name: 'พี่สมชาย วินเทอร์โบ', avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Somchai' },
+            unread_count: [{ count: 2 }] // 🔴 แจ้งเตือน 2 ข้อความ
+          },
+          {
+            id: 'mock-job-222222',
+            title: 'ออกแบบโลโก้ร้านกาแฟ',
+            status: 'completed',
+            job_type: 'online',
+            updated_at: new Date(Date.now() - 3600000).toISOString(),
+            employer_id: 'fake-employer-id', 
+            worker_id: user.id, // จำลองว่าบีสามเป็นช่าง
+            employer: { full_name: 'น้องใบบัว กราฟิก', avatar_url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Baibua' },
+            unread_count: [{ count: 0 }] // อ่านแล้ว
+          }
+        ]);
         setLoading(false);
-      };
-
-      fetchChatList();
-
-      // 🌟 Subscribe Real-time เพื่อให้ตัวเลขแจ้งเตือนเด้งทันทีที่มีแชทเข้า
-      const channel = supabase.channel('inbox_updates')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'job_chat_messages' }, () => {
-          fetchChatList();
-        })
-        .subscribe();
-
-      return () => { supabase.removeChannel(channel); };
+      }, 500); // ใส่ดีเลย์ 0.5 วินาทีให้ดูเหมือนการดึงข้อมูลจริงๆ
     }
 
     initInbox();
