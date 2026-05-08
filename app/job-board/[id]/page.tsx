@@ -12,6 +12,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [job, setJob] = useState<any>(null);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
   
   // 🌟 State สำหรับฟอร์มเสนอราคา
   const [showProposalForm, setShowProposalForm] = useState(false);
@@ -23,10 +24,11 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     const fetchJobDetail = async () => {
       setLoading(true);
       const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) setCurrentUser(session.user);
+      const user = session?.user;
+      if (user) setCurrentUser(user);
 
       try {
-        // 1. ดึงข้อมูลงาน และข้อมูลผู้ว่าจ้างก่อน
+        // 1. ดึงข้อมูลงาน และข้อมูลผู้ว่าจ้าง
         const { data: jobData, error: jobError } = await supabase
           .from('jobs')
           .select(`
@@ -38,15 +40,20 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
         
         if (jobError) throw jobError;
 
-        // 2. ดึงข้อมูลข้อเสนอ (Proposals) แยกต่างหาก เพื่อป้องกันการ Join Table Error
-        const { data: proposalsData } = await supabase
-          .from('job_proposals')
-          .select('freelancer_id')
-          .eq('job_id', jobId);
+        // 2. ดึงข้อมูลข้อเสนอ (แยกตาม Role)
+        let proposalsData = [];
+        if (user?.id === jobData.employer_id) {
+          // ถ้าเป็นคนจ้าง ดึงข้อเสนอทั้งหมดมาโชว์ พร้อมชื่อช่าง
+          const { data } = await supabase.from('job_proposals').select('*, profiles(*)').eq('job_id', jobId);
+          proposalsData = data || [];
+        } else {
+          // ถ้าเป็นคนรับงาน ดึงแค่ ID ไปเช็คว่าตัวเองเคยเสนอหรือยัง (ไม่ให้เห็นของคนอื่น)
+          const { data } = await supabase.from('job_proposals').select('freelancer_id').eq('job_id', jobId);
+          proposalsData = data || [];
+        }
 
-        // 3. เอาข้อมูลมารวมกันแล้วเซ็ตลง State
         if (jobData) {
-          setJob({ ...jobData, proposals: proposalsData || [] });
+          setJob({ ...jobData, proposals: proposalsData });
         }
 
       } catch (error) {
@@ -70,7 +77,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     return diffDays < 0 ? 'หมดอายุแล้ว' : diffDays === 0 ? 'วันนี้' : `อีก ${diffDays} วัน`;
   };
 
-  // 🌟 ฟังก์ชันส่งข้อเสนอ (Proposal)
+  // 🌟 ฟังก์ชันส่งข้อเสนอ
   const handleSubmitProposal = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser) return router.push(`/auth/login?next=/job-board/${jobId}`);
@@ -86,13 +93,32 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       });
 
       if (error) throw error;
-      
       alert('🎉 ส่งข้อเสนอสำเร็จ! รอลูกค้าติดต่อกลับนะคะ');
       window.location.reload(); 
     } catch (err: any) {
       alert('เกิดข้อผิดพลาด: ' + err.message);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // 🌟 ฟังก์ชันนายจ้างกดยอมรับข้อเสนอช่าง
+  const handleAcceptProposal = async (proposal: any) => {
+    if (!confirm(`ยืนยันเลือกล็อกคิว ${proposal.profiles?.full_name || 'ช่างท่านนี้'} ใช่ไหมคะ?`)) return;
+    setActionLoading(proposal.id);
+
+    try {
+      const { error } = await supabase.rpc('accept_proposal', {
+        p_job_id: job.id,
+        p_proposal_id: proposal.id,
+        p_worker_id: proposal.freelancer_id
+      });
+      if (error) throw error;
+      alert('เลือกล็อกคิวสำเร็จ! ระบบจะพาท่านไปหน้าชำระเงินค่ะ 🚀');
+      router.push(`/checkout/${job.id}`); 
+    } catch (err: any) {
+      alert('เกิดข้อผิดพลาด: ' + err.message);
+      setActionLoading(null);
     }
   };
 
@@ -108,12 +134,14 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     </div>
   );
 
-  // เช็คสถานะต่างๆ เพื่อแสดงปุ่มให้ถูกต้อง
   const isEmployer = currentUser?.id === job.employer_id;
   const hasApplied = job.proposals?.some((p: any) => p.freelancer_id === currentUser?.id);
   const isJobOpen = job.status === 'open';
 
-  // แปลงคำศัพท์
+  // 🌟 จำลองการแสดงผล ผู้ว่าจ้างไม่ระบุตัวตน
+  const isAnonymous = job.is_anonymous; 
+  const employerName = isAnonymous ? 'ผู้ว่าจ้างไม่ระบุตัวตน' : (job.employer?.full_name || 'ลูกค้าไม่ระบุชื่อ');
+
   const empTypeMap: any = { freelance: 'ฟรีแลนซ์ (รายชิ้น)', contract: 'สัญญาจ้าง', parttime: 'พาร์ทไทม์', fulltime: 'งานประจำ' };
   const catMap: any = { design: 'งานออกแบบ', tech: 'เทคโนโลยี', marketing: 'การตลาด', repair: 'ช่างซ่อม', lifestyle: 'ไลฟ์สไตล์' };
 
@@ -121,15 +149,13 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     <div className="min-h-screen bg-[#F4F6F8] flex justify-center font-sans pb-24 md:pb-10">
       <div className="w-full lg:max-w-5xl xl:max-w-6xl bg-[#F8FAFC] min-h-screen relative flex flex-col md:shadow-2xl overflow-x-hidden md:border-x border-gray-200/50">
         
-        {/* 🟠 Header */}
+        {/* 🟠 Header (เอา Badge ออกให้ดูคลีน) */}
         <header className="bg-white px-6 pt-6 pb-4 border-b border-gray-200 sticky top-0 z-20 flex items-center gap-4">
           <button onClick={() => router.back()} className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 active:scale-95 transition-all text-gray-600 font-bold shrink-0">
             ←
           </button>
           <div className="flex-1">
-            <span className={`text-[10px] font-black px-2.5 py-1 rounded text-white tracking-widest ${job.job_type === 'onsite' ? 'bg-[#EE4D2D]' : 'bg-[#0047FF]'}`}>
-              {job.job_type === 'onsite' ? '📍 ONSITE' : '💻 ONLINE'}
-            </span>
+            <span className="font-black text-gray-800 text-sm">รายละเอียดงาน</span>
           </div>
         </header>
 
@@ -138,15 +164,33 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           {/* 🌟 ฝั่งซ้าย: รายละเอียดงาน (Brief) */}
           <div className="flex-1 space-y-6">
             <div>
+              {/* ย้าย Badge มาไว้ตรงนี้ */}
+              <div className="flex gap-2 mb-3">
+                <span className={`text-[10px] font-black px-2.5 py-1 rounded text-white tracking-widest shadow-sm ${job.job_type === 'onsite' ? 'bg-[#EE4D2D]' : 'bg-[#0047FF]'}`}>
+                  {job.job_type === 'onsite' ? '📍 ONSITE' : '💻 ONLINE'}
+                </span>
+                <span className="text-[10px] font-bold text-yellow-600 bg-yellow-50 px-2.5 py-1 rounded border border-yellow-100 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 bg-yellow-400 rounded-full animate-pulse"></span>
+                  {job.status === 'open' ? 'รอคนรับงาน' : job.status === 'in_progress' ? 'กำลังดำเนินการ' : 'เสร็จสิ้น'}
+                </span>
+              </div>
+
               <h1 className="text-2xl md:text-3xl font-black text-gray-900 leading-tight mb-4">{job.title}</h1>
               
+              {/* โพรไฟล์นายจ้าง (รองรับระบบ Anonymous) */}
               <div className="flex items-center gap-3 bg-gray-50 p-3 rounded-2xl border border-gray-100">
-                <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden shrink-0">
-                  {job.employer?.avatar_url ? <img src={job.employer.avatar_url} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-sm">👤</div>}
+                <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden shrink-0 flex items-center justify-center">
+                  {isAnonymous ? (
+                     <span className="text-xl">🕵️</span>
+                  ) : job.employer?.avatar_url ? (
+                     <img src={job.employer.avatar_url} className="w-full h-full object-cover" /> 
+                  ) : (
+                     <span className="text-sm">👤</span>
+                  )}
                 </div>
                 <div>
                   <p className="text-xs font-black text-gray-500 mb-0.5">ผู้ว่าจ้าง</p>
-                  <p className="text-sm font-bold text-gray-800">{job.employer?.full_name || 'ลูกค้าไม่ระบุชื่อ'}</p>
+                  <p className="text-sm font-bold text-gray-800">{employerName}</p>
                 </div>
               </div>
             </div>
@@ -159,9 +203,60 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                 {job.description || 'ไม่ได้ระบุรายละเอียดเพิ่มเติม'}
               </div>
             </div>
+
+            {/* 🌟 ส่วนแสดงข้อเสนอจากช่าง (เฉพาะเจ้าของงานถึงจะเห็น) */}
+            {isEmployer && (
+              <div className="mt-8">
+                <h3 className="text-base font-black text-gray-800 mb-4 flex items-center gap-2">
+                  <span className="text-[#00C300]">🎯</span> ข้อเสนอจากช่าง ({job.proposals?.length || 0})
+                </h3>
+                
+                {job.proposals?.length === 0 ? (
+                  <div className="bg-gray-50 rounded-2xl p-6 text-center border border-gray-200">
+                    <p className="text-sm font-bold text-gray-400">ยังไม่มีใครยื่นข้อเสนอสำหรับงานนี้ค่ะ</p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-4">
+                    {job.proposals?.map((prop: any) => (
+                      <div key={prop.id} className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+                        <div className="flex justify-between items-start mb-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden">
+                              {prop.profiles?.avatar_url ? <img src={prop.profiles.avatar_url} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-sm">👤</div>}
+                            </div>
+                            <div>
+                              <p className="text-sm font-black text-gray-800">{prop.profiles?.full_name}</p>
+                              <p className="text-[10px] font-bold text-yellow-500">⭐ 5.0 (รีวิว 12)</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-lg font-black text-[#00C300]">{Number(prop.proposed_price).toLocaleString()}</p>
+                            <p className="text-[10px] text-gray-400 font-bold uppercase">บาท</p>
+                          </div>
+                        </div>
+                        
+                        <p className="text-xs font-medium text-gray-600 mb-4 bg-gray-50 p-3 rounded-xl italic">
+                          "{prop.cover_letter}"
+                        </p>
+                        
+                        <div className="flex gap-2">
+                          <button 
+                            onClick={() => handleAcceptProposal(prop)}
+                            disabled={actionLoading === prop.id}
+                            className="w-full py-2.5 bg-[#00C300] text-white rounded-xl text-xs font-black shadow-md hover:bg-[#00A300] transition-colors"
+                          >
+                            {actionLoading === prop.id ? 'รอสักครู่...' : '✅ เลือกจ้างคนนี้'}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
-          {/* 🌟 ฝั่งขวา: สรุปข้อมูล & Action (Sidebar สไตล์ Fastwork) */}
+          {/* 🌟 ฝั่งขวา: สรุปข้อมูล & Action */}
           <div className="w-full md:w-[320px] shrink-0 space-y-4">
             
             <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex flex-col gap-5">
@@ -196,7 +291,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
               {/* 🌟 ปุ่ม Action ตาม Role */}
               {isEmployer ? (
                 <div className="bg-blue-50 text-blue-700 p-4 rounded-2xl text-center text-sm font-black border border-blue-100">
-                  💼 นี่คืองานที่คุณโพสต์เอง<br/><span className="text-xs font-bold text-blue-500">ไปที่เมนู "งานของฉัน" เพื่อดูผู้เสนอราคา</span>
+                  💼 นี่คืองานที่คุณโพสต์เอง<br/><span className="text-xs font-bold text-blue-500">ดูข้อเสนอจากช่างได้ที่ด้านล่างเลยค่ะ</span>
                 </div>
               ) : hasApplied ? (
                 <div className="bg-emerald-50 text-emerald-700 p-4 rounded-2xl text-center text-sm font-black border border-emerald-100">
