@@ -21,7 +21,8 @@ export default function MyJobsPage() {
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<any>(null);
   
-  const [activeTab, setActiveTab] = useState<'employer' | 'freelancer'>('employer');
+  // 🌟 เพิ่มแท็บ history
+  const [activeTab, setActiveTab] = useState<'employer' | 'freelancer' | 'history'>('employer');
   const [jobs, setJobs] = useState<Job[]>([]);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
@@ -38,25 +39,38 @@ export default function MyJobsPage() {
 
       try {
         if (activeTab === 'employer') {
-          // 💼 ดึงงานที่ฉันเป็นคน "จ้าง"
+          // 💼 ดึงงานที่ฉันจ้าง (เฉพาะที่ยังไม่จบ)
           const { data } = await supabase
             .from('jobs')
             .select(`*, proposals:job_proposals(*, profiles(*))`)
             .eq('employer_id', session.user.id)
+            .in('status', ['open', 'verifying_slip', 'in_progress', 'delivered'])
             .order('created_at', { ascending: false });
           if (data) setJobs(data);
-        } else {
-          // 🛵 ดึงงานที่ฉัน "รับทำ" (ส่ง proposal ไปแล้ว)
+
+        } else if (activeTab === 'freelancer') {
+          // 🛵 ดึงงานที่ฉันรับ (เฉพาะที่ยังไม่จบ)
           const { data } = await supabase
             .from('job_proposals')
-            .select(`*, job:jobs(*)`)
-            .eq('freelancer_id', session.user.id);
+            .select(`*, job:jobs!inner(*)`)
+            .eq('freelancer_id', session.user.id)
+            .in('job.status', ['open', 'verifying_slip', 'in_progress', 'delivered']);
           
           if (data) {
-            // ดึงข้อมูล job ออกมาเป็นตัวหลัก
             const mappedJobs = data.map(p => ({ ...p.job, my_proposal: p }));
+            mappedJobs.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
             setJobs(mappedJobs as any);
           }
+
+        } else if (activeTab === 'history') {
+          // 🗄️ ดึงประวัติงาน (เสร็จสิ้นหรือยกเลิก) ทั้งที่จ้างและรับทำ
+          const { data } = await supabase
+            .from('jobs')
+            .select(`*, proposals:job_proposals(*, profiles(*))`)
+            .or(`employer_id.eq.${session.user.id},worker_id.eq.${session.user.id}`)
+            .in('status', ['completed', 'cancelled'])
+            .order('updated_at', { ascending: false });
+          if (data) setJobs(data);
         }
       } catch (error) {
         console.error("Error fetching jobs:", error);
@@ -112,12 +126,10 @@ export default function MyJobsPage() {
     setActionLoading(null);
   };
 
-  // 🌟 ตัวแปรช่วยเรื่องสี ให้ตรงกับแท็บที่เลือก
+  // 🌟 ตัวแปรช่วยเรื่องสีและสถานะ
   const isHired = activeTab === 'employer';
-  const themeColor = isHired ? 'bg-[#EE4D2D]' : 'bg-[#0047FF]';
+  const isHistory = activeTab === 'history';
   const themeText = isHired ? 'text-[#EE4D2D]' : 'text-[#0047FF]';
-  const themeShadow = isHired ? 'shadow-orange-200' : 'shadow-blue-200';
-  const themeHover = isHired ? 'hover:bg-orange-50 hover:text-[#EE4D2D]' : 'hover:bg-blue-50 hover:text-[#0047FF]';
 
   return (
     <div className="min-h-screen bg-[#F4F6F8] flex justify-center font-sans pb-24 md:pb-10">
@@ -136,25 +148,30 @@ export default function MyJobsPage() {
           </div>
         </header>
 
-        {/* 🌟 Tab Switcher */}
+        {/* 🌟 Tab Switcher (เปลี่ยนเป็น 3 ปุ่ม) */}
         <div className="flex justify-center -mt-6 md:-mt-8 relative z-30 px-5 w-full max-w-4xl mx-auto">
-           <div className="bg-white p-1.5 rounded-full shadow-lg border border-gray-100 flex gap-1 w-full max-w-md">
+           <div className="bg-white p-1.5 rounded-full shadow-lg border border-gray-100 flex gap-1 w-full max-w-lg">
              <button 
                onClick={() => setActiveTab('employer')}
-               className={`flex-1 py-3 rounded-full text-[11px] md:text-sm font-black transition-all ${isHired ? `${themeColor} text-white shadow-md ${themeShadow}` : `text-gray-500 ${themeHover}`}`}
+               className={`flex-1 py-3 rounded-full text-[10px] md:text-sm font-black transition-all ${activeTab === 'employer' ? 'bg-[#EE4D2D] text-white shadow-md shadow-orange-200' : 'text-gray-500 hover:bg-orange-50 hover:text-[#EE4D2D]'}`}
              >
-               💼 งานที่ฉันจ้าง
+               💼 งานที่จ้าง
              </button>
              <button 
                onClick={() => setActiveTab('freelancer')}
-               className={`flex-1 py-3 rounded-full text-[11px] md:text-sm font-black transition-all ${!isHired ? `${themeColor} text-white shadow-md ${themeShadow}` : `text-gray-500 ${themeHover}`}`}
+               className={`flex-1 py-3 rounded-full text-[10px] md:text-sm font-black transition-all ${activeTab === 'freelancer' ? 'bg-[#0047FF] text-white shadow-md shadow-blue-200' : 'text-gray-500 hover:bg-blue-50 hover:text-[#0047FF]'}`}
              >
-               🛵 งานที่ฉันรับ
+               🛵 งานที่รับ
+             </button>
+             <button 
+               onClick={() => setActiveTab('history')}
+               className={`flex-1 py-3 rounded-full text-[10px] md:text-sm font-black transition-all ${activeTab === 'history' ? 'bg-gray-600 text-white shadow-md shadow-gray-300' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-700'}`}
+             >
+               🗄️ ประวัติ
              </button>
            </div>
         </div>
 
-        {/* 🌟 เปลี่ยนกลับเป็นแนวยาว (flex-col) ตามที่บีสามต้องการ */}
         <main className="flex-1 p-4 md:p-8 mt-4 w-full max-w-4xl mx-auto">
           {loading ? (
             <div className="flex flex-col gap-4 md:gap-6 animate-pulse">
@@ -163,13 +180,15 @@ export default function MyJobsPage() {
           ) : jobs.length === 0 ? (
             <div className="bg-white rounded-3xl p-10 text-center border border-gray-100 shadow-sm mt-4 mx-auto">
               <div className="text-5xl mb-3 opacity-50 grayscale">📭</div>
-              <h3 className="font-black text-gray-800 text-base">ยังไม่มีรายการงาน</h3>
+              <h3 className="font-black text-gray-800 text-base">ไม่มีรายการ</h3>
               <p className="text-[11px] text-gray-400 font-bold mt-1">
-                {isHired ? 'ไปโพสต์จ้างงาน หรือหาคนช่วยทำสิคะ' : 'ไปหาโปรเจกต์ใหม่ๆ หรือเสนอราคางานดูสิคะ'}
+                {activeTab === 'employer' ? 'ไปโพสต์จ้างงาน หรือหาคนช่วยทำสิคะ' : activeTab === 'freelancer' ? 'ไปหาโปรเจกต์ใหม่ๆ หรือเสนอราคางานดูสิคะ' : 'ยังไม่มีประวัติการทำงานที่เสร็จสิ้นค่ะ'}
               </p>
-              <Link href="/job-board" className={`mt-5 inline-block ${themeColor} text-white font-black px-6 py-2.5 rounded-full shadow-lg active:scale-95 transition-transform text-xs`}>
-                ไปบอร์ดหางาน ➔
-              </Link>
+              {!isHistory && (
+                <Link href="/job-board" className={`mt-5 inline-block ${isHired ? 'bg-[#EE4D2D]' : 'bg-[#0047FF]'} text-white font-black px-6 py-2.5 rounded-full shadow-lg active:scale-95 transition-transform text-xs`}>
+                  ไปบอร์ดหางาน ➔
+                </Link>
+              )}
             </div>
           ) : (
             <div className="flex flex-col gap-4 md:gap-6">
@@ -178,17 +197,18 @@ export default function MyJobsPage() {
                 const acceptedProposal = job.proposals?.find((p: any) => p.status === 'accepted') || job.proposals?.[0];
 
                 return (
-                  <article key={job.id} className={`bg-white rounded-[2rem] p-5 md:p-6 shadow-sm border-l-4 border-y border-r border-gray-100 hover:shadow-md transition-shadow relative overflow-hidden ${isHired ? 'border-l-[#EE4D2D]' : 'border-l-[#0047FF]'}`}>
+                  // 🌟 ปรับสี Background และ Border ให้เป็นสีเทาหมอก ถ้าอยู่ในหน้าประวัติ
+                  <article key={job.id} className={`rounded-[2rem] p-5 md:p-6 shadow-sm border-l-4 border-y border-r hover:shadow-md transition-shadow relative overflow-hidden ${isHistory ? 'bg-gray-50 border-gray-200 border-l-gray-400 opacity-95' : 'bg-white border-gray-100 ' + (isHired ? 'border-l-[#EE4D2D]' : 'border-l-[#0047FF]')}`}>
                     
                     {/* Badge & Date */}
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-1.5">
-                        <span className={`text-[8px] md:text-[9px] font-black px-2 py-1 rounded text-white shadow-sm tracking-widest ${job.job_type === 'onsite' ? 'bg-[#EE4D2D]' : 'bg-[#0047FF]'}`}>
+                        <span className={`text-[8px] md:text-[9px] font-black px-2 py-1 rounded text-white shadow-sm tracking-widest ${isHistory ? 'bg-gray-400' : job.job_type === 'onsite' ? 'bg-[#EE4D2D]' : 'bg-[#0047FF]'}`}>
                           {job.job_type === 'onsite' ? '📍 ONSITE' : '💻 ONLINE'}
                         </span>
-                        <span className="text-[9px] font-bold text-yellow-600 bg-yellow-50 px-2 py-1 rounded border border-yellow-100 flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 bg-yellow-400 rounded-full animate-pulse"></span>
-                          {job.status === 'open' ? 'รอคนรับงาน' : job.status === 'in_progress' ? 'กำลังดำเนินการ' : job.status === 'verifying_slip' ? 'รอแอดมินตรวจสลิป' : 'เสร็จสิ้น'}
+                        <span className={`text-[9px] font-bold px-2 py-1 rounded border flex items-center gap-1 ${isHistory ? 'text-gray-500 bg-white border-gray-200' : 'text-yellow-600 bg-yellow-50 border-yellow-100'}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${isHistory ? 'bg-gray-400' : 'bg-yellow-400 animate-pulse'}`}></span>
+                          {job.status === 'open' ? 'รอคนรับงาน' : job.status === 'in_progress' ? 'กำลังดำเนินการ' : job.status === 'verifying_slip' ? 'รอแอดมินตรวจสลิป' : job.status === 'completed' ? 'เสร็จสิ้น' : 'ยกเลิก'}
                         </span>
                       </div>
                       <p className="text-[9px] text-gray-400 font-bold flex items-center gap-1">
@@ -196,9 +216,9 @@ export default function MyJobsPage() {
                       </p>
                     </div>
 
-                    <h2 className="text-base md:text-xl font-black text-gray-900 mb-2 leading-snug">{job.title}</h2>
+                    <h2 className={`text-base md:text-xl font-black mb-2 leading-snug ${isHistory ? 'text-gray-500' : 'text-gray-900'}`}>{job.title}</h2>
                     
-                    {/* Progress Tracker (ย่อส่วนลงแนวตั้งกระชับขึ้น) */}
+                    {/* Progress Tracker */}
                     <div className="relative mb-4 mt-2 px-2 mx-auto w-full">
                       <div className="absolute left-6 right-6 top-2 h-1 bg-gray-100 rounded-full -z-10"></div>
                       {job.status === 'in_progress' && <div className="absolute left-6 right-1/2 top-2 h-1 bg-[#00C300] rounded-full -z-10"></div>}
@@ -206,16 +226,16 @@ export default function MyJobsPage() {
                       
                       <div className="flex justify-between">
                         <div className="flex flex-col items-center gap-1">
-                          <div className="w-5 h-5 rounded-full bg-[#00C300] text-white flex items-center justify-center font-black text-[9px] shadow-sm shadow-green-200">1</div>
-                          <span className="text-[9px] font-bold text-[#00C300]">จองงาน</span>
+                          <div className={`w-5 h-5 rounded-full flex items-center justify-center font-black text-[9px] shadow-sm ${isHistory ? 'bg-gray-400 text-white' : 'bg-[#00C300] text-white shadow-green-200'}`}>1</div>
+                          <span className={`text-[9px] font-bold ${isHistory ? 'text-gray-400' : 'text-[#00C300]'}`}>จองงาน</span>
                         </div>
                         <div className="flex flex-col items-center gap-1">
-                          <div className={`w-5 h-5 rounded-full flex items-center justify-center font-black text-[9px] shadow-sm ${(job.status === 'in_progress' || job.status === 'completed') ? 'bg-[#0047FF] text-white' : 'bg-gray-200 text-gray-400'}`}>2</div>
-                          <span className={`text-[9px] font-bold ${(job.status === 'in_progress' || job.status === 'completed') ? 'text-[#0047FF]' : 'text-gray-400'}`}>ทำ/พักเงิน</span>
+                          <div className={`w-5 h-5 rounded-full flex items-center justify-center font-black text-[9px] shadow-sm ${(job.status === 'in_progress' || job.status === 'completed') ? (isHistory ? 'bg-gray-400 text-white' : 'bg-[#0047FF] text-white') : 'bg-gray-200 text-gray-400'}`}>2</div>
+                          <span className={`text-[9px] font-bold ${(job.status === 'in_progress' || job.status === 'completed') ? (isHistory ? 'text-gray-400' : 'text-[#0047FF]') : 'text-gray-400'}`}>ทำ/พักเงิน</span>
                         </div>
                         <div className="flex flex-col items-center gap-1">
-                          <div className={`w-5 h-5 rounded-full flex items-center justify-center font-black text-[9px] shadow-sm ${job.status === 'completed' ? 'bg-[#00C300] text-white' : 'bg-gray-200 text-gray-400'}`}>3</div>
-                          <span className={`text-[9px] font-bold ${job.status === 'completed' ? 'text-[#00C300]' : 'text-gray-400'}`}>ปล่อยเงิน</span>
+                          <div className={`w-5 h-5 rounded-full flex items-center justify-center font-black text-[9px] shadow-sm ${job.status === 'completed' ? (isHistory ? 'bg-gray-400 text-white' : 'bg-[#00C300] text-white') : 'bg-gray-200 text-gray-400'}`}>3</div>
+                          <span className={`text-[9px] font-bold ${job.status === 'completed' ? (isHistory ? 'text-gray-400' : 'text-[#00C300]') : 'text-gray-400'}`}>ปล่อยเงิน</span>
                         </div>
                       </div>
                     </div>
@@ -223,19 +243,19 @@ export default function MyJobsPage() {
                     <div className="flex justify-between items-end border-t border-gray-50 pt-3">
                       <div>
                         <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-0.5">งบประมาณ</p>
-                        <p className="text-xl font-black text-gray-800">{job.budget ? `฿${job.budget.toLocaleString()}` : 'รอเสนอราคา'}</p>
+                        <p className={`text-xl font-black ${isHistory ? 'text-gray-500' : 'text-gray-800'}`}>{job.budget ? `฿${job.budget.toLocaleString()}` : 'รอเสนอราคา'}</p>
                       </div>
-                      <Link href={`/jobs/${job.id}`} className={`text-xs font-bold ${themeText} bg-gray-50 border border-gray-100 px-4 py-2 rounded-xl hover:bg-gray-100 transition-colors`}>
+                      <Link href={`/jobs/${job.id}`} className={`text-xs font-bold bg-gray-50 border border-gray-100 px-4 py-2 rounded-xl hover:bg-gray-100 transition-colors ${isHistory ? 'text-gray-500' : themeText}`}>
                         ดูรายละเอียด
                       </Link>
                     </div>
 
-                    {/* 🌟 Proposals */}
+                    {/* 🌟 Proposals (ซ่อนในหน้าประวัติอัตโนมัติ เพราะเช็ค status === 'open') */}
                     {isHired && job.status === 'open' && proposals.length > 0 && (
                       <div className="mt-4 bg-gray-50 -mx-5 md:-mx-6 -mb-5 md:-mb-6 px-5 md:px-6 py-4 border-t border-gray-100 rounded-b-[2rem]">
                         <div className="flex items-center justify-between mb-3">
                           <p className={`text-[11px] font-black ${themeText} flex items-center gap-1.5`}>
-                            <span className={`w-2 h-2 ${themeColor} rounded-full animate-pulse`}></span>
+                            <span className={`w-2 h-2 ${isHired ? 'bg-[#EE4D2D]' : 'bg-[#0047FF]'} rounded-full animate-pulse`}></span>
                             ข้อเสนอใหม่ ({proposals.length})
                           </p>
                           <span className="text-[9px] font-bold text-gray-400">ปัดขวาเพื่อดูเพิ่มเติม 👉</span>
@@ -305,17 +325,17 @@ export default function MyJobsPage() {
                         </button>
                       )}
 
-                      {!isHired && job.status === 'verifying_slip' && (
+                      {!isHired && !isHistory && job.status === 'verifying_slip' && (
                         <span className="bg-orange-50 text-orange-600 px-4 py-2.5 rounded-xl text-[11px] font-black border border-orange-100 w-full text-center">⏳ รอลูกค้าชำระเงินเข้าสู่ระบบ</span>
                       )}
 
-                      {!isHired && job.status === 'in_progress' && (
+                      {!isHired && !isHistory && job.status === 'in_progress' && (
                         <button onClick={() => handleDeliverJob(job.id)} disabled={actionLoading === job.id} className="bg-purple-500 text-white px-4 py-3 rounded-xl text-[11px] font-black shadow-md active:scale-95 w-full">
                           {actionLoading === job.id ? '⏳' : '📦 กดส่งมอบงานให้ลูกค้า'}
                         </button>
                       )}
 
-                      {!isHired && job.status === 'delivered' && (
+                      {!isHired && !isHistory && job.status === 'delivered' && (
                         <span className="bg-purple-50 text-purple-600 px-4 py-2.5 rounded-xl text-[11px] font-black border border-purple-100 w-full text-center">⏳ รอลูกค้าตรวจรับงาน</span>
                       )}
 
@@ -329,7 +349,9 @@ export default function MyJobsPage() {
                       )}
 
                       {job.status === 'completed' && (
-                        <span className="bg-emerald-50 text-emerald-600 border border-emerald-100 px-4 py-3 rounded-xl text-[11px] font-black w-full text-center">🎉 งานสำเร็จแล้ว</span>
+                        <span className={`${isHistory ? 'bg-gray-100 text-gray-500 border-gray-200' : 'bg-emerald-50 text-emerald-600 border-emerald-100'} px-4 py-3 rounded-xl text-[11px] font-black w-full text-center`}>
+                          🎉 งานสำเร็จแล้ว
+                        </span>
                       )}
                     </div>
 
