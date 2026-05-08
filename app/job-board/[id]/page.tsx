@@ -13,14 +13,13 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [job, setJob] = useState<any>(null);
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
   
   // 🌟 State สำหรับฟอร์มเสนอราคา
   const [showProposalForm, setShowProposalForm] = useState(false);
   const [proposedPrice, setProposedPrice] = useState('');
   const [coverLetter, setCoverLetter] = useState('');
-  const [durationDays, setDurationDays] = useState('1'); // ระยะเวลาทำงาน (วัน)
-  const [portfolioUrl, setPortfolioUrl] = useState(''); // ลิงก์รูปผลงาน / Jobs-Card
+  const [durationDays, setDurationDays] = useState('1'); 
+  const [portfolioUrl, setPortfolioUrl] = useState(''); 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -44,11 +43,9 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
 
         let proposalsData = [];
         if (user?.id === jobData.employer_id) {
-          // ดึงข้อมูลข้อเสนอทั้งหมดสำหรับผู้จ้าง
           const { data } = await supabase.from('job_proposals').select('*, profiles(*)').eq('job_id', jobId);
           proposalsData = data || [];
         } else {
-          // ดึงแค่ ID ไปเช็คว่าตัวเองเคยเสนอหรือยัง
           const { data } = await supabase.from('job_proposals').select('freelancer_id').eq('job_id', jobId);
           proposalsData = data || [];
         }
@@ -78,7 +75,6 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     return diffDays < 0 ? 'หมดอายุแล้ว' : diffDays === 0 ? 'วันนี้' : `อีก ${diffDays} วัน`;
   };
 
-  // 🌟 ฟังก์ชันส่งข้อเสนอ
   const handleSubmitProposal = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser) return router.push(`/auth/login?next=/job-board/${jobId}`);
@@ -102,25 +98,6 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       alert('เกิดข้อผิดพลาด: ' + err.message);
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  const handleAcceptProposal = async (proposal: any) => {
-    if (!confirm(`ยืนยันเลือกล็อกคิว ${proposal.profiles?.full_name || 'ช่างท่านนี้'} ใช่ไหมคะ?`)) return;
-    setActionLoading(proposal.id);
-
-    try {
-      const { error } = await supabase.rpc('accept_proposal', {
-        p_job_id: job.id,
-        p_proposal_id: proposal.id,
-        p_worker_id: proposal.freelancer_id
-      });
-      if (error) throw error;
-      alert('เลือกล็อกคิวสำเร็จ! ระบบจะพาท่านไปหน้าชำระเงินค่ะ 🚀');
-      router.push(`/checkout/${job.id}`); 
-    } catch (err: any) {
-      alert('เกิดข้อผิดพลาด: ' + err.message);
-      setActionLoading(null);
     }
   };
 
@@ -160,7 +137,6 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           </div>
         </header>
 
-        {/* 🌟 ปรับโครงสร้างหลัก: ให้รองรับเนื้อหาแบบเต็มความกว้าง */}
         <main className="flex-1 p-5 md:p-8 max-w-5xl mx-auto w-full space-y-8">
           
           {/* ================= SECTION 1: รายละเอียดงาน ================= */}
@@ -305,65 +281,86 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                   <p className="text-xs font-bold text-gray-400 mt-1">โปรดรอสักครู่ หรือแชร์ลิงก์งานนี้ให้ช่างที่คุณรู้จักนะคะ</p>
                 </div>
               ) : (
-                <div className="flex flex-col gap-5">
+                <div className="flex flex-col gap-6">
                   {job.proposals?.map((prop: any) => (
-                    <article key={prop.id} className="bg-white border border-gray-200 rounded-[2rem] p-6 shadow-sm hover:shadow-md transition-all flex flex-col gap-4">
+                    <article key={prop.id} className="bg-white border border-gray-200 rounded-[2rem] p-6 md:p-8 shadow-sm hover:shadow-md transition-all flex flex-col gap-4">
                       
-                      {/* ข้อมูลช่าง และ ราคา */}
-                      <div className="flex justify-between items-start">
-                        <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden border border-gray-100">
-                            {prop.profiles?.avatar_url ? <img src={prop.profiles.avatar_url} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-lg">👤</div>}
+                      {/* 🌟 ข้อมูลช่าง และ ขวา: ราคา/ระยะเวลา */}
+                      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        
+                        <div className="flex items-start gap-3">
+                          <div className="w-14 h-14 rounded-full bg-gray-200 overflow-hidden border border-gray-100 shrink-0">
+                            {prop.profiles?.avatar_url ? <img src={prop.profiles.avatar_url} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-2xl">👤</div>}
                           </div>
                           <div>
-                            <p className="text-base font-black text-gray-900">{prop.profiles?.full_name}</p>
-                            <p className="text-xs font-bold text-yellow-500 mt-0.5">⭐ 5.0 (รีวิว 12)</p>
+                            <p className="text-lg font-black text-gray-900">{prop.profiles?.full_name}</p>
+                            <div className="flex flex-wrap items-center gap-2 mt-1">
+                              <p className="text-[11px] font-bold text-yellow-600 bg-yellow-50 border border-yellow-100 px-2 py-0.5 rounded-md">⭐ 5.0 (12)</p>
+                              {/* จำลองตัวเลขสำเร็จงาน */}
+                              <p className="text-[11px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-md">🏆 ทำสำเร็จแล้ว 15 งาน</p>
+                            </div>
                           </div>
                         </div>
-                        <div className="text-right bg-green-50 px-3 py-1.5 rounded-xl border border-green-100">
-                          <p className="text-xl font-black text-[#00C300] leading-none">{Number(prop.proposed_price).toLocaleString()}</p>
-                          <p className="text-[10px] text-green-600 font-bold uppercase mt-0.5">บาท</p>
+
+                        {/* ย้ายระยะเวลา และค่าใช้จ่าย มาไว้ตรงนี้ */}
+                        <div className="flex flex-col items-start md:items-end w-full md:w-auto bg-gray-50 md:bg-transparent p-4 md:p-0 rounded-2xl md:rounded-none">
+                          <div className="bg-blue-50 text-[#0047FF] px-3 py-1.5 rounded-xl border border-blue-100 text-xs font-black flex items-center gap-1.5 mb-2">
+                            <span>⏱️</span> คาดว่าเสร็จใน: {prop.duration_days ? `${prop.duration_days} วัน` : 'ไม่ระบุ'}
+                          </div>
+                          <div className="text-left md:text-right">
+                            <p className="text-2xl font-black text-[#00C300] leading-none">{Number(prop.proposed_price).toLocaleString()} <span className="text-sm text-gray-500 font-bold uppercase ml-0.5">บาท</span></p>
+                          </div>
                         </div>
+
                       </div>
                       
-                      {/* Cover Letter */}
-                      <p className="text-sm font-medium text-gray-600 bg-gray-50 p-4 rounded-xl italic">
-                        "{prop.cover_letter}"
-                      </p>
+                      {/* 🌟 Cover Letter */}
+                      <div className="bg-gray-50 p-4 md:p-5 rounded-2xl border border-gray-100">
+                        <p className="text-sm font-medium text-gray-600 italic">
+                          "{prop.cover_letter}"
+                        </p>
+                      </div>
 
-                      {/* ภาพผลงานที่แนบมา */}
-                      {prop.portfolio_url && (
-                        <div className="mt-2">
-                          <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-2">ตัวอย่างผลงาน / Jobs-Card ที่แนบมา</p>
-                          <div className="flex gap-2">
-                            <a href={prop.portfolio_url} target="_blank" rel="noreferrer" className="block w-24 h-24 rounded-xl border border-gray-200 overflow-hidden hover:opacity-80 transition-opacity">
-                              <img src={prop.portfolio_url} alt="Portfolio" className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-                            </a>
-                          </div>
+                      {/* 🌟 ฝั่งซ้ายล่าง: ภาพผลงาน & ปุ่มกด */}
+                      <div className="flex flex-col md:flex-row justify-between items-end gap-6 mt-2">
+                        
+                        <div className="w-full md:w-auto">
+                          {prop.portfolio_url ? (
+                            <div className="flex flex-col gap-2">
+                              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">ผลงาน / Jobs-Card จากผู้รับจ้าง</p>
+                              <a href={prop.portfolio_url} target="_blank" rel="noreferrer" className="block w-32 h-32 rounded-2xl border-2 border-gray-100 overflow-hidden hover:opacity-80 transition-all hover:border-[#0047FF] shadow-sm">
+                                <img src={prop.portfolio_url} alt="Portfolio" className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                              </a>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col gap-2">
+                              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">ผลงาน / Jobs-Card จากผู้รับจ้าง</p>
+                              <div className="w-32 h-32 rounded-2xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center bg-gray-50 text-gray-400 p-2">
+                                <span className="text-2xl mb-1 opacity-50">📁</span>
+                                <span className="text-[10px] font-bold text-center">ไม่ได้แนบรูป<br/>ผลงานมาด้วย</span>
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      )}
-                      
-                      {/* Action Footer */}
-                      <div className="flex flex-col md:flex-row justify-between items-start md:items-center pt-4 border-t border-gray-50 gap-4 mt-2">
-                        <div>
-                          <span className="text-xs font-bold text-gray-500">ระยะเวลาที่คาดว่าจะเสร็จสิ้น: </span>
-                          <span className="text-sm font-black text-gray-800">{prop.duration_days ? `${prop.duration_days} วัน` : 'ไม่ระบุ'}</span>
-                        </div>
-                        <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto">
+
+                        {/* 🌟 Action Buttons (ย้ายปุ่มจ้างออก แทนด้วยปุ่มทักแชท) */}
+                        <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto pt-4 md:pt-0 border-t border-gray-100 md:border-none">
                           <Link 
                             href={`/profile/${prop.freelancer_id}`} 
-                            className="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl text-xs font-black hover:bg-gray-200 transition-colors text-center"
+                            className="px-6 py-4 bg-white border border-gray-200 text-gray-700 rounded-2xl text-sm font-black hover:bg-gray-50 hover:border-gray-300 transition-all text-center shadow-sm"
                           >
                             ดู Jobs-Card ผู้รับจ้าง
                           </Link>
-                          <button 
-                            onClick={() => handleAcceptProposal(prop)}
-                            disabled={actionLoading === prop.id}
-                            className="px-6 py-3 bg-[#00C300] text-white rounded-xl text-xs font-black shadow-md hover:bg-[#00A300] transition-colors"
+                          
+                          {/* ปุ่มทักแชทก่อนจ้าง สีน้ำเงินเด่นๆ */}
+                          <Link 
+                            href={`/chat/${job.id}?proposal_id=${prop.id}&freelancer_id=${prop.freelancer_id}`}
+                            className="px-6 py-4 bg-[#0047FF] text-white rounded-2xl text-sm font-black shadow-lg shadow-blue-200 hover:bg-blue-700 hover:scale-[1.02] active:scale-95 transition-all text-center flex items-center justify-center gap-2"
                           >
-                            {actionLoading === prop.id ? 'รอสักครู่...' : '✅ เลือกจ้างคนนี้'}
-                          </button>
+                            <span className="text-xl">💬</span> สอบถามข้อมูลเพิ่มเติม
+                          </Link>
                         </div>
+
                       </div>
 
                     </article>
