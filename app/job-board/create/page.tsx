@@ -10,15 +10,25 @@ export default function CreateJobPage() {
   const [loading, setLoading] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
 
+  // คำนวณวันดีฟอลต์ (3 วันนับจากวันนี้)
+  const getDefaultDeadline = () => {
+    const date = new Date();
+    date.setDate(date.getDate() + 3);
+    return date.toISOString().split('T')[0];
+  };
+
+  // วันที่ปัจจุบัน (สำหรับล็อคห้ามเลือกย้อนหลัง)
+  const getTodayDate = () => new Date().toISOString().split('T')[0];
+
   // 🌟 State สำหรับเก็บข้อมูลฟอร์ม
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    job_type: 'online',
+    job_type: 'onsite', // ✅ ดีฟอลต์เป็น onsite ตามสั่ง
     category: 'design',
     employment_type: 'freelance',
     budget: '',
-    deadline: '',
+    deadline: getDefaultDeadline(), // ✅ ดีฟอลต์เป็น 3 วันถัดไป
     is_anonymous: false 
   });
 
@@ -46,10 +56,21 @@ export default function CreateJobPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser) return;
+
+    // 🔒 Validation: ห้ามเกิน 3 วัน
+    const selectedDate = new Date(formData.deadline);
+    const maxDate = new Date();
+    maxDate.setDate(maxDate.getDate() + 3);
+    maxDate.setHours(23, 59, 59, 999);
+
+    if (selectedDate > maxDate) {
+      alert('❌ ขออภัยค่ะ ประกาศหางานสามารถตั้งวันหมดอายุได้สูงสุดไม่เกิน 3 วันนะคะ');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      // 🌟 นำข้อมูลลง Database
       const { error } = await supabase.from('jobs').insert({
         employer_id: currentUser.id,
         title: formData.title,
@@ -190,12 +211,15 @@ export default function CreateJobPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs md:text-sm font-black text-gray-700 mb-2">วันหมดอายุประกาศ (ถ้ามี)</label>
+                  <label className="block text-xs md:text-sm font-black text-gray-700 mb-2">วันหมดอายุประกาศ (สูงสุด 3 วัน)</label>
                   <input 
-                    type="date" name="deadline" 
+                    type="date" name="deadline" required
                     value={formData.deadline} onChange={handleInputChange}
+                    min={getTodayDate()}
+                    max={getDefaultDeadline()}
                     className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-800 focus:bg-white focus:ring-2 focus:ring-[#0047FF] outline-none cursor-pointer"
                   />
+                  <p className="text-[10px] text-blue-500 mt-1 font-bold">เพื่อความรวดเร็ว ระบบกำหนดให้โพสต์มีอายุไม่เกิน 3 วันค่ะ</p>
                 </div>
               </div>
 
