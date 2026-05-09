@@ -9,6 +9,7 @@ export default function RiderDashboardPage() {
   const supabase = useMemo(() => createClient(), []);
 
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [profileData, setProfileData] = useState<any>(null); // 🌟 เพิ่ม State เก็บโปรไฟล์
   const [loading, setLoading] = useState(true);
   
   // Rider States
@@ -17,11 +18,11 @@ export default function RiderDashboardPage() {
   
   // Data States
   const [availableJobs, setAvailableJobs] = useState<any[]>([]);
-  const [activeJob, setActiveJob] = useState<any>(null); // งานที่กำลังทำอยู่ตอนนี้
+  const [activeJob, setActiveJob] = useState<any>(null);
   const [todaysEarnings, setTodaysEarnings] = useState(0);
   const [todaysTrips, setTodaysTrips] = useState(0);
 
-  // 🌟 1. ตรวจสอบสิทธิ์และดึงข้อมูลเริ่มต้น
+  // 🌟 ตรวจสอบสิทธิ์และดึงข้อมูลเริ่มต้น
   useEffect(() => {
     const initRider = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -30,10 +31,10 @@ export default function RiderDashboardPage() {
         return;
       }
       
-      // ดึงโปรไฟล์เพื่อเช็ค KYC
+      // ดึงโปรไฟล์ (เพิ่ม full_name และ avatar_url)
       const { data: profile } = await supabase
         .from('profiles')
-        .select('is_kyc_verified')
+        .select('is_kyc_verified, full_name, avatar_url')
         .eq('id', session.user.id)
         .single();
 
@@ -43,15 +44,14 @@ export default function RiderDashboardPage() {
         return;
       }
 
+      setProfileData(profile);
       setCurrentUser(session.user);
       fetchRiderData(session.user.id);
     };
     initRider();
   }, [router, supabase]);
 
-  // 🌟 2. ดึงข้อมูลงาน (งานที่ว่างอยู่ + งานที่กำลังทำ + รายได้วันนี้)
   const fetchRiderData = useCallback(async (userId: string) => {
-    // ก. ดึงงานที่ตัวเองกำลังทำอยู่ (ถ้ามี)
     const { data: currentJob } = await supabase
       .from('jobs')
       .select('*, employer:profiles!employer_id(full_name, phone)')
@@ -61,7 +61,6 @@ export default function RiderDashboardPage() {
     
     setActiveJob(currentJob);
 
-    // ข. ดึงงานที่รอคนรับ (ถ้ายังไม่มีงานทำ)
     if (!currentJob) {
       const { data: openJobs } = await supabase
         .from('jobs')
@@ -73,8 +72,7 @@ export default function RiderDashboardPage() {
       if (openJobs) setAvailableJobs(openJobs);
     }
 
-    // ค. คำนวณรายได้วันนี้
-    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    const today = new Date().toISOString().split('T')[0];
     const { data: completedJobs } = await supabase
       .from('jobs')
       .select('budget')
@@ -90,7 +88,6 @@ export default function RiderDashboardPage() {
     setLoading(false);
   }, [supabase]);
 
-  // 🌟 3. Real-time Subscription
   useEffect(() => {
     if (!currentUser) return;
     const channel = supabase.channel('rider-dashboard')
@@ -101,7 +98,6 @@ export default function RiderDashboardPage() {
     return () => { supabase.removeChannel(channel); };
   }, [currentUser, fetchRiderData, supabase]);
 
-  // 🌟 4. ฟังก์ชันกดรับงาน
   const handleAcceptJob = async (jobId: string) => {
     if (!isOnline) { alert('กรุณาเปิดออนไลน์ก่อนรับงานค่ะ'); return; }
     if (activeJob) { alert('คุณมีงานที่กำลังดำเนินการอยู่ค่ะ'); return; }
@@ -110,7 +106,7 @@ export default function RiderDashboardPage() {
       .from('jobs')
       .update({ status: 'in_progress', worker_id: currentUser.id })
       .eq('id', jobId)
-      .eq('status', 'open'); // ป้องกันคนกดพร้อมกัน
+      .eq('status', 'open');
 
     if (error) {
       alert('ขออภัยค่ะ งานนี้ถูกรับไปแล้ว 🥲');
@@ -119,13 +115,12 @@ export default function RiderDashboardPage() {
     }
   };
 
-  // 🌟 5. ฟังก์ชันจบงาน (เก็บเงิน)
   const handleCompleteJob = async (jobId: string) => {
     if (!confirm('ยืนยันว่าส่งลูกค้าถึงที่หมายและเก็บเงินเรียบร้อยแล้วใช่ไหมคะ?')) return;
     
     const { error } = await supabase
       .from('jobs')
-      .update({ status: 'completed' }) // วินมอเตอร์ไซค์จบงานได้เลย
+      .update({ status: 'completed' })
       .eq('id', jobId);
 
     if (error) {
@@ -136,15 +131,14 @@ export default function RiderDashboardPage() {
     }
   };
 
-  // เปิด Google Maps นำทาง
   const openNavigation = (location: string) => {
     const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(location)}`;
     window.open(url, '_blank');
   };
 
   if (loading) return (
-    <div className="min-h-screen bg-gray-900 flex items-center justify-center font-sans">
-      <div className="w-12 h-12 border-4 border-[#00C300] border-t-transparent rounded-full animate-spin" />
+    <div className="min-h-screen bg-[#F4F6F8] flex items-center justify-center font-sans">
+      <div className="w-12 h-12 border-4 border-[#EE4D2D] border-t-transparent rounded-full animate-spin" />
     </div>
   );
 
@@ -152,45 +146,61 @@ export default function RiderDashboardPage() {
     <div className="min-h-screen bg-gray-100 flex justify-center font-sans pb-24 md:pb-10">
       <div className="w-full lg:max-w-4xl xl:max-w-5xl bg-[#F4F6F8] min-h-screen relative flex flex-col md:shadow-2xl overflow-x-hidden md:border-x border-gray-200">
         
-        {/* 🟢 Header Section (Driver Dark Mode) */}
-        <header className="bg-gray-900 px-6 pt-12 pb-8 rounded-b-[2rem] md:rounded-b-[3rem] text-white shadow-xl relative z-20">
-          <div className="flex justify-between items-start max-w-2xl mx-auto mb-6">
-            <button onClick={() => router.push('/profile')} className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center hover:bg-white/20 active:scale-95 transition-all backdrop-blur-md">
-              ←
-            </button>
+        {/* 🟠 Header Section (เปลี่ยนเป็นสีส้มแอปจงเจริญ) */}
+        <header className="bg-gradient-to-br from-[#EE4D2D] via-[#FF6243] to-[#FF8A65] px-6 pt-12 pb-8 rounded-b-[2.5rem] md:rounded-b-[3.5rem] text-white shadow-xl relative z-20">
+          <div className="flex justify-between items-start max-w-2xl mx-auto mb-8">
             
-            {/* Online Toggle */}
+            {/* 🌟 ย้ายปุ่มกลับและข้อมูลโปรไฟล์มาฝั่งซ้าย */}
+            <div className="flex items-center gap-3">
+              <button onClick={() => router.push('/profile')} className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 active:scale-95 transition-all backdrop-blur-md shrink-0">
+                ←
+              </button>
+              <div className="flex items-center gap-3 bg-black/10 pr-4 pl-1 py-1 rounded-full backdrop-blur-sm border border-white/10">
+                 <div className="w-8 h-8 rounded-full overflow-hidden bg-white flex items-center justify-center text-sm shadow-sm shrink-0">
+                   {profileData?.avatar_url ? (
+                     <img src={profileData.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+                   ) : '👤'}
+                 </div>
+                 <div className="flex flex-col">
+                   <span className="text-[9px] font-black text-white/80 uppercase tracking-widest leading-none">คนขับ</span>
+                   <span className="text-xs font-black text-white line-clamp-1 leading-tight">{profileData?.full_name || 'พี่วินจงเจริญ'}</span>
+                 </div>
+              </div>
+            </div>
+            
+            {/* Online Toggle (ปรับ UI ให้อ่านง่ายบนพื้นส้ม) */}
             <div className="flex flex-col items-end">
               <label className="relative inline-flex items-center cursor-pointer">
                 <input type="checkbox" className="sr-only peer" checked={isOnline} onChange={(e) => setIsOnline(e.target.checked)} />
-                <div className="w-14 h-8 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-[#00C300] shadow-inner"></div>
+                <div className="w-14 h-8 bg-black/20 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:border-gray-200 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-[#00C300] shadow-inner backdrop-blur-sm border border-white/20"></div>
               </label>
-              <span className={`text-xs font-black mt-1 ${isOnline ? 'text-[#00C300]' : 'text-gray-500'}`}>
-                {isOnline ? '🟢 ออนไลน์ (รับงาน)' : '⚫ ออฟไลน์'}
-              </span>
+              <div className={`mt-1.5 px-2 py-0.5 rounded-md text-[10px] font-black backdrop-blur-md shadow-sm border ${isOnline ? 'bg-white text-[#00C300] border-white' : 'bg-black/30 text-white/80 border-transparent'}`}>
+                {isOnline ? '🟢 รับงานอยู่' : '⚫ ออฟไลน์'}
+              </div>
             </div>
+
           </div>
 
           <div className="max-w-2xl mx-auto">
-            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">รายได้วันนี้</p>
+            <p className="text-[10px] text-white/80 font-black uppercase tracking-widest mb-1">รายได้วันนี้</p>
             <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-bold text-gray-300">฿</span>
-              <h1 className="text-5xl md:text-6xl font-black text-white tracking-tighter">
+              <span className="text-3xl font-bold text-white/90 drop-shadow-sm">฿</span>
+              <h1 className="text-5xl md:text-6xl font-black text-white tracking-tighter drop-shadow-md">
                 {todaysEarnings.toLocaleString('th-TH')}
               </h1>
             </div>
-            <div className="flex gap-4 mt-4">
-              <div className="bg-gray-800 px-4 py-2 rounded-xl flex items-center gap-2">
-                <span className="text-lg">🎯</span>
+            <div className="flex gap-4 mt-5">
+              <div className="bg-white/20 backdrop-blur-sm px-4 py-2.5 rounded-2xl flex items-center gap-2.5 border border-white/10 shadow-sm flex-1">
+                <span className="text-xl bg-white/20 p-1.5 rounded-xl">🎯</span>
                 <div>
-                  <p className="text-[9px] text-gray-400 font-bold uppercase">รอบวิ่งวันนี้</p>
+                  <p className="text-[9px] text-white/80 font-bold uppercase">รอบวิ่งวันนี้</p>
                   <p className="text-sm font-black text-white">{todaysTrips} รอบ</p>
                 </div>
               </div>
-              <div className="bg-gray-800 px-4 py-2 rounded-xl flex items-center gap-2">
-                <span className="text-lg">⭐</span>
+              <div className="bg-white/20 backdrop-blur-sm px-4 py-2.5 rounded-2xl flex items-center gap-2.5 border border-white/10 shadow-sm flex-1">
+                <span className="text-xl bg-white/20 p-1.5 rounded-xl">⭐</span>
                 <div>
-                  <p className="text-[9px] text-gray-400 font-bold uppercase">คะแนนดาว</p>
+                  <p className="text-[9px] text-white/80 font-bold uppercase">คะแนนดาว</p>
                   <p className="text-sm font-black text-white">5.0</p>
                 </div>
               </div>
@@ -202,9 +212,9 @@ export default function RiderDashboardPage() {
           
           {/* ⚡ Auto-Accept Settings */}
           {isOnline && !activeJob && (
-            <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100 flex items-center justify-between">
+            <div className="bg-white rounded-[1.5rem] p-5 shadow-sm border border-gray-100 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl transition-colors ${isAutoAccept ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-400'}`}>
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl transition-colors ${isAutoAccept ? 'bg-orange-100 text-[#EE4D2D]' : 'bg-gray-100 text-gray-400'}`}>
                   ⚡
                 </div>
                 <div>
@@ -214,7 +224,7 @@ export default function RiderDashboardPage() {
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
                 <input type="checkbox" className="sr-only peer" checked={isAutoAccept} onChange={(e) => setIsAutoAccept(e.target.checked)} />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500"></div>
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#EE4D2D]"></div>
               </label>
             </div>
           )}
@@ -294,17 +304,17 @@ export default function RiderDashboardPage() {
 
               {availableJobs.length === 0 ? (
                 <div className="bg-white rounded-[2rem] p-10 text-center border border-gray-100 shadow-sm flex flex-col items-center">
-                  <div className="w-16 h-16 rounded-full border-4 border-blue-50 border-t-[#0047FF] animate-spin mb-4"></div>
+                  <div className="w-16 h-16 rounded-full border-4 border-orange-50 border-t-[#EE4D2D] animate-spin mb-4"></div>
                   <p className="font-black text-gray-800 text-sm">กำลังค้นหางานรอบตัวคุณ...</p>
                   <p className="text-[11px] text-gray-400 font-bold mt-1">รอสักครู่ ระบบจะแจ้งเตือนเมื่องานเข้า</p>
                 </div>
               ) : (
                 <div className="space-y-4">
                   {availableJobs.map((job) => (
-                    <div key={job.id} className="bg-white rounded-3xl p-5 shadow-md border border-gray-100 flex flex-col gap-4 animate-fade-in group">
+                    <div key={job.id} className="bg-white rounded-3xl p-5 shadow-md border border-gray-100 flex flex-col gap-4 animate-fade-in group hover:border-[#EE4D2D] transition-colors">
                       <div className="flex justify-between items-start">
                         <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 bg-blue-50 text-blue-500 rounded-xl flex items-center justify-center text-2xl font-black">
+                          <div className="w-12 h-12 bg-orange-50 text-[#EE4D2D] rounded-xl flex items-center justify-center text-2xl font-black">
                             {job.job_type === 'buy' ? '🛒' : job.job_type === 'deliver' ? '📦' : '🛵'}
                           </div>
                           <div>
