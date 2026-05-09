@@ -195,6 +195,16 @@ export default function ChatPage({ params }: { params: { id: string } }) {
           
           <input type="file" accept="image/*" ref={fileInputRef} onChange={handleUploadAndSubmit} className="hidden" />
 
+          {/* 💰 เพิ่มส่วนชำระเงินสำหรับผู้ว่าจ้าง */}
+          {isEmployer && job?.status === 'open' && (
+            <Link 
+              href={`/checkout/${jobId}`}
+              className="w-full bg-[#0047FF] text-white py-4 rounded-2xl font-black text-base shadow-lg shadow-blue-200 active:scale-95 transition-all text-center block mb-2"
+            >
+              💳 ยืนยันจ้างงานและชำระเงิน ฿{job?.budget?.toLocaleString()}
+            </Link>
+          )}
+
           {isWorker && job?.status === 'in_progress' && (
             <button onClick={() => fileInputRef.current?.click()} disabled={isActionLoading} className="w-full bg-[#EE4D2D] text-white py-3 rounded-2xl font-black text-sm shadow-md active:scale-95 transition-transform disabled:opacity-50">
               {isActionLoading ? 'กำลังอัปโหลดรูป...' : '📸 ถ่ายรูปผลงาน & ส่งมอบ (เก็บตังค์!)'}
