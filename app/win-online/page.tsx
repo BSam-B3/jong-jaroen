@@ -81,12 +81,14 @@ export default function WinOnlinePage() {
 
   useEffect(() => { if (isLoaded) init(); }, [isLoaded, init]);
 
+  // 🌟 ฟังก์ชันดึงข้อมูลที่แก้ไขให้กรองเฉพาะ "หมวดวิน" และ "รอรับงาน"
   const fetchMyActiveJobs = useCallback(async (userId: string, isSilent = false) => {
     if (!isSilent) setIsLoading(true); 
     const { data } = await supabase.from('jobs')
       .select(`*, worker:profiles!worker_id (full_name)`)
       .eq('employer_id', userId)
-      .in('status', ['open', 'in_progress'])
+      .in('job_type', ['ride', 'buy', 'deliver']) // 🎯 กรองเฉพาะงานวินออนไลน์
+      .eq('status', 'open') // 🎯 กรองเอาเฉพาะสเตตัสรอรับงานเท่านั้น
       .order('created_at', { ascending: false });
     
     if (data) setJobs(data);
@@ -230,7 +232,7 @@ export default function WinOnlinePage() {
           </div>
         </header>
 
-        {/* 🌟 Tab Switcher (ซ้าย: เรียกใช้บริการ / ขวา: วินใกล้ฉัน) */}
+        {/* 🌟 Tab Switcher */}
         <div className="relative z-30 px-5 w-full max-w-2xl mx-auto -mt-10 md:-mt-12">
           <div className="relative bg-white rounded-full p-1.5 flex shadow-lg border border-gray-100">
             <span className={`absolute top-1.5 bottom-1.5 w-[calc(50%-0.375rem)] rounded-full bg-[#EE4D2D] shadow-sm transition-all duration-300 ${activeTab === 'call' ? 'left-1.5' : 'left-[calc(50%+0.125rem)]'}`} />
@@ -246,7 +248,7 @@ export default function WinOnlinePage() {
         {/* 🌟 Main Content Area */}
         <main className="flex-1 p-5 md:px-10 mt-2 relative z-30 w-full max-w-2xl mx-auto">
           
-          {/* ================= แท็บ 1: เรียกใช้บริการ (Default) ================= */}
+          {/* ================= แท็บ 1: เรียกใช้บริการ ================= */}
           {activeTab === 'call' && (
             <div className="space-y-6 animate-fade-in">
               {/* ปุ่มสร้างรายการใหม่ */}
@@ -270,7 +272,7 @@ export default function WinOnlinePage() {
               <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100">
                  <div className="flex items-center justify-between mb-4">
                     <h2 className="text-base font-black text-gray-800 flex items-center gap-2">
-                      <span className="text-blue-500">⏳</span> งานที่กำลังดำเนินการ
+                      <span className="text-blue-500">⏳</span> รายการเรียกวินที่กำลังรอรับงาน
                     </h2>
                  </div>
 
@@ -280,7 +282,7 @@ export default function WinOnlinePage() {
                    </div>
                  ) : jobs.length === 0 ? (
                    <div className="text-center py-8 bg-gray-50 rounded-2xl border border-gray-100 border-dashed">
-                     <p className="text-sm font-bold text-gray-400">ยังไม่มีรายการที่กำลังรอรถค่ะ</p>
+                     <p className="text-sm font-bold text-gray-400">ไม่มีรายการเรียกวินค้างในระบบค่ะ</p>
                    </div>
                  ) : (
                    <div className="space-y-3 max-h-[400px] overflow-y-auto no-scrollbar pr-1">
@@ -288,14 +290,14 @@ export default function WinOnlinePage() {
                        <div key={job.id} onClick={() => router.push(`/chat/${job.id}`)} className="p-4 rounded-2xl border border-gray-200 hover:border-[#EE4D2D] hover:bg-orange-50/30 transition-all cursor-pointer group">
                          <div className="flex justify-between items-start mb-2">
                            <span className="text-sm font-black text-gray-800 group-hover:text-[#EE4D2D] transition-colors">{job.title || 'เรียกงานด่วน'}</span>
-                           <span className={`text-[9px] font-bold px-2 py-0.5 rounded flex items-center gap-1 ${job.status === 'open' ? 'bg-yellow-50 text-yellow-600 border border-yellow-100' : 'bg-blue-50 text-blue-600 border border-blue-100'}`}>
-                             <span className={`w-1.5 h-1.5 rounded-full ${job.status === 'open' ? 'bg-yellow-400 animate-pulse' : 'bg-blue-500'}`}></span>
-                             {job.status === 'open' ? 'รอรับงาน' : 'คนขับกำลังไป'}
+                           <span className="text-[9px] font-bold px-2 py-0.5 rounded flex items-center gap-1 bg-yellow-50 text-yellow-600 border border-yellow-100">
+                             <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse"></span>
+                             รอคนขับรับงาน
                            </span>
                          </div>
                          <p className="text-xs text-gray-500 font-medium line-clamp-1 mb-3">📍 {job.pickup_location}</p>
                          <div className="flex justify-between items-end border-t border-gray-100 pt-3">
-                           <span className="text-[10px] font-bold text-gray-400">{job.worker ? `รับงานโดย: ${job.worker.full_name}` : 'กำลังหาคนขับ...'}</span>
+                           <span className="text-[10px] font-bold text-gray-400">กำลังประกาศหาคนขับ...</span>
                            <span className="text-base font-black text-[#00C300]">{job.budget} บาท</span>
                          </div>
                        </div>
