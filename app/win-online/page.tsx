@@ -9,21 +9,7 @@ import usePlacesAutocomplete, { getGeocode, getLatLng } from 'use-places-autocom
 const libraries: ("places")[] = ["places"];
 const DEFAULT_CENTER = { lat: 12.7844, lng: 101.6500 };
 
-// จำลองพิกัดพี่วินใกล้ๆ
-const MOCK_RIDERS = [
-  { id: 1, lat: 12.7850, lng: 101.6510 },
-  { id: 2, lat: 12.7830, lng: 101.6480 },
-  { id: 3, lat: 12.7860, lng: 101.6495 },
-];
-
-// จำลองวินประจำ
-const MOCK_FAVORITES = [
-  { id: 'd1', name: 'พี่สมชาย ซอย 4', status: 'online', vehicle: 'motorcycle' },
-  { id: 'd2', name: 'ลุงเอก ซาเล้ง', status: 'busy', vehicle: 'saleng' },
-  { id: 'd3', name: 'พี่น้อย กระบะรับจ้าง', status: 'offline', vehicle: 'pickup' },
-];
-
-// 🌟 เพิ่มรายการสถานที่ยอดฮิต (Popular Places)
+// 🌟 รายการสถานที่ยอดฮิต (Popular Places)
 const POPULAR_PLACES = [
   { name: 'โรงพยาบาลแกลง', detail: 'Klaeng Hospital', icon: '🏥' },
   { name: 'ตลาดสามย่าน แกลง', detail: 'Sam Yan Market', icon: '🏪' },
@@ -60,8 +46,7 @@ export default function WinOnlinePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<any>(null);
 
-  const [activeTab, setActiveTab] = useState<'call' | 'map'>('call');
-
+  // Modal & Form States
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLocationPickerOpen, setIsLocationPickerOpen] = useState(false);
@@ -80,7 +65,6 @@ export default function WinOnlinePage() {
   const [dropoff, setDropoff] = useState('');
   const [distanceKm, setDistanceKm] = useState<number>(0);
   
-  // 🌟 ปรับ state ให้รองรับค่าพลังงาน
   const [fareBreakdown, setFareBreakdown] = useState({ base: 0, distanceFee: 0, fuelSurge: 0, totalFare: 0 });
 
   const { ready, value, suggestions: { status, data }, setValue, clearSuggestions, init } = usePlacesAutocomplete({
@@ -95,7 +79,7 @@ export default function WinOnlinePage() {
       .select(`*, worker:profiles!worker_id (full_name)`)
       .eq('employer_id', userId)
       .in('job_type', ['ride', 'buy', 'deliver']) 
-      .in('status', ['open', 'in_progress']) // 🌟 อนุญาตให้โชว์งานที่กำลังดำเนินการด้วย จะได้ตามเรื่องต่อได้
+      .in('status', ['open', 'in_progress']) 
       .order('created_at', { ascending: false });
     
     if (data) setJobs(data);
@@ -144,7 +128,6 @@ export default function WinOnlinePage() {
       if (dropoffCoords) calculateRoute(pickupCoords, dropoffCoords);
       let baseFare = 0; let ratePerKm = 0;
       
-      // 🌟 เรตราคาอัปเดตใหม่ตามมาตรฐานแพลตฟอร์ม
       switch (vehicleType) {
         case 'motorcycle': baseFare = 20; ratePerKm = distanceKm > 5 ? 10 : 8; break;
         case 'saleng': baseFare = 30; ratePerKm = 10; break;
@@ -155,7 +138,6 @@ export default function WinOnlinePage() {
       }
       
       const distanceFee = distanceKm * ratePerKm;
-      // 🌟 ค่าพลังงาน: ชาร์จเพิ่ม กม. ละ 1.5 บาท เพื่อช่วยค่าน้ำมันคนขับ (แปรผันตามระยะทาง)
       const fuelSurge = distanceKm > 0 ? (distanceKm * 1.5) : 0; 
       const totalFare = baseFare + distanceFee + fuelSurge;
 
@@ -223,17 +205,12 @@ export default function WinOnlinePage() {
     }
   }, [pickingType]);
 
-  const getVehicleIcon = (type: string) => {
-    const v = VEHICLES_UI.find(x => x.key === type);
-    return v ? v.icon : '🛵';
-  };
-
   return (
     <div className="min-h-screen bg-[#F4F6F8] flex justify-center font-sans pb-24 md:pb-10">
-      <div className="w-full lg:max-w-4xl xl:max-w-5xl bg-[#F8FAFC] min-h-screen relative flex flex-col md:shadow-2xl overflow-x-hidden md:border-x border-gray-200/50">
+      <div className="w-full lg:max-w-3xl xl:max-w-4xl bg-[#F8FAFC] min-h-screen relative flex flex-col md:shadow-2xl overflow-x-hidden md:border-x border-gray-200/50">
         
         {/* 🟠 Header */}
-        <header className="bg-gradient-to-br from-[#EE4D2D] to-[#FF7337] px-6 pt-12 pb-24 md:pb-28 rounded-b-[2.5rem] md:rounded-b-[4rem] text-white shadow-lg relative z-20">
+        <header className="bg-gradient-to-br from-[#EE4D2D] to-[#FF7337] px-6 pt-12 pb-20 md:pb-24 rounded-b-[2.5rem] md:rounded-b-[4rem] text-white shadow-lg relative z-20">
           <div className="flex items-center gap-4 max-w-2xl mx-auto">
             <button onClick={() => router.back()} className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 active:scale-95 transition-all backdrop-blur-md shrink-0">
               ←
@@ -245,156 +222,63 @@ export default function WinOnlinePage() {
           </div>
         </header>
 
-        {/* 🌟 Tab Switcher */}
-        <div className="relative z-30 px-5 w-full max-w-2xl mx-auto -mt-10 md:-mt-12">
-          <div className="relative bg-white rounded-full p-1.5 flex shadow-lg border border-gray-100">
-            <span className={`absolute top-1.5 bottom-1.5 w-[calc(50%-0.375rem)] rounded-full bg-[#EE4D2D] shadow-sm transition-all duration-300 ${activeTab === 'call' ? 'left-1.5' : 'left-[calc(50%+0.125rem)]'}`} />
-            <button onClick={() => setActiveTab('call')} className={`relative z-10 flex-1 py-3.5 text-[13px] md:text-sm font-black transition-colors ${activeTab === 'call' ? 'text-white' : 'text-gray-500 hover:text-gray-800'}`}>
-              🙋‍♂️ เรียกใช้บริการ
-            </button>
-            <button onClick={() => setActiveTab('map')} className={`relative z-10 flex-1 py-3.5 text-[13px] md:text-sm font-black transition-colors ${activeTab === 'map' ? 'text-white' : 'text-gray-500 hover:text-gray-800'}`}>
-              📍 วินใกล้ฉัน
+        {/* 🌟 Main Content Area */}
+        <main className="flex-1 p-5 md:px-10 -mt-10 relative z-30 w-full max-w-2xl mx-auto space-y-6">
+          
+          {/* ปุ่มสร้างรายการใหม่ */}
+          <div className="bg-white rounded-[2rem] p-8 shadow-xl border border-gray-100 text-center relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-orange-50 rounded-bl-full -z-10 opacity-50"></div>
+            <h2 className="text-lg md:text-xl font-black text-gray-800 mb-2">จะไปไหน หรือฝากซื้ออะไร?</h2>
+            <p className="text-xs md:text-sm text-gray-500 font-medium mb-6">กดสร้างรายการให้พี่วินในพื้นที่ดูแลได้เลย</p>
+            
+            <button 
+              onClick={() => {
+                if(!currentUser) { alert('กรุณาเข้าสู่ระบบก่อนค่ะ'); router.push('/auth/login?next=/win-online'); return; }
+                setIsModalOpen(true);
+              }} 
+              className="w-full bg-gradient-to-r from-[#EE4D2D] to-[#FF7337] text-white py-4 rounded-2xl font-black text-base shadow-lg shadow-orange-200 active:scale-95 transition-all flex items-center justify-center gap-2"
+            >
+              <span className="text-xl">+</span> สร้างรายการใหม่
             </button>
           </div>
-        </div>
 
-        {/* 🌟 Main Content Area */}
-        <main className="flex-1 p-5 md:px-10 mt-2 relative z-30 w-full max-w-2xl mx-auto">
-          
-          {/* ================= แท็บ 1: เรียกใช้บริการ ================= */}
-          {activeTab === 'call' && (
-            <div className="space-y-6 animate-fade-in">
-              {/* ปุ่มสร้างรายการใหม่ */}
-              <div className="bg-white rounded-[2rem] p-8 shadow-xl border border-gray-100 text-center relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-orange-50 rounded-bl-full -z-10 opacity-50"></div>
-                <h2 className="text-lg md:text-xl font-black text-gray-800 mb-2">จะไปไหน หรือฝากซื้ออะไร?</h2>
-                <p className="text-xs md:text-sm text-gray-500 font-medium mb-6">กดสร้างรายการให้พี่วินในพื้นที่ดูแลได้เลย</p>
-                
-                <button 
-                  onClick={() => {
-                    if(!currentUser) { alert('กรุณาเข้าสู่ระบบก่อนค่ะ'); router.push('/auth/login?next=/win-online'); return; }
-                    setIsModalOpen(true);
-                  }} 
-                  className="w-full bg-gradient-to-r from-[#EE4D2D] to-[#FF7337] text-white py-4 rounded-2xl font-black text-base shadow-lg shadow-orange-200 active:scale-95 transition-all flex items-center justify-center gap-2"
-                >
-                  <span className="text-xl">+</span> สร้างรายการใหม่
-                </button>
-              </div>
+          {/* ประวัติงานกำลังรอ/กำลังทำ */}
+          <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100">
+             <div className="flex items-center justify-between mb-4">
+                <h2 className="text-base font-black text-gray-800 flex items-center gap-2">
+                  <span className="text-blue-500">⏳</span> รายการเรียกวินของคุณ
+                </h2>
+             </div>
 
-              {/* ประวัติงานกำลังรอ/กำลังทำ */}
-              <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100">
-                 <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-base font-black text-gray-800 flex items-center gap-2">
-                      <span className="text-blue-500">⏳</span> รายการเรียกวินของคุณ
-                    </h2>
-                 </div>
-
-                 {isLoading ? (
-                   <div className="animate-pulse space-y-3">
-                     <div className="h-20 bg-gray-100 rounded-2xl"></div>
-                   </div>
-                 ) : jobs.length === 0 ? (
-                   <div className="text-center py-8 bg-gray-50 rounded-2xl border border-gray-100 border-dashed">
-                     <p className="text-sm font-bold text-gray-400">ไม่มีรายการเรียกวินค้างในระบบค่ะ</p>
-                   </div>
-                 ) : (
-                   <div className="space-y-3 max-h-[400px] overflow-y-auto no-scrollbar pr-1">
-                     {jobs.map((job) => (
-                       <div key={job.id} onClick={() => router.push(`/chat/${job.id}`)} className="p-4 rounded-2xl border border-gray-200 hover:border-[#EE4D2D] hover:bg-orange-50/30 transition-all cursor-pointer group">
-                         <div className="flex justify-between items-start mb-2">
-                           <span className="text-sm font-black text-gray-800 group-hover:text-[#EE4D2D] transition-colors">{job.title || 'เรียกงานด่วน'}</span>
-                           <span className={`text-[9px] font-bold px-2 py-0.5 rounded flex items-center gap-1 ${job.status === 'open' ? 'bg-yellow-50 text-yellow-600 border border-yellow-100' : 'bg-blue-50 text-blue-600 border border-blue-100'}`}>
-                             <span className={`w-1.5 h-1.5 rounded-full ${job.status === 'open' ? 'bg-yellow-400 animate-pulse' : 'bg-blue-500'}`}></span>
-                             {job.status === 'open' ? 'รอคนขับรับงาน' : 'คนขับกำลังไป'}
-                           </span>
-                         </div>
-                         <p className="text-xs text-gray-500 font-medium line-clamp-1 mb-3">📍 {job.pickup_location}</p>
-                         <div className="flex justify-between items-end border-t border-gray-100 pt-3">
-                           <span className="text-[10px] font-bold text-gray-400">{job.worker ? `รับงานโดย: ${job.worker.full_name}` : 'กำลังประกาศหาคนขับ...'}</span>
-                           <span className="text-base font-black text-[#00C300]">{job.budget} บาท</span>
-                         </div>
-                       </div>
-                     ))}
-                   </div>
-                 )}
-              </div>
-            </div>
-          )}
-
-          {/* ================= แท็บ 2: วินใกล้ฉัน ================= */}
-          {activeTab === 'map' && (
-            <div className="space-y-6 animate-fade-in">
-              {/* แผนที่วินใกล้ฉัน */}
-              <div className="bg-white rounded-[2rem] p-4 shadow-sm border border-gray-100 flex flex-col">
-                <div className="flex items-center justify-between mb-3 px-2">
-                  <h2 className="text-base font-black text-gray-800 flex items-center gap-2">
-                    <span className="text-[#EE4D2D]">📍</span> วินรอบๆ ตัวคุณ
-                  </h2>
-                  <span className="text-[10px] font-bold text-emerald-500 bg-emerald-50 px-2 py-1 rounded-md animate-pulse border border-emerald-100">
-                    อัปเดตสด
-                  </span>
-                </div>
-                
-                <div className="w-full h-[300px] md:h-[400px] bg-gray-100 rounded-[1.5rem] overflow-hidden relative border border-gray-200">
-                  {isLoaded ? (
-                    <GoogleMap 
-                      mapContainerStyle={{ width: '100%', height: '100%' }} 
-                      center={mapCenter} 
-                      zoom={15} 
-                      options={{ disableDefaultUI: true, zoomControl: true }}
-                    >
-                      <MarkerF position={mapCenter} icon={{ url: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png' }} />
-                      {MOCK_RIDERS.map(rider => (
-                        <MarkerF 
-                          key={rider.id} 
-                          position={{ lat: rider.lat, lng: rider.lng }} 
-                          icon={{ url: 'http://maps.google.com/mapfiles/ms/icons/motorcycling.png' }} 
-                        />
-                      ))}
-                    </GoogleMap>
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-sm font-bold text-gray-400">กำลังโหลดแผนที่...</div>
-                  )}
-                  <button onClick={handleGetCurrentLocation} className="absolute bottom-4 right-4 w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center text-blue-500 hover:scale-105 transition-transform text-xl">
-                    🎯
-                  </button>
-                </div>
-              </div>
-
-              {/* ลิสต์วินประจำของฉัน */}
-              <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100">
-                 <h2 className="text-base font-black text-gray-800 mb-4 flex items-center gap-2">
-                    <span className="text-pink-500">💖</span> วินประจำของฉัน
-                 </h2>
-                 
-                 <div className="space-y-3">
-                   {MOCK_FAVORITES.map((fav) => (
-                     <div key={fav.id} className="flex items-center justify-between p-3 rounded-2xl border border-gray-100 hover:bg-orange-50/50 transition-colors cursor-pointer group">
-                       <div className="flex items-center gap-3">
-                         <div className="w-12 h-12 bg-orange-50 rounded-full flex items-center justify-center text-2xl relative border border-orange-100">
-                           {getVehicleIcon(fav.vehicle)}
-                           <span className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-white shadow-sm ${fav.status === 'online' ? 'bg-emerald-500' : fav.status === 'busy' ? 'bg-red-500' : 'bg-gray-300'}`}></span>
-                         </div>
-                         <div>
-                           <p className="text-sm font-black text-gray-800">{fav.name}</p>
-                           <p className={`text-[10px] font-bold ${fav.status === 'online' ? 'text-emerald-500' : fav.status === 'busy' ? 'text-red-500' : 'text-gray-400'}`}>
-                             {fav.status === 'online' ? 'ว่าง รับงานได้' : fav.status === 'busy' ? 'ติดงานอยู่' : 'ออฟไลน์'}
-                           </p>
-                         </div>
-                       </div>
-                       <button 
-                          disabled={fav.status !== 'online'}
-                          className={`text-xs font-black px-4 py-2 rounded-xl transition-all ${fav.status === 'online' ? 'bg-[#EE4D2D] text-white shadow-md hover:bg-[#D43D1D] active:scale-95' : 'bg-gray-100 text-gray-400'}`}
-                       >
-                          เรียกตรง
-                       </button>
+             {isLoading ? (
+               <div className="animate-pulse space-y-3">
+                 <div className="h-20 bg-gray-100 rounded-2xl"></div>
+               </div>
+             ) : jobs.length === 0 ? (
+               <div className="text-center py-8 bg-gray-50 rounded-2xl border border-gray-100 border-dashed">
+                 <p className="text-sm font-bold text-gray-400">ไม่มีรายการเรียกวินค้างในระบบค่ะ</p>
+               </div>
+             ) : (
+               <div className="space-y-3 max-h-[400px] overflow-y-auto no-scrollbar pr-1">
+                 {jobs.map((job) => (
+                   <div key={job.id} onClick={() => router.push(`/chat/${job.id}`)} className="p-4 rounded-2xl border border-gray-200 hover:border-[#EE4D2D] hover:bg-orange-50/30 transition-all cursor-pointer group">
+                     <div className="flex justify-between items-start mb-2">
+                       <span className="text-sm font-black text-gray-800 group-hover:text-[#EE4D2D] transition-colors">{job.title || 'เรียกงานด่วน'}</span>
+                       <span className={`text-[9px] font-bold px-2 py-0.5 rounded flex items-center gap-1 ${job.status === 'open' ? 'bg-yellow-50 text-yellow-600 border border-yellow-100' : 'bg-blue-50 text-blue-600 border border-blue-100'}`}>
+                         <span className={`w-1.5 h-1.5 rounded-full ${job.status === 'open' ? 'bg-yellow-400 animate-pulse' : 'bg-blue-500'}`}></span>
+                         {job.status === 'open' ? 'รอคนขับรับงาน' : 'คนขับกำลังไป'}
+                       </span>
                      </div>
-                   ))}
-                 </div>
-              </div>
-            </div>
-          )}
-
+                     <p className="text-xs text-gray-500 font-medium line-clamp-1 mb-3">📍 {job.pickup_location}</p>
+                     <div className="flex justify-between items-end border-t border-gray-100 pt-3">
+                       <span className="text-[10px] font-bold text-gray-400">{job.worker ? `รับงานโดย: ${job.worker.full_name}` : 'กำลังประกาศหาคนขับ...'}</span>
+                       <span className="text-base font-black text-[#00C300]">{job.budget} บาท</span>
+                     </div>
+                   </div>
+                 ))}
+               </div>
+             )}
+          </div>
         </main>
 
         {/* --- ส่วน Modal เรียกรถ --- */}
@@ -443,8 +327,6 @@ export default function WinOnlinePage() {
                     <div className="space-y-2 mb-3 pb-3 border-b border-orange-200/50 text-[11px] font-bold text-gray-600">
                       <div className="flex justify-between"><span>ค่าเริ่มต้น</span><span>{fareBreakdown.base.toLocaleString('th-TH')} บาท</span></div>
                       {distanceKm > 0 && <div className="flex justify-between"><span>ค่าระยะทาง ({distanceKm} กม.)</span><span>{Math.round(fareBreakdown.distanceFee).toLocaleString('th-TH')} บาท</span></div>}
-                      
-                      {/* 🌟 เปลี่ยนเป็น ค่าพลังงาน (อุดหนุนค่าน้ำมันคนขับ) */}
                       <div className="flex justify-between text-[#EE4D2D]"><span>ค่าพลังงาน (อุดหนุนค่าน้ำมัน)</span><span>{Math.ceil(fareBreakdown.fuelSurge).toLocaleString('th-TH')} บาท</span></div>
                     </div>
                   )}
@@ -488,13 +370,11 @@ export default function WinOnlinePage() {
                   </div>
                   <div onClick={() => setIsMapMode(true)} className="p-4 bg-white rounded-[1rem] border border-gray-200 flex items-center gap-3 text-gray-700 font-bold text-sm shadow-sm cursor-pointer hover:bg-gray-50"><span>🗺️</span>ปักหมุดบนแผนที่เอง</div>
                   
-                  {/* 🌟 แสดงผล Places API ถ้าค้นหาเจอ หรือแสดงสถานที่ยอดฮิต (Popular Places) ถ้ายังไม่ค้นหา */}
                   {status === "OK" ? data.map(({ place_id, description }) => (
                     <div key={place_id} onClick={() => handleSelectLocation(description)} className="p-4 bg-white rounded-[1rem] shadow-sm border border-gray-100 flex items-center gap-4 cursor-pointer hover:border-[#EE4D2D]">
                       <div className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-lg">📍</div><h4 className="text-sm font-bold text-gray-800">{description}</h4>
                     </div>
                   )) : (
-                    // 🌟 แนะนำสถานที่ยอดฮิต
                     POPULAR_PLACES.map((p, i) => (
                       <div key={i} onClick={() => handleSelectLocation(p.name)} className="p-4 bg-white rounded-[1rem] shadow-sm border border-gray-100 flex items-center gap-4 cursor-pointer hover:border-[#EE4D2D]">
                         <div className="w-10 h-10 rounded-full bg-orange-50 flex items-center justify-center text-lg">{p.icon}</div>
