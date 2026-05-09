@@ -23,6 +23,14 @@ const MOCK_FAVORITES = [
   { id: 'd3', name: 'พี่น้อย กระบะรับจ้าง', status: 'offline', vehicle: 'pickup' },
 ];
 
+// 🌟 เพิ่มรายการสถานที่ยอดฮิต (Popular Places)
+const POPULAR_PLACES = [
+  { name: 'โรงพยาบาลแกลง', detail: 'Klaeng Hospital', icon: '🏥' },
+  { name: 'ตลาดสามย่าน แกลง', detail: 'Sam Yan Market', icon: '🏪' },
+  { name: 'เทสโก้ โลตัส แกลง', detail: 'Tesco Lotus Klaeng', icon: '🛒' },
+  { name: 'โรงเรียนแกลง "วิทยสถาวร"', detail: 'Klaeng Wittayasathaworn School', icon: '🏫' },
+];
+
 const JOB_TYPES_UI = [
   { key: 'ride', label: 'เรียกรถ', icon: '🛵', desc: 'รับ-ส่งคน' },
   { key: 'buy', label: 'ซื้อของ', icon: '🛒', desc: 'ฝากซื้อ' },
@@ -52,10 +60,8 @@ export default function WinOnlinePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<any>(null);
 
-  // 🌟 State สำหรับ Tab Switcher (ซ้าย=call, ขวา=map)
   const [activeTab, setActiveTab] = useState<'call' | 'map'>('call');
 
-  // Modal & Form States
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLocationPickerOpen, setIsLocationPickerOpen] = useState(false);
@@ -73,7 +79,9 @@ export default function WinOnlinePage() {
   const [pickup, setPickup] = useState('');
   const [dropoff, setDropoff] = useState('');
   const [distanceKm, setDistanceKm] = useState<number>(0);
-  const [fareBreakdown, setFareBreakdown] = useState({ base: 0, distanceFee: 0, fuelSurge: 0, platformFee: 0, totalFare: 0 });
+  
+  // 🌟 ปรับ state ให้รองรับค่าพลังงาน
+  const [fareBreakdown, setFareBreakdown] = useState({ base: 0, distanceFee: 0, fuelSurge: 0, totalFare: 0 });
 
   const { ready, value, suggestions: { status, data }, setValue, clearSuggestions, init } = usePlacesAutocomplete({
     initOnMount: false, requestOptions: { componentRestrictions: { country: 'th' } }, debounce: 300,
@@ -81,14 +89,13 @@ export default function WinOnlinePage() {
 
   useEffect(() => { if (isLoaded) init(); }, [isLoaded, init]);
 
-  // 🌟 ฟังก์ชันดึงข้อมูลที่แก้ไขให้กรองเฉพาะ "หมวดวิน" และ "รอรับงาน"
   const fetchMyActiveJobs = useCallback(async (userId: string, isSilent = false) => {
     if (!isSilent) setIsLoading(true); 
     const { data } = await supabase.from('jobs')
       .select(`*, worker:profiles!worker_id (full_name)`)
       .eq('employer_id', userId)
-      .in('job_type', ['ride', 'buy', 'deliver']) // 🎯 กรองเฉพาะงานวินออนไลน์
-      .eq('status', 'open') // 🎯 กรองเอาเฉพาะสเตตัสรอรับงานเท่านั้น
+      .in('job_type', ['ride', 'buy', 'deliver']) 
+      .in('status', ['open', 'in_progress']) // 🌟 อนุญาตให้โชว์งานที่กำลังดำเนินการด้วย จะได้ตามเรื่องต่อได้
       .order('created_at', { ascending: false });
     
     if (data) setJobs(data);
@@ -136,21 +143,27 @@ export default function WinOnlinePage() {
     if (pickupCoords && (dropoffCoords || jobType === 'buy')) {
       if (dropoffCoords) calculateRoute(pickupCoords, dropoffCoords);
       let baseFare = 0; let ratePerKm = 0;
+      
+      // 🌟 เรตราคาอัปเดตใหม่ตามมาตรฐานแพลตฟอร์ม
       switch (vehicleType) {
         case 'motorcycle': baseFare = 20; ratePerKm = distanceKm > 5 ? 10 : 8; break;
         case 'saleng': baseFare = 30; ratePerKm = 10; break;
-        case 'car': baseFare = 40; ratePerKm = 12; break;
-        case 'suv': baseFare = 50; ratePerKm = 15; break;
-        case 'van': baseFare = 100; ratePerKm = 20; break;
-        case 'pickup': baseFare = 150; ratePerKm = 20; break;
+        case 'car': baseFare = 45; ratePerKm = 10; break;
+        case 'suv': baseFare = 60; ratePerKm = 14; break;
+        case 'van': baseFare = 150; ratePerKm = 20; break;
+        case 'pickup': baseFare = 250; ratePerKm = 20; break;
       }
+      
       const distanceFee = distanceKm * ratePerKm;
-      const rawBeforeFuel = baseFare + distanceFee;
-      const fuelSurge = (rawBeforeFuel * 1.05) - rawBeforeFuel;
-      const totalDriverFare = rawBeforeFuel + fuelSurge;
+      // 🌟 ค่าพลังงาน: ชาร์จเพิ่ม กม. ละ 1.5 บาท เพื่อช่วยค่าน้ำมันคนขับ (แปรผันตามระยะทาง)
+      const fuelSurge = distanceKm > 0 ? (distanceKm * 1.5) : 0; 
+      const totalFare = baseFare + distanceFee + fuelSurge;
 
       setFareBreakdown({
-        base: baseFare, distanceFee, fuelSurge, platformFee: totalDriverFare * 0.03, totalFare: Math.ceil(totalDriverFare * 1.03)
+        base: baseFare, 
+        distanceFee, 
+        fuelSurge, 
+        totalFare: Math.ceil(totalFare)
       });
     }
   }, [pickupCoords, dropoffCoords, jobType, vehicleType, distanceKm, calculateRoute]);
@@ -268,11 +281,11 @@ export default function WinOnlinePage() {
                 </button>
               </div>
 
-              {/* ประวัติงานกำลังรอ */}
+              {/* ประวัติงานกำลังรอ/กำลังทำ */}
               <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100">
                  <div className="flex items-center justify-between mb-4">
                     <h2 className="text-base font-black text-gray-800 flex items-center gap-2">
-                      <span className="text-blue-500">⏳</span> รายการเรียกวินที่กำลังรอรับงาน
+                      <span className="text-blue-500">⏳</span> รายการเรียกวินของคุณ
                     </h2>
                  </div>
 
@@ -290,14 +303,14 @@ export default function WinOnlinePage() {
                        <div key={job.id} onClick={() => router.push(`/chat/${job.id}`)} className="p-4 rounded-2xl border border-gray-200 hover:border-[#EE4D2D] hover:bg-orange-50/30 transition-all cursor-pointer group">
                          <div className="flex justify-between items-start mb-2">
                            <span className="text-sm font-black text-gray-800 group-hover:text-[#EE4D2D] transition-colors">{job.title || 'เรียกงานด่วน'}</span>
-                           <span className="text-[9px] font-bold px-2 py-0.5 rounded flex items-center gap-1 bg-yellow-50 text-yellow-600 border border-yellow-100">
-                             <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse"></span>
-                             รอคนขับรับงาน
+                           <span className={`text-[9px] font-bold px-2 py-0.5 rounded flex items-center gap-1 ${job.status === 'open' ? 'bg-yellow-50 text-yellow-600 border border-yellow-100' : 'bg-blue-50 text-blue-600 border border-blue-100'}`}>
+                             <span className={`w-1.5 h-1.5 rounded-full ${job.status === 'open' ? 'bg-yellow-400 animate-pulse' : 'bg-blue-500'}`}></span>
+                             {job.status === 'open' ? 'รอคนขับรับงาน' : 'คนขับกำลังไป'}
                            </span>
                          </div>
                          <p className="text-xs text-gray-500 font-medium line-clamp-1 mb-3">📍 {job.pickup_location}</p>
                          <div className="flex justify-between items-end border-t border-gray-100 pt-3">
-                           <span className="text-[10px] font-bold text-gray-400">กำลังประกาศหาคนขับ...</span>
+                           <span className="text-[10px] font-bold text-gray-400">{job.worker ? `รับงานโดย: ${job.worker.full_name}` : 'กำลังประกาศหาคนขับ...'}</span>
                            <span className="text-base font-black text-[#00C300]">{job.budget} บาท</span>
                          </div>
                        </div>
@@ -430,7 +443,9 @@ export default function WinOnlinePage() {
                     <div className="space-y-2 mb-3 pb-3 border-b border-orange-200/50 text-[11px] font-bold text-gray-600">
                       <div className="flex justify-between"><span>ค่าเริ่มต้น</span><span>{fareBreakdown.base.toLocaleString('th-TH')} บาท</span></div>
                       {distanceKm > 0 && <div className="flex justify-between"><span>ค่าระยะทาง ({distanceKm} กม.)</span><span>{Math.round(fareBreakdown.distanceFee).toLocaleString('th-TH')} บาท</span></div>}
-                      <div className="flex justify-between text-[#EE4D2D]"><span>ค่าบำรุงแอป (3%)</span><span>{Math.ceil(fareBreakdown.platformFee).toLocaleString('th-TH')} บาท</span></div>
+                      
+                      {/* 🌟 เปลี่ยนเป็น ค่าพลังงาน (อุดหนุนค่าน้ำมันคนขับ) */}
+                      <div className="flex justify-between text-[#EE4D2D]"><span>ค่าพลังงาน (อุดหนุนค่าน้ำมัน)</span><span>{Math.ceil(fareBreakdown.fuelSurge).toLocaleString('th-TH')} บาท</span></div>
                     </div>
                   )}
                   <div className="flex justify-between items-end">
@@ -452,7 +467,7 @@ export default function WinOnlinePage() {
           </div>
         )}
 
-        {/* --- ส่วน Modal แผนที่ปักหมุด --- */}
+        {/* --- ส่วน Modal แผนที่ปักหมุด & สถานที่ยอดฮิต --- */}
         {isLocationPickerOpen && (
           <div className="fixed inset-0 z-[110] bg-[#F4F6F8] flex flex-col animate-fade-in">
             <div className="p-4 border-b flex items-center gap-3 bg-white shadow-sm z-10 pt-safe">
@@ -472,11 +487,24 @@ export default function WinOnlinePage() {
                     {isLocating && <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>}
                   </div>
                   <div onClick={() => setIsMapMode(true)} className="p-4 bg-white rounded-[1rem] border border-gray-200 flex items-center gap-3 text-gray-700 font-bold text-sm shadow-sm cursor-pointer hover:bg-gray-50"><span>🗺️</span>ปักหมุดบนแผนที่เอง</div>
+                  
+                  {/* 🌟 แสดงผล Places API ถ้าค้นหาเจอ หรือแสดงสถานที่ยอดฮิต (Popular Places) ถ้ายังไม่ค้นหา */}
                   {status === "OK" ? data.map(({ place_id, description }) => (
                     <div key={place_id} onClick={() => handleSelectLocation(description)} className="p-4 bg-white rounded-[1rem] shadow-sm border border-gray-100 flex items-center gap-4 cursor-pointer hover:border-[#EE4D2D]">
                       <div className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-lg">📍</div><h4 className="text-sm font-bold text-gray-800">{description}</h4>
                     </div>
-                  )) : null}
+                  )) : (
+                    // 🌟 แนะนำสถานที่ยอดฮิต
+                    POPULAR_PLACES.map((p, i) => (
+                      <div key={i} onClick={() => handleSelectLocation(p.name)} className="p-4 bg-white rounded-[1rem] shadow-sm border border-gray-100 flex items-center gap-4 cursor-pointer hover:border-[#EE4D2D]">
+                        <div className="w-10 h-10 rounded-full bg-orange-50 flex items-center justify-center text-lg">{p.icon}</div>
+                        <div>
+                          <h4 className="text-sm font-bold text-gray-800">{p.name}</h4>
+                          <p className="text-[10px] text-gray-400 mt-0.5">{p.detail}</p>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </>
               ) : (
                 <div className="absolute inset-0">
