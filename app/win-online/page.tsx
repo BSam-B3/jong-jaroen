@@ -9,6 +9,12 @@ import usePlacesAutocomplete, { getGeocode, getLatLng } from 'use-places-autocom
 const libraries: ("places")[] = ["places"];
 const DEFAULT_CENTER = { lat: 12.7844, lng: 101.6500 };
 
+// 🌟 รายการสถานที่ที่บันทึกไว้ (Saved Places)
+const SAVED_PLACES = [
+  { name: 'บ้าน', detail: 'ตั้งค่าที่อยู่บ้าน', icon: '🏠' },
+  { name: 'ที่ทำงาน', detail: 'ตั้งค่าที่อยู่ที่ทำงาน', icon: '💼' },
+];
+
 // 🌟 รายการสถานที่ยอดฮิต (Popular Places)
 const POPULAR_PLACES = [
   { name: 'โรงพยาบาลแกลง', detail: 'Klaeng Hospital', icon: '🏥' },
@@ -207,11 +213,12 @@ export default function WinOnlinePage() {
 
   return (
     <div className="min-h-screen bg-[#F4F6F8] flex justify-center font-sans pb-24 md:pb-10">
-      <div className="w-full lg:max-w-3xl xl:max-w-4xl bg-[#F8FAFC] min-h-screen relative flex flex-col md:shadow-2xl overflow-x-hidden md:border-x border-gray-200/50">
+      {/* 🌟 ขยายขนาด Container ให้พอดีกับหน้าหลัก */}
+      <div className="w-full lg:max-w-5xl xl:max-w-6xl bg-[#F8FAFC] min-h-screen relative flex flex-col md:shadow-2xl overflow-x-hidden md:border-x border-gray-200/50">
         
         {/* 🟠 Header */}
-        <header className="bg-gradient-to-br from-[#EE4D2D] to-[#FF7337] px-6 pt-12 pb-20 md:pb-24 rounded-b-[2.5rem] md:rounded-b-[4rem] text-white shadow-lg relative z-20">
-          <div className="flex items-center gap-4 max-w-2xl mx-auto">
+        <header className="bg-gradient-to-br from-[#EE4D2D] to-[#FF7337] px-6 pt-12 pb-16 md:pb-20 rounded-b-[2.5rem] md:rounded-b-[4rem] text-white shadow-lg relative z-20">
+          <div className="flex items-center gap-4 max-w-3xl mx-auto">
             <button onClick={() => router.back()} className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 active:scale-95 transition-all backdrop-blur-md shrink-0">
               ←
             </button>
@@ -222,28 +229,39 @@ export default function WinOnlinePage() {
           </div>
         </header>
 
-        {/* 🌟 Main Content Area */}
-        <main className="flex-1 p-5 md:px-10 -mt-10 relative z-30 w-full max-w-2xl mx-auto space-y-6">
+        {/* 🌟 Main Content Area (จำกัดความกว้างให้ตรงกลางเพื่อความสมดุล) */}
+        <main className="flex-1 p-5 md:px-10 -mt-8 relative z-30 w-full max-w-3xl mx-auto space-y-6">
           
-          {/* ปุ่มสร้างรายการใหม่ */}
-          <div className="bg-white rounded-[2rem] p-8 shadow-xl border border-gray-100 text-center relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-orange-50 rounded-bl-full -z-10 opacity-50"></div>
-            <h2 className="text-lg md:text-xl font-black text-gray-800 mb-2">จะไปไหน หรือฝากซื้ออะไร?</h2>
-            <p className="text-xs md:text-sm text-gray-500 font-medium mb-6">กดสร้างรายการให้พี่วินในพื้นที่ดูแลได้เลย</p>
-            
-            <button 
-              onClick={() => {
-                if(!currentUser) { alert('กรุณาเข้าสู่ระบบก่อนค่ะ'); router.push('/auth/login?next=/win-online'); return; }
-                setIsModalOpen(true);
-              }} 
-              className="w-full bg-gradient-to-r from-[#EE4D2D] to-[#FF7337] text-white py-4 rounded-2xl font-black text-base shadow-lg shadow-orange-200 active:scale-95 transition-all flex items-center justify-center gap-2"
-            >
-              <span className="text-xl">+</span> สร้างรายการใหม่
-            </button>
+          {/* 🌟 ปุ่มลัด Quick Buttons แทนปุ่มสร้างรายการใหญ่ */}
+          <div>
+            <div className="flex items-center justify-between mb-3 px-2">
+              <h2 className="text-sm font-black text-gray-800 uppercase tracking-widest">เลือกบริการที่ต้องการ</h2>
+            </div>
+            <div className="grid grid-cols-3 gap-3 md:gap-5">
+              {JOB_TYPES_UI.map((t) => (
+                <button 
+                  key={t.key}
+                  onClick={() => {
+                    if(!currentUser) { alert('กรุณาเข้าสู่ระบบก่อนค่ะ'); router.push('/auth/login?next=/win-online'); return; }
+                    setJobType(t.key as any);
+                    setIsModalOpen(true);
+                  }}
+                  className="bg-white rounded-[1.5rem] p-4 md:p-6 shadow-sm border border-gray-100 flex flex-col items-center gap-2 hover:border-[#EE4D2D] hover:shadow-md transition-all group active:scale-95"
+                >
+                  <div className="w-14 h-14 md:w-16 md:h-16 bg-orange-50 rounded-full flex items-center justify-center text-3xl group-hover:scale-110 transition-transform">
+                    {t.icon}
+                  </div>
+                  <div className="text-center mt-1">
+                    <p className="text-sm md:text-base font-black text-gray-800">{t.label}</p>
+                    <p className="text-[10px] md:text-xs text-gray-500 font-bold mt-0.5">{t.desc}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* ประวัติงานกำลังรอ/กำลังทำ */}
-          <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100">
+          <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100 mt-4">
              <div className="flex items-center justify-between mb-4">
                 <h2 className="text-base font-black text-gray-800 flex items-center gap-2">
                   <span className="text-blue-500">⏳</span> รายการเรียกวินของคุณ
@@ -286,7 +304,7 @@ export default function WinOnlinePage() {
           <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/60 backdrop-blur-sm animate-fade-in">
             <div className="bg-white w-full max-w-xl rounded-t-[2.5rem] p-8 max-h-[90vh] overflow-y-auto pb-10 shadow-2xl relative">
               <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-black text-gray-800">เรียกงานด่วน 🚀</h2>
+                <h2 className="text-xl font-black text-gray-800">รายละเอียดงานด่วน 🚀</h2>
                 <button onClick={() => setIsModalOpen(false)} className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-200">✕</button>
               </div>
 
@@ -370,6 +388,18 @@ export default function WinOnlinePage() {
                   </div>
                   <div onClick={() => setIsMapMode(true)} className="p-4 bg-white rounded-[1rem] border border-gray-200 flex items-center gap-3 text-gray-700 font-bold text-sm shadow-sm cursor-pointer hover:bg-gray-50"><span>🗺️</span>ปักหมุดบนแผนที่เอง</div>
                   
+                  {/* 🌟 ปุ่มสถานที่ที่บันทึกไว้ (Saved Places) */}
+                  <div className="flex gap-3 my-2">
+                     {SAVED_PLACES.map((p, i) => (
+                       <div key={i} onClick={() => handleSelectLocation(p.name)} className="flex-1 bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-[#EE4D2D] active:scale-95 transition-transform">
+                         <span className="text-2xl">{p.icon}</span>
+                         <span className="text-xs font-black text-gray-800">{p.name}</span>
+                       </div>
+                     ))}
+                  </div>
+                  
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1 mt-4 mb-2">สถานที่ยอดฮิต</p>
+
                   {status === "OK" ? data.map(({ place_id, description }) => (
                     <div key={place_id} onClick={() => handleSelectLocation(description)} className="p-4 bg-white rounded-[1rem] shadow-sm border border-gray-100 flex items-center gap-4 cursor-pointer hover:border-[#EE4D2D]">
                       <div className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-lg">📍</div><h4 className="text-sm font-bold text-gray-800">{description}</h4>
