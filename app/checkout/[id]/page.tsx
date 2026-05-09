@@ -4,10 +4,9 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 
-// 🌟 ปรับให้รับ params โดยตรงตามโครงสร้าง [id]
 export default function CheckoutPage({ params }: { params: { id: string } }) {
   const router = useRouter();
-  const jobId = params.id; // ดึง ID จาก URL Path
+  const jobId = params.id;
   const supabase = useMemo(() => createClient(), []);
 
   const [job, setJob] = useState<any>(null);
@@ -38,7 +37,6 @@ export default function CheckoutPage({ params }: { params: { id: string } }) {
   const handlePayment = async () => {
     setIsPaying(true);
     try {
-      // อัปเดตสถานะเป็น in_progress เมื่อชำระเงิน (จำลอง)
       const { error } = await supabase
         .from('jobs')
         .update({ 
@@ -66,14 +64,14 @@ export default function CheckoutPage({ params }: { params: { id: string } }) {
   );
 
   return (
-    <div className="min-h-screen bg-[#F4F6F8] font-sans pb-24">
+    <div className="min-h-screen bg-[#F4F6F8] font-sans">
       <div className="bg-white p-4 sticky top-0 z-10 shadow-sm flex items-center gap-4">
         <button onClick={() => router.back()} className="text-2xl text-gray-400">←</button>
         <h1 className="font-black text-lg text-gray-800">สรุปการชำระเงิน</h1>
       </div>
 
-      <main className="p-4 max-w-md mx-auto space-y-4">
-        {/* รายละเอียดงาน */}
+      {/* 🌟 เพิ่ม pb-32 เพื่อกันแถบ Navigate บัง */}
+      <main className="p-4 max-w-md mx-auto space-y-4 pb-32">
         <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
           <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">งานที่คุณจ้าง</p>
           <h2 className="font-black text-gray-800 text-lg mb-4">{job?.title}</h2>
@@ -89,12 +87,12 @@ export default function CheckoutPage({ params }: { params: { id: string } }) {
             </div>
             <div className="flex justify-between text-xl pt-4 border-t border-gray-100">
               <span className="font-black text-gray-800">ยอดสุทธิ</span>
-              <span className="font-black text-[#0047FF]">฿{job?.budget?.toLocaleString()}</span>
+              {/* 🌟 ปรับเป็นสีเขียว #00C300 ตามที่บีสามต้องการ */}
+              <span className="font-black text-[#00C300]">฿{job?.budget?.toLocaleString()}</span>
             </div>
           </div>
         </div>
 
-        {/* วิธีชำระเงิน */}
         <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
           <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">วิธีชำระเงิน</p>
           <div className="flex items-center gap-4 p-4 border-2 border-[#0047FF] rounded-2xl bg-blue-50/50">
@@ -114,8 +112,8 @@ export default function CheckoutPage({ params }: { params: { id: string } }) {
         </div>
       </main>
 
-      {/* ปุ่มจ่ายเงิน */}
-      <div className="fixed bottom-0 left-0 right-0 p-5 bg-white border-t border-gray-100 flex justify-center">
+      {/* 🌟 ปรับ Padding Bottom ของ Container ปุ่ม เพื่อหลบแถบ Navigate */}
+      <div className="fixed bottom-0 left-0 right-0 p-5 pb-8 md:pb-5 bg-white border-t border-gray-100 flex justify-center z-20">
         <button 
           onClick={handlePayment}
           disabled={isPaying}
