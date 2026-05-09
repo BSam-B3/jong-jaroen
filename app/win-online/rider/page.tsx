@@ -4,12 +4,21 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 
+const VEHICLES_UI = [
+  { key: 'motorcycle', label: 'มอไซค์', icon: '🛵' },
+  { key: 'saleng', label: 'ซาเล้ง', icon: '🛺' },
+  { key: 'car', label: 'รถเก๋ง', icon: '🚗' },
+  { key: 'suv', label: 'ครอบครัว', icon: '🚙' },
+  { key: 'van', label: 'รถตู้', icon: '🚐' },
+  { key: 'pickup', label: 'กระบะ', icon: '🛻' }
+];
+
 export default function RiderDashboardPage() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
 
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [profileData, setProfileData] = useState<any>(null); // 🌟 เพิ่ม State เก็บโปรไฟล์
+  const [profileData, setProfileData] = useState<any>(null); 
   const [loading, setLoading] = useState(true);
   
   // Rider States
@@ -21,8 +30,24 @@ export default function RiderDashboardPage() {
   const [activeJob, setActiveJob] = useState<any>(null);
   const [todaysEarnings, setTodaysEarnings] = useState(0);
   const [todaysTrips, setTodaysTrips] = useState(0);
+  
+  // 🌟 State สำหรับประวัติงาน
+  const [historyJobs, setHistoryJobs] = useState<any[]>([]);
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
 
-  // 🌟 ตรวจสอบสิทธิ์และดึงข้อมูลเริ่มต้น
+  // 🌟 Helper: คำนวณเวลาที่ผ่านไป
+  const getTimeElapsed = (dateString: string) => {
+    const diff = Math.floor((new Date().getTime() - new Date(dateString).getTime()) / 60000);
+    if (diff < 1) return 'เพิ่งเรียกเมื่อกี้';
+    if (diff < 60) return `${diff} นาทีที่แล้ว`;
+    return `${Math.floor(diff / 60)} ชม. ที่แล้ว`;
+  };
+
+  const getVehicleLabel = (type: string) => {
+    const v = VEHICLES_UI.find(x => x.key === type);
+    return v ? `${v.icon} ${v.label}` : '🛵 มอไซค์';
+  };
+
   useEffect(() => {
     const initRider = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -31,7 +56,6 @@ export default function RiderDashboardPage() {
         return;
       }
       
-      // ดึงโปรไฟล์ (เพิ่ม full_name และ avatar_url)
       const { data: profile } = await supabase
         .from('profiles')
         .select('is_kyc_verified, full_name, avatar_url')
@@ -52,6 +76,7 @@ export default function RiderDashboardPage() {
   }, [router, supabase]);
 
   const fetchRiderData = useCallback(async (userId: string) => {
+    // 1. งานที่กำลังทำ
     const { data: currentJob } = await supabase
       .from('jobs')
       .select('*, employer:profiles!employer_id(full_name, phone)')
@@ -61,6 +86,7 @@ export default function RiderDashboardPage() {
     
     setActiveJob(currentJob);
 
+    // 2. งานเรดาร์รอบตัว
     if (!currentJob) {
       const { data: openJobs } = await supabase
         .from('jobs')
@@ -72,15 +98,18 @@ export default function RiderDashboardPage() {
       if (openJobs) setAvailableJobs(openJobs);
     }
 
+    // 🌟 3. ดึงประวัติงานวันนี้แบบละเอียด
     const today = new Date().toISOString().split('T')[0];
     const { data: completedJobs } = await supabase
       .from('jobs')
-      .select('budget')
+      .select('*, employer:profiles!employer_id(full_name)')
       .eq('worker_id', userId)
       .eq('status', 'completed')
-      .gte('created_at', `${today}T00:00:00Z`);
+      .gte('created_at', `${today}T00:00:00Z`)
+      .order('updated_at', { ascending: false });
 
     if (completedJobs) {
+      setHistoryJobs(completedJobs);
       setTodaysTrips(completedJobs.length);
       setTodaysEarnings(completedJobs.reduce((sum, job) => sum + (job.budget || 0), 0));
     }
@@ -120,7 +149,7 @@ export default function RiderDashboardPage() {
     
     const { error } = await supabase
       .from('jobs')
-      .update({ status: 'completed' })
+      .update({ status: 'completed', updated_at: new Date().toISOString() })
       .eq('id', jobId);
 
     if (error) {
@@ -146,11 +175,9 @@ export default function RiderDashboardPage() {
     <div className="min-h-screen bg-gray-100 flex justify-center font-sans pb-24 md:pb-10">
       <div className="w-full lg:max-w-4xl xl:max-w-5xl bg-[#F4F6F8] min-h-screen relative flex flex-col md:shadow-2xl overflow-x-hidden md:border-x border-gray-200">
         
-        {/* 🟠 Header Section (เปลี่ยนเป็นสีส้มแอปจงเจริญ) */}
+        {/* 🟠 Header Section */}
         <header className="bg-gradient-to-br from-[#EE4D2D] via-[#FF6243] to-[#FF8A65] px-6 pt-12 pb-8 rounded-b-[2.5rem] md:rounded-b-[3.5rem] text-white shadow-xl relative z-20">
           <div className="flex justify-between items-start max-w-2xl mx-auto mb-8">
-            
-            {/* 🌟 ย้ายปุ่มกลับและข้อมูลโปรไฟล์มาฝั่งซ้าย */}
             <div className="flex items-center gap-3">
               <button onClick={() => router.push('/profile')} className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 active:scale-95 transition-all backdrop-blur-md shrink-0">
                 ←
@@ -168,7 +195,6 @@ export default function RiderDashboardPage() {
               </div>
             </div>
             
-            {/* Online Toggle (ปรับ UI ให้อ่านง่ายบนพื้นส้ม) */}
             <div className="flex flex-col items-end">
               <label className="relative inline-flex items-center cursor-pointer">
                 <input type="checkbox" className="sr-only peer" checked={isOnline} onChange={(e) => setIsOnline(e.target.checked)} />
@@ -178,7 +204,6 @@ export default function RiderDashboardPage() {
                 {isOnline ? '🟢 รับงานอยู่' : '⚫ ออฟไลน์'}
               </div>
             </div>
-
           </div>
 
           <div className="max-w-2xl mx-auto">
@@ -190,13 +215,14 @@ export default function RiderDashboardPage() {
               </h1>
             </div>
             <div className="flex gap-4 mt-5">
-              <div className="bg-white/20 backdrop-blur-sm px-4 py-2.5 rounded-2xl flex items-center gap-2.5 border border-white/10 shadow-sm flex-1">
+              {/* 🌟 ปุ่มเปิด Modal ประวัติงาน (Trip History) */}
+              <button onClick={() => setIsHistoryModalOpen(true)} className="bg-white/20 hover:bg-white/30 active:scale-95 transition-all backdrop-blur-sm px-4 py-2.5 rounded-2xl flex items-center gap-2.5 border border-white/10 shadow-sm flex-1 text-left">
                 <span className="text-xl bg-white/20 p-1.5 rounded-xl">🎯</span>
                 <div>
-                  <p className="text-[9px] text-white/80 font-bold uppercase">รอบวิ่งวันนี้</p>
+                  <p className="text-[9px] text-white/80 font-bold uppercase flex items-center gap-1">รอบวิ่งวันนี้ <span className="bg-white/30 px-1 rounded text-[8px]">ดูประวัติ ›</span></p>
                   <p className="text-sm font-black text-white">{todaysTrips} รอบ</p>
                 </div>
-              </div>
+              </button>
               <div className="bg-white/20 backdrop-blur-sm px-4 py-2.5 rounded-2xl flex items-center gap-2.5 border border-white/10 shadow-sm flex-1">
                 <span className="text-xl bg-white/20 p-1.5 rounded-xl">⭐</span>
                 <div>
@@ -214,9 +240,7 @@ export default function RiderDashboardPage() {
           {isOnline && !activeJob && (
             <div className="bg-white rounded-[1.5rem] p-5 shadow-sm border border-gray-100 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl transition-colors ${isAutoAccept ? 'bg-orange-100 text-[#EE4D2D]' : 'bg-gray-100 text-gray-400'}`}>
-                  ⚡
-                </div>
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl transition-colors ${isAutoAccept ? 'bg-orange-100 text-[#EE4D2D]' : 'bg-gray-100 text-gray-400'}`}>⚡</div>
                 <div>
                   <h3 className="font-black text-gray-800 text-sm">รับงานอัตโนมัติ</h3>
                   <p className="text-[10px] text-gray-500 font-bold">รัศมี 3 กม. (แนะนำ)</p>
@@ -253,6 +277,11 @@ export default function RiderDashboardPage() {
               
               <div className="p-6 space-y-5">
                 <h2 className="text-xl font-black text-gray-800">{activeJob.title}</h2>
+                <div className="flex items-center gap-2">
+                   <span className="text-[10px] bg-orange-100 text-[#EE4D2D] px-2 py-0.5 rounded-full font-bold">
+                     รีเควส: {getVehicleLabel(activeJob.vehicle_type)}
+                   </span>
+                </div>
                 
                 <div className="space-y-4 relative before:absolute before:inset-0 before:ml-3.5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-blue-400 before:to-gray-200 pl-8 md:pl-0">
                   <div className="relative flex items-start md:justify-center">
@@ -260,7 +289,7 @@ export default function RiderDashboardPage() {
                     <div className="md:w-1/2 md:pr-10 md:text-right w-full">
                       <p className="text-[10px] font-black text-blue-500 uppercase">จุดรับ (รับผู้โดยสาร)</p>
                       <p className="text-sm font-bold text-gray-800 mt-0.5">{activeJob.pickup_location}</p>
-                      <button onClick={() => openNavigation(activeJob.pickup_location)} className="mt-2 text-[10px] font-black bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg active:scale-95 transition-all">นำทางไปจุดรับ ↗</button>
+                      <button onClick={() => openNavigation(activeJob.pickup_location)} className="mt-2 text-[10px] font-black bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg active:scale-95 transition-all shadow-sm">นำทางไปจุดรับ ↗</button>
                     </div>
                   </div>
                   
@@ -270,7 +299,7 @@ export default function RiderDashboardPage() {
                       <div className="md:w-1/2 md:pl-10 md:ml-auto w-full mt-2 md:mt-0">
                         <p className="text-[10px] font-black text-red-500 uppercase">จุดส่ง (ปลายทาง)</p>
                         <p className="text-sm font-bold text-gray-800 mt-0.5">{activeJob.dropoff_location}</p>
-                        <button onClick={() => openNavigation(activeJob.dropoff_location)} className="mt-2 text-[10px] font-black bg-red-50 text-red-600 px-3 py-1.5 rounded-lg active:scale-95 transition-all">นำทางไปจุดส่ง ↗</button>
+                        <button onClick={() => openNavigation(activeJob.dropoff_location)} className="mt-2 text-[10px] font-black bg-red-50 text-red-600 px-3 py-1.5 rounded-lg active:scale-95 transition-all shadow-sm">นำทางไปจุดส่ง ↗</button>
                       </div>
                     </div>
                   )}
@@ -284,7 +313,14 @@ export default function RiderDashboardPage() {
                       <p className="text-sm font-black text-gray-800">{activeJob.employer?.full_name || 'ลูกค้าทั่วไป'}</p>
                     </div>
                   </div>
-                  <button onClick={() => router.push(`/chat/${activeJob.id}`)} className="w-10 h-10 bg-[#0047FF] text-white rounded-full flex items-center justify-center text-lg shadow-md active:scale-95">💬</button>
+                  
+                  {/* 🌟 ปุ่มติดต่อลูกค้า */}
+                  <div className="flex items-center gap-2">
+                    {activeJob.employer?.phone && (
+                      <a href={`tel:${activeJob.employer.phone}`} className="w-10 h-10 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-lg shadow-sm active:scale-95 transition-transform">📞</a>
+                    )}
+                    <button onClick={() => router.push(`/chat/${activeJob.id}`)} className="w-10 h-10 bg-[#0047FF] text-white rounded-full flex items-center justify-center text-lg shadow-md active:scale-95 transition-transform">💬</button>
+                  </div>
                 </div>
 
                 <button onClick={() => handleCompleteJob(activeJob.id)} className="w-full bg-[#00C300] hover:bg-green-600 text-white font-black py-4 rounded-2xl text-base shadow-lg shadow-green-200 active:scale-95 transition-all">
@@ -311,28 +347,43 @@ export default function RiderDashboardPage() {
               ) : (
                 <div className="space-y-4">
                   {availableJobs.map((job) => (
-                    <div key={job.id} className="bg-white rounded-3xl p-5 shadow-md border border-gray-100 flex flex-col gap-4 animate-fade-in group hover:border-[#EE4D2D] transition-colors">
-                      <div className="flex justify-between items-start">
+                    <div key={job.id} className="bg-white rounded-3xl p-5 shadow-md border border-gray-100 flex flex-col gap-4 animate-fade-in group hover:border-[#EE4D2D] transition-colors relative overflow-hidden">
+                      
+                      {/* 🌟 แบดจ์แยกประเภทงาน */}
+                      <div className={`absolute top-0 right-0 px-3 py-1 rounded-bl-xl text-[9px] font-black text-white ${job.job_type === 'buy' ? 'bg-pink-500' : job.job_type === 'deliver' ? 'bg-orange-500' : 'bg-blue-500'}`}>
+                        {job.job_type === 'buy' ? 'ฝากซื้อ' : job.job_type === 'deliver' ? 'ส่งของ' : 'รับส่งคน'}
+                      </div>
+
+                      <div className="flex justify-between items-start mt-2">
                         <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 bg-orange-50 text-[#EE4D2D] rounded-xl flex items-center justify-center text-2xl font-black">
+                          <div className="w-12 h-12 bg-gray-50 text-gray-800 rounded-xl flex items-center justify-center text-2xl font-black border border-gray-100">
                             {job.job_type === 'buy' ? '🛒' : job.job_type === 'deliver' ? '📦' : '🛵'}
                           </div>
                           <div>
                             <h3 className="text-sm font-black text-gray-900">{job.title || 'เรียกงานด่วน'}</h3>
-                            <p className="text-[10px] font-bold text-gray-400 mt-0.5">ระยะทางรวม {job.distance_km || '?'} กม.</p>
+                            {/* 🌟 โชว์เวลาที่เรียก และ รูปรถ */}
+                            <div className="flex flex-wrap items-center gap-2 mt-1">
+                              <span className="text-[9px] bg-orange-50 text-[#EE4D2D] px-2 py-0.5 rounded-md font-black border border-orange-100">
+                                {getVehicleLabel(job.vehicle_type)}
+                              </span>
+                              <span className="text-[9px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-md font-bold flex items-center gap-1">
+                                ⏱️ {getTimeElapsed(job.created_at)}
+                              </span>
+                            </div>
                           </div>
                         </div>
                         <div className="text-right">
                           <p className="text-lg font-black text-[#00C300]">฿{job.budget}</p>
+                          <p className="text-[9px] font-bold text-gray-400 mt-0.5">~{job.distance_km || '?'} กม.</p>
                         </div>
                       </div>
                       
-                      <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 text-[11px] font-bold text-gray-600 space-y-1">
-                        <div className="flex gap-2"><span className="text-blue-500 shrink-0">📍</span><span className="line-clamp-1">{job.pickup_location}</span></div>
-                        {job.dropoff_location && <div className="flex gap-2"><span className="text-red-500 shrink-0">🚩</span><span className="line-clamp-1">{job.dropoff_location}</span></div>}
+                      <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 text-[11px] font-bold text-gray-600 space-y-1.5 mt-1">
+                        <div className="flex gap-2 items-start"><span className="text-blue-500 shrink-0">📍</span><span className="line-clamp-2 leading-tight">{job.pickup_location}</span></div>
+                        {job.dropoff_location && <div className="flex gap-2 items-start pt-1.5 border-t border-gray-200/50"><span className="text-red-500 shrink-0">🚩</span><span className="line-clamp-2 leading-tight">{job.dropoff_location}</span></div>}
                       </div>
 
-                      <button onClick={() => handleAcceptJob(job.id)} className="w-full bg-[#EE4D2D] hover:bg-[#D43D1D] text-white font-black py-3 rounded-xl text-sm shadow-md active:scale-95 transition-all">
+                      <button onClick={() => handleAcceptJob(job.id)} className="w-full bg-[#EE4D2D] hover:bg-[#D43D1D] text-white font-black py-3.5 rounded-xl text-sm shadow-md active:scale-95 transition-all">
                         รับงานนี้ ⚡
                       </button>
                     </div>
@@ -343,6 +394,54 @@ export default function RiderDashboardPage() {
           )}
 
         </main>
+
+        {/* 🌟 Modal ประวัติงาน (Trip History) */}
+        {isHistoryModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/60 backdrop-blur-sm animate-fade-in">
+            <div className="bg-white w-full max-w-xl rounded-t-[2.5rem] p-6 md:p-8 max-h-[85vh] overflow-y-auto pb-10 shadow-2xl relative flex flex-col">
+              
+              <div className="flex justify-between items-center mb-6 shrink-0 sticky top-0 bg-white z-10 py-2">
+                <div>
+                  <h2 className="text-xl font-black text-gray-800">ประวัติงานวันนี้ 🗓️</h2>
+                  <p className="text-[10px] text-gray-500 font-bold mt-0.5">เช็คบิลและตรวจสอบงานที่ทำเสร็จแล้ว</p>
+                </div>
+                <button onClick={() => setIsHistoryModalOpen(false)} className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-gray-600 hover:bg-gray-200 font-bold active:scale-95">✕</button>
+              </div>
+
+              {historyJobs.length === 0 ? (
+                <div className="text-center py-10 opacity-50 grayscale flex-1 flex flex-col justify-center">
+                  <div className="text-6xl mb-3">📭</div>
+                  <p className="text-sm font-black text-gray-800">ยังไม่มีงานที่ทำสำเร็จในวันนี้</p>
+                </div>
+              ) : (
+                <div className="space-y-3 flex-1 overflow-y-auto pr-1">
+                  {historyJobs.map((job, idx) => (
+                    <div key={job.id} className="bg-gray-50 rounded-2xl p-4 border border-gray-100 flex flex-col gap-2 relative">
+                      <div className="absolute top-4 right-4 text-xs font-black text-[#00C300]">฿{job.budget}</div>
+                      
+                      <div className="flex items-center gap-2">
+                         <span className="text-[10px] font-black text-white bg-gray-800 px-2 py-0.5 rounded">#{idx + 1}</span>
+                         <span className="text-xs font-black text-gray-800">{job.title}</span>
+                      </div>
+                      
+                      <div className="text-[10px] font-bold text-gray-500 flex items-center gap-2">
+                        <span>👤 ลูกค้า: {job.employer?.full_name || 'ไม่ระบุ'}</span>
+                        <span className="text-gray-300">|</span>
+                        <span>เวลาจบงาน: {new Date(job.updated_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น.</span>
+                      </div>
+
+                      <div className="mt-2 pt-2 border-t border-gray-200 text-[10px] text-gray-400 font-medium space-y-1">
+                        <p className="line-clamp-1"><span className="text-blue-400">📍</span> {job.pickup_location}</p>
+                        {job.dropoff_location && <p className="line-clamp-1"><span className="text-red-400">🚩</span> {job.dropoff_location}</p>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );
