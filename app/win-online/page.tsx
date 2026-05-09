@@ -52,6 +52,9 @@ export default function WinOnlinePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<any>(null);
 
+  // 🌟 State สำหรับ Tab Switcher (ซ้าย=call, ขวา=map)
+  const [activeTab, setActiveTab] = useState<'call' | 'map'>('call');
+
   // Modal & Form States
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -78,7 +81,6 @@ export default function WinOnlinePage() {
 
   useEffect(() => { if (isLoaded) init(); }, [isLoaded, init]);
 
-  // 🌟 1. ฟังก์ชันดึงข้อมูลแบบแยกโหลดแอนิเมชัน (isSilent)
   const fetchMyActiveJobs = useCallback(async (userId: string, isSilent = false) => {
     if (!isSilent) setIsLoading(true); 
     const { data } = await supabase.from('jobs')
@@ -91,7 +93,6 @@ export default function WinOnlinePage() {
     if (!isSilent) setIsLoading(false);
   }, [supabase]);
 
-  // 🌟 2. ดึงข้อมูล User เริ่มต้น (ทำครั้งเดียว)
   useEffect(() => {
     const initData = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -105,7 +106,6 @@ export default function WinOnlinePage() {
     initData();
   }, [fetchMyActiveJobs, supabase]);
 
-  // 🌟 3. จัดการ Real-time (ทำเมื่อรู้ User แล้ว อัปเดตแบบ isSilent)
   useEffect(() => {
     if (!currentUser) return;
     const channel = supabase.channel('public-jobs-win-customer')
@@ -217,9 +217,9 @@ export default function WinOnlinePage() {
     <div className="min-h-screen bg-[#F4F6F8] flex justify-center font-sans pb-24 md:pb-10">
       <div className="w-full lg:max-w-4xl xl:max-w-5xl bg-[#F8FAFC] min-h-screen relative flex flex-col md:shadow-2xl overflow-x-hidden md:border-x border-gray-200/50">
         
-        {/* 🟠 Header (Gradient สีเดิมเป๊ะ) */}
-        <header className="bg-gradient-to-br from-[#EE4D2D] to-[#FF7337] px-6 pt-12 pb-16 md:pb-20 rounded-b-[2.5rem] md:rounded-b-[4rem] text-white shadow-lg relative z-20">
-          <div className="flex items-center gap-4 max-w-4xl mx-auto">
+        {/* 🟠 Header */}
+        <header className="bg-gradient-to-br from-[#EE4D2D] to-[#FF7337] px-6 pt-12 pb-24 md:pb-28 rounded-b-[2.5rem] md:rounded-b-[4rem] text-white shadow-lg relative z-20">
+          <div className="flex items-center gap-4 max-w-2xl mx-auto">
             <button onClick={() => router.back()} className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 active:scale-95 transition-all backdrop-blur-md shrink-0">
               ←
             </button>
@@ -230,145 +230,156 @@ export default function WinOnlinePage() {
           </div>
         </header>
 
-        {/* 🌟 Main Grid (2 Columns on Desktop) */}
-        <main className="flex-1 p-5 md:px-10 -mt-8 relative z-30 w-full max-w-5xl mx-auto flex flex-col md:flex-row gap-6 md:gap-8">
+        {/* 🌟 Tab Switcher (ซ้าย: เรียกใช้บริการ / ขวา: วินใกล้ฉัน) */}
+        <div className="relative z-30 px-5 w-full max-w-2xl mx-auto -mt-10 md:-mt-12">
+          <div className="relative bg-white rounded-full p-1.5 flex shadow-lg border border-gray-100">
+            <span className={`absolute top-1.5 bottom-1.5 w-[calc(50%-0.375rem)] rounded-full bg-[#EE4D2D] shadow-sm transition-all duration-300 ${activeTab === 'call' ? 'left-1.5' : 'left-[calc(50%+0.125rem)]'}`} />
+            <button onClick={() => setActiveTab('call')} className={`relative z-10 flex-1 py-3.5 text-[13px] md:text-sm font-black transition-colors ${activeTab === 'call' ? 'text-white' : 'text-gray-500 hover:text-gray-800'}`}>
+              🙋‍♂️ เรียกใช้บริการ
+            </button>
+            <button onClick={() => setActiveTab('map')} className={`relative z-10 flex-1 py-3.5 text-[13px] md:text-sm font-black transition-colors ${activeTab === 'map' ? 'text-white' : 'text-gray-500 hover:text-gray-800'}`}>
+              📍 วินใกล้ฉัน
+            </button>
+          </div>
+        </div>
+
+        {/* 🌟 Main Content Area */}
+        <main className="flex-1 p-5 md:px-10 mt-2 relative z-30 w-full max-w-2xl mx-auto">
           
-          {/* ================= ฝั่งซ้าย: วินใกล้ฉัน & วินประจำ ================= */}
-          <div className="flex-1 space-y-6">
-            
-            {/* แผนที่วินใกล้ฉัน */}
-            <div className="bg-white rounded-[2rem] p-4 shadow-sm border border-gray-100 flex flex-col">
-              <div className="flex items-center justify-between mb-3 px-2">
-                <h2 className="text-base font-black text-gray-800 flex items-center gap-2">
-                  <span className="text-[#EE4D2D]">📍</span> วินใกล้ฉัน
-                </h2>
-                <span className="text-[10px] font-bold text-emerald-500 bg-emerald-50 px-2 py-1 rounded-md animate-pulse">
-                  อัปเดตสด
-                </span>
-              </div>
-              
-              <div className="w-full h-[250px] md:h-[300px] bg-gray-100 rounded-[1.5rem] overflow-hidden relative border border-gray-200">
-                {isLoaded ? (
-                  <GoogleMap 
-                    mapContainerStyle={{ width: '100%', height: '100%' }} 
-                    center={mapCenter} 
-                    zoom={15} 
-                    options={{ disableDefaultUI: true, zoomControl: true }}
-                  >
-                    {/* หมุดตัวเรา */}
-                    <MarkerF position={mapCenter} icon={{ url: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png' }} />
-                    {/* Mock หมุดพี่วินรอบๆ */}
-                    {MOCK_RIDERS.map(rider => (
-                      <MarkerF 
-                        key={rider.id} 
-                        position={{ lat: rider.lat, lng: rider.lng }} 
-                        icon={{ url: 'http://maps.google.com/mapfiles/ms/icons/motorcycling.png' }} 
-                      />
-                    ))}
-                  </GoogleMap>
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-sm font-bold text-gray-400">กำลังโหลดแผนที่...</div>
-                )}
-                <button onClick={handleGetCurrentLocation} className="absolute bottom-4 right-4 w-10 h-10 bg-white rounded-full shadow-md flex items-center justify-center text-blue-500 hover:scale-105 transition-transform">
-                  🎯
+          {/* ================= แท็บ 1: เรียกใช้บริการ (Default) ================= */}
+          {activeTab === 'call' && (
+            <div className="space-y-6 animate-fade-in">
+              {/* ปุ่มสร้างรายการใหม่ */}
+              <div className="bg-white rounded-[2rem] p-8 shadow-xl border border-gray-100 text-center relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-orange-50 rounded-bl-full -z-10 opacity-50"></div>
+                <h2 className="text-lg md:text-xl font-black text-gray-800 mb-2">จะไปไหน หรือฝากซื้ออะไร?</h2>
+                <p className="text-xs md:text-sm text-gray-500 font-medium mb-6">กดสร้างรายการให้พี่วินในพื้นที่ดูแลได้เลย</p>
+                
+                <button 
+                  onClick={() => {
+                    if(!currentUser) { alert('กรุณาเข้าสู่ระบบก่อนค่ะ'); router.push('/auth/login?next=/win-online'); return; }
+                    setIsModalOpen(true);
+                  }} 
+                  className="w-full bg-gradient-to-r from-[#EE4D2D] to-[#FF7337] text-white py-4 rounded-2xl font-black text-base shadow-lg shadow-orange-200 active:scale-95 transition-all flex items-center justify-center gap-2"
+                >
+                  <span className="text-xl">+</span> สร้างรายการใหม่
                 </button>
               </div>
-            </div>
 
-            {/* ลิสต์วินประจำของฉัน */}
-            <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100">
-               <h2 className="text-base font-black text-gray-800 mb-4 flex items-center gap-2">
-                  <span className="text-pink-500">💖</span> วินประจำของฉัน
-               </h2>
-               
-               <div className="space-y-3">
-                 {MOCK_FAVORITES.map((fav) => (
-                   <div key={fav.id} className="flex items-center justify-between p-3 rounded-2xl border border-gray-100 hover:bg-gray-50 transition-colors">
-                     <div className="flex items-center gap-3">
-                       <div className="w-10 h-10 bg-orange-50 rounded-full flex items-center justify-center text-xl relative">
-                         {getVehicleIcon(fav.vehicle)}
-                         {/* จุดสีสถานะ */}
-                         <span className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${fav.status === 'online' ? 'bg-emerald-500' : fav.status === 'busy' ? 'bg-red-500' : 'bg-gray-300'}`}></span>
-                       </div>
-                       <div>
-                         <p className="text-sm font-black text-gray-800">{fav.name}</p>
-                         <p className={`text-[10px] font-bold ${fav.status === 'online' ? 'text-emerald-500' : fav.status === 'busy' ? 'text-red-500' : 'text-gray-400'}`}>
-                           {fav.status === 'online' ? 'ว่าง รับงานได้' : fav.status === 'busy' ? 'ติดงานอยู่' : 'ออฟไลน์'}
-                         </p>
-                       </div>
-                     </div>
-                     <button 
-                        disabled={fav.status !== 'online'}
-                        className={`text-[10px] font-black px-3 py-1.5 rounded-lg transition-all ${fav.status === 'online' ? 'bg-[#EE4D2D] text-white shadow-sm hover:bg-[#D43D1D]' : 'bg-gray-100 text-gray-400'}`}
-                     >
-                        เรียกตรง
-                     </button>
+              {/* ประวัติงานกำลังรอ */}
+              <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100">
+                 <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-base font-black text-gray-800 flex items-center gap-2">
+                      <span className="text-blue-500">⏳</span> งานที่กำลังดำเนินการ
+                    </h2>
+                 </div>
+
+                 {isLoading ? (
+                   <div className="animate-pulse space-y-3">
+                     <div className="h-20 bg-gray-100 rounded-2xl"></div>
                    </div>
-                 ))}
-               </div>
+                 ) : jobs.length === 0 ? (
+                   <div className="text-center py-8 bg-gray-50 rounded-2xl border border-gray-100 border-dashed">
+                     <p className="text-sm font-bold text-gray-400">ยังไม่มีรายการที่กำลังรอรถค่ะ</p>
+                   </div>
+                 ) : (
+                   <div className="space-y-3 max-h-[400px] overflow-y-auto no-scrollbar pr-1">
+                     {jobs.map((job) => (
+                       <div key={job.id} onClick={() => router.push(`/chat/${job.id}`)} className="p-4 rounded-2xl border border-gray-200 hover:border-[#EE4D2D] hover:bg-orange-50/30 transition-all cursor-pointer group">
+                         <div className="flex justify-between items-start mb-2">
+                           <span className="text-sm font-black text-gray-800 group-hover:text-[#EE4D2D] transition-colors">{job.title || 'เรียกงานด่วน'}</span>
+                           <span className={`text-[9px] font-bold px-2 py-0.5 rounded flex items-center gap-1 ${job.status === 'open' ? 'bg-yellow-50 text-yellow-600 border border-yellow-100' : 'bg-blue-50 text-blue-600 border border-blue-100'}`}>
+                             <span className={`w-1.5 h-1.5 rounded-full ${job.status === 'open' ? 'bg-yellow-400 animate-pulse' : 'bg-blue-500'}`}></span>
+                             {job.status === 'open' ? 'รอรับงาน' : 'คนขับกำลังไป'}
+                           </span>
+                         </div>
+                         <p className="text-xs text-gray-500 font-medium line-clamp-1 mb-3">📍 {job.pickup_location}</p>
+                         <div className="flex justify-between items-end border-t border-gray-100 pt-3">
+                           <span className="text-[10px] font-bold text-gray-400">{job.worker ? `รับงานโดย: ${job.worker.full_name}` : 'กำลังหาคนขับ...'}</span>
+                           <span className="text-base font-black text-[#00C300]">{job.budget} บาท</span>
+                         </div>
+                       </div>
+                     ))}
+                   </div>
+                 )}
+              </div>
             </div>
+          )}
 
-          </div>
-
-          {/* ================= ฝั่งขวา: เรียกใช้บริการ & ประวัติ ================= */}
-          <div className="w-full md:w-[380px] shrink-0 space-y-6">
-            
-            {/* ปุ่มสร้างรายการใหม่ */}
-            <div className="bg-white rounded-[2rem] p-8 shadow-xl border border-gray-100 text-center relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-orange-50 rounded-bl-full -z-10 opacity-50"></div>
-              <h2 className="text-lg font-black text-gray-800 mb-2">จะไปไหน หรือฝากซื้ออะไร?</h2>
-              <p className="text-xs text-gray-500 font-medium mb-6">กดสร้างรายการให้พี่วินในพื้นที่ดูแลได้เลย</p>
-              
-              <button 
-                onClick={() => {
-                  if(!currentUser) { alert('กรุณาเข้าสู่ระบบก่อนค่ะ'); router.push('/auth/login?next=/win-online'); return; }
-                  setIsModalOpen(true);
-                }} 
-                className="w-full bg-gradient-to-r from-[#EE4D2D] to-[#FF7337] text-white py-4 rounded-2xl font-black text-base shadow-lg shadow-orange-200 active:scale-95 transition-all flex items-center justify-center gap-2"
-              >
-                <span className="text-xl">+</span> สร้างรายการใหม่
-              </button>
-            </div>
-
-            {/* ประวัติงานกำลังรอ */}
-            <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100">
-               <div className="flex items-center justify-between mb-4">
+          {/* ================= แท็บ 2: วินใกล้ฉัน ================= */}
+          {activeTab === 'map' && (
+            <div className="space-y-6 animate-fade-in">
+              {/* แผนที่วินใกล้ฉัน */}
+              <div className="bg-white rounded-[2rem] p-4 shadow-sm border border-gray-100 flex flex-col">
+                <div className="flex items-center justify-between mb-3 px-2">
                   <h2 className="text-base font-black text-gray-800 flex items-center gap-2">
-                    <span className="text-blue-500">⏳</span> งานที่กำลังดำเนินการ
+                    <span className="text-[#EE4D2D]">📍</span> วินรอบๆ ตัวคุณ
                   </h2>
-               </div>
+                  <span className="text-[10px] font-bold text-emerald-500 bg-emerald-50 px-2 py-1 rounded-md animate-pulse border border-emerald-100">
+                    อัปเดตสด
+                  </span>
+                </div>
+                
+                <div className="w-full h-[300px] md:h-[400px] bg-gray-100 rounded-[1.5rem] overflow-hidden relative border border-gray-200">
+                  {isLoaded ? (
+                    <GoogleMap 
+                      mapContainerStyle={{ width: '100%', height: '100%' }} 
+                      center={mapCenter} 
+                      zoom={15} 
+                      options={{ disableDefaultUI: true, zoomControl: true }}
+                    >
+                      <MarkerF position={mapCenter} icon={{ url: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png' }} />
+                      {MOCK_RIDERS.map(rider => (
+                        <MarkerF 
+                          key={rider.id} 
+                          position={{ lat: rider.lat, lng: rider.lng }} 
+                          icon={{ url: 'http://maps.google.com/mapfiles/ms/icons/motorcycling.png' }} 
+                        />
+                      ))}
+                    </GoogleMap>
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-sm font-bold text-gray-400">กำลังโหลดแผนที่...</div>
+                  )}
+                  <button onClick={handleGetCurrentLocation} className="absolute bottom-4 right-4 w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center text-blue-500 hover:scale-105 transition-transform text-xl">
+                    🎯
+                  </button>
+                </div>
+              </div>
 
-               {isLoading ? (
-                 <div className="animate-pulse space-y-3">
-                   <div className="h-20 bg-gray-100 rounded-2xl"></div>
-                 </div>
-               ) : jobs.length === 0 ? (
-                 <div className="text-center py-6 bg-gray-50 rounded-2xl border border-gray-100 border-dashed">
-                   <p className="text-sm font-bold text-gray-400">ยังไม่มีรายการที่กำลังรอรถค่ะ</p>
-                 </div>
-               ) : (
-                 <div className="space-y-3 max-h-[400px] overflow-y-auto no-scrollbar pr-1">
-                   {jobs.map((job) => (
-                     <div key={job.id} onClick={() => router.push(`/chat/${job.id}`)} className="p-4 rounded-2xl border border-gray-200 hover:border-[#EE4D2D] hover:bg-orange-50/30 transition-all cursor-pointer group">
-                       <div className="flex justify-between items-start mb-2">
-                         <span className="text-xs font-black text-gray-800 group-hover:text-[#EE4D2D] transition-colors">{job.title || 'เรียกงานด่วน'}</span>
-                         <span className={`text-[9px] font-bold px-2 py-0.5 rounded flex items-center gap-1 ${job.status === 'open' ? 'bg-yellow-50 text-yellow-600 border border-yellow-100' : 'bg-blue-50 text-blue-600 border border-blue-100'}`}>
-                           <span className={`w-1.5 h-1.5 rounded-full ${job.status === 'open' ? 'bg-yellow-400 animate-pulse' : 'bg-blue-500'}`}></span>
-                           {job.status === 'open' ? 'รอรับงาน' : 'คนขับกำลังไป'}
-                         </span>
+              {/* ลิสต์วินประจำของฉัน */}
+              <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100">
+                 <h2 className="text-base font-black text-gray-800 mb-4 flex items-center gap-2">
+                    <span className="text-pink-500">💖</span> วินประจำของฉัน
+                 </h2>
+                 
+                 <div className="space-y-3">
+                   {MOCK_FAVORITES.map((fav) => (
+                     <div key={fav.id} className="flex items-center justify-between p-3 rounded-2xl border border-gray-100 hover:bg-orange-50/50 transition-colors cursor-pointer group">
+                       <div className="flex items-center gap-3">
+                         <div className="w-12 h-12 bg-orange-50 rounded-full flex items-center justify-center text-2xl relative border border-orange-100">
+                           {getVehicleIcon(fav.vehicle)}
+                           <span className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-white shadow-sm ${fav.status === 'online' ? 'bg-emerald-500' : fav.status === 'busy' ? 'bg-red-500' : 'bg-gray-300'}`}></span>
+                         </div>
+                         <div>
+                           <p className="text-sm font-black text-gray-800">{fav.name}</p>
+                           <p className={`text-[10px] font-bold ${fav.status === 'online' ? 'text-emerald-500' : fav.status === 'busy' ? 'text-red-500' : 'text-gray-400'}`}>
+                             {fav.status === 'online' ? 'ว่าง รับงานได้' : fav.status === 'busy' ? 'ติดงานอยู่' : 'ออฟไลน์'}
+                           </p>
+                         </div>
                        </div>
-                       <p className="text-[10px] text-gray-500 font-medium line-clamp-1 mb-2">📍 {job.pickup_location}</p>
-                       <div className="flex justify-between items-end border-t border-gray-100 pt-2">
-                         <span className="text-[10px] font-bold text-gray-400">{job.worker ? `รับงานโดย: ${job.worker.full_name}` : 'กำลังหาคนขับ...'}</span>
-                         <span className="text-sm font-black text-[#00C300]">{job.budget} บาท</span>
-                       </div>
+                       <button 
+                          disabled={fav.status !== 'online'}
+                          className={`text-xs font-black px-4 py-2 rounded-xl transition-all ${fav.status === 'online' ? 'bg-[#EE4D2D] text-white shadow-md hover:bg-[#D43D1D] active:scale-95' : 'bg-gray-100 text-gray-400'}`}
+                       >
+                          เรียกตรง
+                       </button>
                      </div>
                    ))}
                  </div>
-               )}
+              </div>
             </div>
+          )}
 
-          </div>
         </main>
 
         {/* --- ส่วน Modal เรียกรถ --- */}
