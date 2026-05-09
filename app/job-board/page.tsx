@@ -15,6 +15,7 @@ interface Job {
   budget: number;
   created_at: string;
   deadline?: string; // วันหมดอายุประกาศ
+  proposals_count?: number; // 🌟 เพิ่มสำหรับเก็บจำนวนคนเสนอราคา
 }
 
 export default function JobBoardPage() {
@@ -24,11 +25,9 @@ export default function JobBoardPage() {
   const [loading, setLoading] = useState(true);
   const [jobs, setJobs] = useState<Job[]>([]);
   
-  // 🌟 State สำหรับกรองงาน
-  const [activeTab, setActiveTab] = useState('all'); // ลักษณะการจ้าง
-  const [selectedCategory, setSelectedCategory] = useState('all'); // หมวดหมู่งาน
+  const [activeTab, setActiveTab] = useState('all'); 
+  const [selectedCategory, setSelectedCategory] = useState('all');
 
-  // รายการลักษณะการจ้าง (สำหรับทำแถบเลื่อน)
   const employmentTypes = [
     { id: 'all', label: '📋 ทั้งหมด' },
     { id: 'freelance', label: '🚀 ฟรีแลนซ์' },
@@ -41,17 +40,22 @@ export default function JobBoardPage() {
     const fetchOpenJobs = async () => {
       setLoading(true);
       try {
-        // ดึงเฉพาะงานที่สถานะ 'open'
+        // 🌟 ดึงข้อมูลงานพร้อมนับจำนวน Proposal (ใช้ .select พร้อม count)
         const { data } = await supabase
           .from('jobs')
           .select(`
-            id, title, job_type, status, budget, created_at, category, employment_type, deadline
+            id, title, job_type, status, budget, created_at, category, employment_type, deadline,
+            proposals:job_proposals(count)
           `)
           .eq('status', 'open')
           .order('created_at', { ascending: false });
         
         if (data) {
-          setJobs(data as any);
+          const mappedJobs = data.map((job: any) => ({
+            ...job,
+            proposals_count: job.proposals?.[0]?.count || 0
+          }));
+          setJobs(mappedJobs as any);
         }
       } catch (error) {
         console.error("Error fetching job board:", error);
@@ -71,7 +75,6 @@ export default function JobBoardPage() {
     });
   };
 
-  // 🌟 ฟังก์ชันคำนวณวันหมดอายุ
   const getDaysLeft = (deadline?: string) => {
     if (!deadline) return 'ไม่ระบุวันหมดอายุ';
     const today = new Date();
@@ -84,9 +87,7 @@ export default function JobBoardPage() {
     return `หมดอายุในอีก ${diffDays} วัน`;
   };
 
-  // 🌟 ฟังก์ชันกรองงาน
   const filteredJobs = jobs.filter(job => {
-    // ถ้าใน DB ยังไม่มี employment_type ให้ถือว่าเป็น freelance ไปก่อน (จำลองข้อมูล)
     const empType = job.employment_type || 'freelance'; 
     const matchTab = activeTab === 'all' || empType === activeTab;
     const matchCategory = selectedCategory === 'all' || job.category === selectedCategory;
@@ -97,7 +98,6 @@ export default function JobBoardPage() {
     <div className="min-h-screen bg-[#F4F6F8] flex justify-center font-sans pb-24 md:pb-10">
       <div className="w-full lg:max-w-5xl xl:max-w-6xl bg-[#F8FAFC] min-h-screen relative flex flex-col md:shadow-2xl overflow-x-hidden md:border-x border-gray-200/50">
         
-        {/* 🟠 Header (คงโครงสร้างเดิม) */}
         <header className="bg-gradient-to-br from-[#0047FF] to-[#0082FA] px-6 pt-12 pb-16 md:pb-24 rounded-b-[2.5rem] md:rounded-b-[4rem] text-white shadow-lg relative z-20">
           <div className="flex items-center gap-4 max-w-4xl mx-auto">
             <button onClick={() => router.back()} className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 active:scale-95 transition-all backdrop-blur-md shrink-0">
@@ -108,17 +108,15 @@ export default function JobBoardPage() {
                 <h1 className="text-2xl md:text-4xl font-black tracking-tight">กระดานหางาน 📌</h1>
                 <p className="text-xs md:text-sm font-bold text-blue-100 opacity-90 mt-1 md:mt-2">ค้นหางานที่ใช่ สำหรับฟรีแลนซ์และช่าง</p>
               </div>
-              <Link href="/jobs/create" className="hidden md:flex bg-white text-[#0047FF] px-6 py-2.5 rounded-full font-black text-sm shadow-md hover:bg-blue-50 transition-colors">
+              {/* 🌟 แก้ลิงก์ไป /job-board/create */}
+              <Link href="/job-board/create" className="hidden md:flex bg-white text-[#0047FF] px-6 py-2.5 rounded-full font-black text-sm shadow-md hover:bg-blue-50 transition-colors">
                 + ลงประกาศงาน
               </Link>
             </div>
           </div>
         </header>
 
-        {/* 🌟 Search & Filter Section */}
         <div className="relative z-30 px-5 w-full max-w-4xl mx-auto -mt-8 md:-mt-10 flex flex-col gap-3">
-          
-          {/* เลือกหมวดหมู่งาน (แทนช่องค้นหา) */}
           <div className="bg-white p-2 rounded-2xl shadow-lg border border-gray-100 flex items-center gap-2">
             <span className="pl-3 text-xl grayscale opacity-50">📂</span>
             <select 
@@ -136,7 +134,6 @@ export default function JobBoardPage() {
             <div className="pr-4 pointer-events-none text-gray-400">▼</div>
           </div>
 
-          {/* แถบเลื่อนประเภทการจ้าง (Scrollable Tabs) */}
           <div className="bg-white p-1.5 rounded-full shadow-sm border border-gray-100 w-full mt-1 relative">
              <div className="flex gap-1 w-full overflow-x-auto no-scrollbar snap-x items-center">
                {employmentTypes.map(type => (
@@ -149,14 +146,12 @@ export default function JobBoardPage() {
                  </button>
                ))}
              </div>
-             {/* Hint ลูกศรสำหรับมือถือให้รู้ว่าเลื่อนได้ */}
              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300 pointer-events-none md:hidden animate-pulse">
                &gt;
              </div>
           </div>
         </div>
 
-        {/* 🌟 Job Feed Area (1 แถวยาว) */}
         <main className="flex-1 p-4 md:px-10 mt-4 w-full max-w-4xl mx-auto">
           {loading ? (
             <div className="grid grid-cols-1 gap-4 md:gap-5 animate-pulse">
@@ -171,7 +166,6 @@ export default function JobBoardPage() {
           ) : (
             <div className="grid grid-cols-1 gap-4 md:gap-5">
               {filteredJobs.map((job) => {
-                // แปลงคำศัพท์ให้ตรงกับ Badge
                 const empTypeLabel = employmentTypes.find(t => t.id === (job.employment_type || 'freelance'))?.label.replace(/[^ก-๙a-zA-Z]/g, '').trim() || 'ฟรีแลนซ์';
 
                 return (
@@ -180,7 +174,6 @@ export default function JobBoardPage() {
                     key={job.id} 
                     className="bg-white rounded-3xl p-5 md:p-6 shadow-sm border border-gray-100 hover:shadow-md hover:border-blue-200 transition-all group flex flex-col"
                   >
-                    {/* Badge & ประเภทการจ้าง */}
                     <div className="flex justify-between items-start mb-3">
                       <div className="flex gap-2 items-center">
                         <span className={`text-[9px] font-black px-2.5 py-1 rounded text-white shadow-sm tracking-widest ${job.job_type === 'onsite' ? 'bg-[#EE4D2D]' : 'bg-[#0047FF]'}`}>
@@ -192,18 +185,23 @@ export default function JobBoardPage() {
                       </div>
                     </div>
 
-                    {/* ชื่องาน */}
                     <h3 className="text-base md:text-xl font-black text-gray-800 leading-snug mb-4 group-hover:text-[#0047FF] transition-colors pr-4">
                       {job.title}
                     </h3>
 
-                    {/* งบประมาณ & วันที่ (ตัดโปรไฟล์ลูกค้าออก) */}
                     <div className="mt-auto pt-4 border-t border-gray-50 flex flex-row items-end justify-between">
                       <div>
                         <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest mb-0.5">งบประมาณ</p>
-                        <p className="text-lg md:text-2xl font-black text-[#00C300] leading-none">
-                          {job.budget.toLocaleString()} <span className="text-xs md:text-sm text-gray-500">บาท</span>
-                        </p>
+                        <div className="flex items-center gap-3">
+                          <p className="text-lg md:text-2xl font-black text-[#00C300] leading-none">
+                            {job.budget.toLocaleString()} <span className="text-xs md:text-sm text-gray-500">บาท</span>
+                          </p>
+                          {/* 🌟 แสดงจำนวนผู้เสนอราคา */}
+                          <div className="bg-orange-50 text-orange-600 px-2 py-1 rounded-md border border-orange-100 flex items-center gap-1.5 shadow-sm">
+                             <span className="text-[10px]">👥 เสนอแล้ว:</span>
+                             <span className="text-xs font-black">{job.proposals_count} คน</span>
+                          </div>
+                        </div>
                       </div>
                       
                       <div className="text-right flex flex-col gap-1">
@@ -225,7 +223,8 @@ export default function JobBoardPage() {
           )}
         </main>
 
-        <Link href="/jobs/create" className="md:hidden fixed bottom-24 right-5 w-14 h-14 bg-[#0047FF] text-white rounded-full flex items-center justify-center shadow-xl shadow-blue-200 active:scale-95 transition-transform z-40 border-2 border-white">
+        {/* 🌟 แก้ลิงก์ FAB ไป /job-board/create */}
+        <Link href="/job-board/create" className="md:hidden fixed bottom-24 right-5 w-14 h-14 bg-[#0047FF] text-white rounded-full flex items-center justify-center shadow-xl shadow-blue-200 active:scale-95 transition-transform z-40 border-2 border-white">
           <span className="text-2xl font-light">+</span>
         </Link>
         
