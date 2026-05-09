@@ -1,268 +1,338 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
-import PushToggle from '@/app/components/PushToggle';
-import BottomNav from '@/app/components/BottomNav';
 
-export default function ProfilePage() {
+export default function RiderDashboardPage() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
-  
-  const [profile, setProfile] = useState<any>(null);
+
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   
-  const [walletBalance, setWalletBalance] = useState<number>(0);
-  const [isLoadingWallet, setIsLoadingWallet] = useState(true);
+  // Rider States
+  const [isOnline, setIsOnline] = useState(false);
+  const [isAutoAccept, setIsAutoAccept] = useState(false);
+  
+  // Data States
+  const [availableJobs, setAvailableJobs] = useState<any[]>([]);
+  const [activeJob, setActiveJob] = useState<any>(null); // งานที่กำลังทำอยู่ตอนนี้
+  const [todaysEarnings, setTodaysEarnings] = useState(0);
+  const [todaysTrips, setTodaysTrips] = useState(0);
 
+  // 🌟 1. ตรวจสอบสิทธิ์และดึงข้อมูลเริ่มต้น
   useEffect(() => {
-    async function fetchData() {
+    const initRider = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
+      if (!session?.user) {
         router.push('/auth/login');
         return;
       }
-
-      const { data: profileData } = await supabase
+      
+      // ดึงโปรไฟล์เพื่อเช็ค KYC
+      const { data: profile } = await supabase
         .from('profiles')
-        .select('*')
+        .select('is_kyc_verified')
         .eq('id', session.user.id)
         .single();
-      
-      setProfile(profileData);
-      setLoading(false);
 
-      const { data: walletData } = await supabase
-        .from('wallets')
-        .select('balance_satang')
-        .eq('owner_id', session.user.id)
-        .eq('kind', 'user')
-        .maybeSingle();
-
-      if (walletData) {
-        setWalletBalance(walletData.balance_satang / 100);
+      if (!profile?.is_kyc_verified) {
+        alert('คุณยังไม่ผ่านการอนุมัติเอกสารคนขับค่ะ');
+        router.push('/profile');
+        return;
       }
-      setIsLoadingWallet(false);
-    }
-    
-    fetchData();
+
+      setCurrentUser(session.user);
+      fetchRiderData(session.user.id);
+    };
+    initRider();
   }, [router, supabase]);
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    router.push('/auth/login');
+  // 🌟 2. ดึงข้อมูลงาน (งานที่ว่างอยู่ + งานที่กำลังทำ + รายได้วันนี้)
+  const fetchRiderData = useCallback(async (userId: string) => {
+    // ก. ดึงงานที่ตัวเองกำลังทำอยู่ (ถ้ามี)
+    const { data: currentJob } = await supabase
+      .from('jobs')
+      .select('*, employer:profiles!employer_id(full_name, phone)')
+      .eq('worker_id', userId)
+      .eq('status', 'in_progress')
+      .maybeSingle();
+    
+    setActiveJob(currentJob);
+
+    // ข. ดึงงานที่รอคนรับ (ถ้ายังไม่มีงานทำ)
+    if (!currentJob) {
+      const { data: openJobs } = await supabase
+        .from('jobs')
+        .select('*, employer:profiles!employer_id(full_name)')
+        .in('job_type', ['ride', 'buy', 'deliver'])
+        .eq('status', 'open')
+        .order('created_at', { ascending: false });
+      
+      if (openJobs) setAvailableJobs(openJobs);
+    }
+
+    // ค. คำนวณรายได้วันนี้
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    const { data: completedJobs } = await supabase
+      .from('jobs')
+      .select('budget')
+      .eq('worker_id', userId)
+      .eq('status', 'completed')
+      .gte('created_at', `${today}T00:00:00Z`);
+
+    if (completedJobs) {
+      setTodaysTrips(completedJobs.length);
+      setTodaysEarnings(completedJobs.reduce((sum, job) => sum + (job.budget || 0), 0));
+    }
+    
+    setLoading(false);
+  }, [supabase]);
+
+  // 🌟 3. Real-time Subscription
+  useEffect(() => {
+    if (!currentUser) return;
+    const channel = supabase.channel('rider-dashboard')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, () => {
+        fetchRiderData(currentUser.id);
+      }).subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [currentUser, fetchRiderData, supabase]);
+
+  // 🌟 4. ฟังก์ชันกดรับงาน
+  const handleAcceptJob = async (jobId: string) => {
+    if (!isOnline) { alert('กรุณาเปิดออนไลน์ก่อนรับงานค่ะ'); return; }
+    if (activeJob) { alert('คุณมีงานที่กำลังดำเนินการอยู่ค่ะ'); return; }
+    
+    const { error } = await supabase
+      .from('jobs')
+      .update({ status: 'in_progress', worker_id: currentUser.id })
+      .eq('id', jobId)
+      .eq('status', 'open'); // ป้องกันคนกดพร้อมกัน
+
+    if (error) {
+      alert('ขออภัยค่ะ งานนี้ถูกรับไปแล้ว 🥲');
+    } else {
+      fetchRiderData(currentUser.id);
+    }
   };
 
-  // 🌟 ฟังก์ชันจัดการปุ่มเข้าโหมดคนขับ
-  const handleRiderModeClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    // ดักจับสถานะ หากผ่านการยืนยันเอกสารรถ (สมมติใช้ is_kyc_verified)
-    if (profile?.is_kyc_verified) {
-      router.push('/win-online/rider'); // พุ่งไปหน้า Dashboard ของคนขับที่เราจะสร้างใหม่
+  // 🌟 5. ฟังก์ชันจบงาน (เก็บเงิน)
+  const handleCompleteJob = async (jobId: string) => {
+    if (!confirm('ยืนยันว่าส่งลูกค้าถึงที่หมายและเก็บเงินเรียบร้อยแล้วใช่ไหมคะ?')) return;
+    
+    const { error } = await supabase
+      .from('jobs')
+      .update({ status: 'completed' }) // วินมอเตอร์ไซค์จบงานได้เลย
+      .eq('id', jobId);
+
+    if (error) {
+      alert('เกิดข้อผิดพลาด: ' + error.message);
     } else {
-      if (confirm('🛑 สิทธิ์ถูกจำกัด!\nคุณต้องลงทะเบียนและผ่านการอนุมัติเอกสารรถ (KYC) ก่อนเปิดโหมดคนขับนะคะ ไปหน้าจัดการข้อมูลเลยไหมคะ?')) {
-        router.push('/profile/edit');
-      }
+      alert('🎉 ปิดจ๊อบสำเร็จ! ลุยงานต่อไปกันเลยค่ะ');
+      fetchRiderData(currentUser.id);
     }
+  };
+
+  // เปิด Google Maps นำทาง
+  const openNavigation = (location: string) => {
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(location)}`;
+    window.open(url, '_blank');
   };
 
   if (loading) return (
-    <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center">
-      <div className="w-12 h-12 border-4 border-[#EE4D2D] border-t-transparent rounded-full animate-spin" />
+    <div className="min-h-screen bg-gray-900 flex items-center justify-center font-sans">
+      <div className="w-12 h-12 border-4 border-[#00C300] border-t-transparent rounded-full animate-spin" />
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-[#F4F6F8] flex justify-center font-sans pb-24 md:pb-10">
-      <div className="w-full lg:max-w-5xl xl:max-w-6xl bg-[#F8FAFC] min-h-screen relative flex flex-col md:shadow-2xl overflow-x-hidden md:border-x border-gray-200/50">
+    <div className="min-h-screen bg-gray-100 flex justify-center font-sans pb-24 md:pb-10">
+      <div className="w-full lg:max-w-4xl xl:max-w-5xl bg-[#F4F6F8] min-h-screen relative flex flex-col md:shadow-2xl overflow-x-hidden md:border-x border-gray-200">
         
-        {/* 🟠 Header ปรับขนาดให้เต็มตาขึ้นบนจอคอม */}
-        <div className="bg-gradient-to-br from-[#EE4D2D] via-[#FF6243] to-[#FF8A65] rounded-b-[3rem] md:rounded-b-[4rem] px-6 pt-12 pb-24 md:pb-32 shadow-lg relative z-10 flex flex-col items-center text-center">
-          
-          <button 
-            onClick={handleSignOut}
-            className="absolute top-6 right-6 md:top-10 md:right-10 text-white bg-white/20 hover:bg-red-500 active:scale-95 transition-all text-xs font-black px-5 py-2.5 rounded-full backdrop-blur-md shadow-sm flex items-center gap-2"
-          >
-            ออกจากระบบ 🚪
-          </button>
-
-          <div className="relative mb-6">
-            <div className="w-28 h-28 md:w-36 md:h-36 bg-white p-1.5 rounded-full shadow-2xl">
-              <div className="w-full h-full bg-gray-100 rounded-full flex items-center justify-center text-5xl md:text-6xl overflow-hidden">
-                {profile?.avatar_url ? (
-                  <img src={profile.avatar_url} className="w-full h-full object-cover" alt="profile" />
-                ) : '👤'}
-              </div>
-            </div>
-            <div className="absolute bottom-2 right-2 w-6 h-6 md:w-8 md:h-8 bg-emerald-500 border-4 border-white rounded-full shadow-lg"></div>
-          </div>
-
-          <h1 className="text-white text-3xl md:text-5xl font-black tracking-tight drop-shadow-md mb-2">
-            {profile?.full_name || 'สมาชิกจงเจริญ'}
-          </h1>
-          
-          <div className="flex flex-wrap justify-center gap-2 mt-2">
-            <span className="bg-white text-[#EE4D2D] text-[10px] md:text-xs font-black px-4 py-1.5 rounded-full shadow-sm">
-              👑 สมาชิก Classic
-            </span>
-            <span className="text-white/90 text-[10px] md:text-xs font-bold tracking-wider uppercase bg-black/10 px-4 py-1.5 rounded-full backdrop-blur-sm">
-              ID: {profile?.id?.slice(0, 8)}
-            </span>
-          </div>
-        </div>
-
-        {/* 💳 การ์ดกระเป๋าเงิน (Responsive Max-width) */}
-        <div className="px-5 md:px-20 -mt-16 md:-mt-20 relative z-20 w-full max-w-4xl mx-auto">
-          <div 
-            onClick={() => router.push('/wallet')}
-            className="bg-gradient-to-br from-gray-900 via-gray-800 to-black rounded-[2.5rem] p-8 md:p-12 text-white shadow-[0_20px_50px_rgba(0,0,0,0.3)] cursor-pointer active:scale-[0.98] transition-all relative overflow-hidden border border-gray-700/50 group"
-          >
-            <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -mr-20 -mt-20 group-hover:bg-[#EE4D2D]/10 transition-colors"></div>
+        {/* 🟢 Header Section (Driver Dark Mode) */}
+        <header className="bg-gray-900 px-6 pt-12 pb-8 rounded-b-[2rem] md:rounded-b-[3rem] text-white shadow-xl relative z-20">
+          <div className="flex justify-between items-start max-w-2xl mx-auto mb-6">
+            <button onClick={() => router.push('/profile')} className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center hover:bg-white/20 active:scale-95 transition-all backdrop-blur-md">
+              ←
+            </button>
             
-            <div className="flex justify-between items-center mb-6 relative z-10">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center text-2xl backdrop-blur-sm">💰</div>
-                <div className="flex flex-col">
-                  <span className="font-bold text-gray-400 text-xs uppercase tracking-[0.2em]">ยอดเงินคงเหลือ</span>
-                  <span className="font-black text-gray-200 text-sm">กระเป๋าเงินจงเจริญ</span>
-                </div>
-              </div>
-              <div className="flex items-center text-gray-900 bg-[#00C300] px-6 py-2.5 rounded-full text-sm font-black shadow-[0_0_20px_rgba(0,195,0,0.4)] group-hover:scale-105 transition-transform">
-                ถอนเงิน <span className="ml-2 text-xl leading-none">›</span>
-              </div>
-            </div>
-            
-            <div className="flex items-baseline gap-2 relative z-10">
-              <span className="text-gray-400 text-2xl font-bold">฿</span>
-              <span className="text-5xl md:text-7xl font-black tracking-tighter">
-                {isLoadingWallet ? '...' : walletBalance.toLocaleString('th-TH', { minimumFractionDigits: 2 })}
+            {/* Online Toggle */}
+            <div className="flex flex-col items-end">
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" className="sr-only peer" checked={isOnline} onChange={(e) => setIsOnline(e.target.checked)} />
+                <div className="w-14 h-8 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-[#00C300] shadow-inner"></div>
+              </label>
+              <span className={`text-xs font-black mt-1 ${isOnline ? 'text-[#00C300]' : 'text-gray-500'}`}>
+                {isOnline ? '🟢 ออนไลน์ (รับงาน)' : '⚫ ออฟไลน์'}
               </span>
             </div>
           </div>
-        </div>
 
-        {/* 📊 Section สถิติ Dashboard */}
-        <div className="px-5 md:px-20 mt-6 relative z-20 w-full max-w-4xl mx-auto">
-          <div className="grid grid-cols-3 gap-3 md:gap-5">
-            <div className="bg-white rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center hover:shadow-md transition-shadow">
-              <span className="text-2xl md:text-3xl mb-1 md:mb-2">⭐</span>
-              <span className="font-black text-gray-800 text-lg md:text-2xl">5.0</span>
-              <span className="text-[9px] md:text-xs font-bold text-gray-400 uppercase tracking-wider">คะแนนรีวิว</span>
+          <div className="max-w-2xl mx-auto">
+            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">รายได้วันนี้</p>
+            <div className="flex items-baseline gap-2">
+              <span className="text-3xl font-bold text-gray-300">฿</span>
+              <h1 className="text-5xl md:text-6xl font-black text-white tracking-tighter">
+                {todaysEarnings.toLocaleString('th-TH')}
+              </h1>
             </div>
-            <div className="bg-white rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center hover:shadow-md transition-shadow">
-              <span className="text-2xl md:text-3xl mb-1 md:mb-2">🏆</span>
-              <span className="font-black text-[#00C300] text-lg md:text-2xl">12</span>
-              <span className="text-[9px] md:text-xs font-bold text-gray-400 uppercase tracking-wider">งานสำเร็จ</span>
-            </div>
-            <div className="bg-white rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center hover:shadow-md transition-shadow">
-              <span className="text-2xl md:text-3xl mb-1 md:mb-2">⚡</span>
-              <span className="font-black text-[#EE4D2D] text-lg md:text-2xl">100%</span>
-              <span className="text-[9px] md:text-xs font-bold text-gray-400 uppercase tracking-wider">ตอบกลับ</span>
+            <div className="flex gap-4 mt-4">
+              <div className="bg-gray-800 px-4 py-2 rounded-xl flex items-center gap-2">
+                <span className="text-lg">🎯</span>
+                <div>
+                  <p className="text-[9px] text-gray-400 font-bold uppercase">รอบวิ่งวันนี้</p>
+                  <p className="text-sm font-black text-white">{todaysTrips} รอบ</p>
+                </div>
+              </div>
+              <div className="bg-gray-800 px-4 py-2 rounded-xl flex items-center gap-2">
+                <span className="text-lg">⭐</span>
+                <div>
+                  <p className="text-[9px] text-gray-400 font-bold uppercase">คะแนนดาว</p>
+                  <p className="text-sm font-black text-white">5.0</p>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+        </header>
 
-        {/* ✅ Main Menu */}
-        <main className="flex-1 relative z-10 px-5 md:px-20 mt-6 pb-32 space-y-6 w-full max-w-4xl mx-auto">
+        <main className="flex-1 p-5 md:px-10 mt-2 relative z-30 w-full max-w-2xl mx-auto space-y-6">
           
-          {/* 🔔 Section 1: Notifications */}
-          <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 p-2 md:p-4">
-            <PushToggle />
-          </div>
-
-          {/* 📇 Section 2: กระเป๋า Jobs-Card */}
-          <div className="bg-white rounded-[2rem] shadow-md border-2 border-emerald-50 overflow-hidden">
-            <div className="bg-emerald-50 px-6 py-3 border-b border-emerald-100 flex items-center justify-between">
-              <span className="text-[11px] font-black text-emerald-700 uppercase tracking-widest">การนำเสนอของฉัน</span>
-              <span className="bg-emerald-500 text-white text-[10px] font-black px-2 py-0.5 rounded-md animate-pulse">LIVE</span>
+          {/* ⚡ Auto-Accept Settings */}
+          {isOnline && !activeJob && (
+            <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl transition-colors ${isAutoAccept ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-400'}`}>
+                  ⚡
+                </div>
+                <div>
+                  <h3 className="font-black text-gray-800 text-sm">รับงานอัตโนมัติ</h3>
+                  <p className="text-[10px] text-gray-500 font-bold">รัศมี 3 กม. (แนะนำ)</p>
+                </div>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" className="sr-only peer" checked={isAutoAccept} onChange={(e) => setIsAutoAccept(e.target.checked)} />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500"></div>
+              </label>
             </div>
-            
-            <Link href="/profile/jobs-cards" className="flex items-center justify-between p-6 hover:bg-emerald-50/30 transition-all active:bg-emerald-50 group">
-              <div className="flex items-center gap-5">
-                <div className="w-14 h-14 rounded-2xl bg-emerald-500 text-white flex items-center justify-center text-3xl shadow-lg shadow-emerald-100 group-hover:rotate-6 transition-transform">
-                  📇
-                </div>
-                <div className="flex flex-col">
-                  <span className="font-black text-gray-800 text-lg">กระเป๋า Jobs-Card ของฉัน</span>
-                  <span className="text-xs font-bold text-gray-400 mt-0.5">สร้างและแก้ไขนามบัตรบริการเพื่อใช้โพสต์งาน</span>
-                </div>
-              </div>
-              <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center group-hover:bg-emerald-500 group-hover:text-white transition-all text-emerald-500">
-                <span className="text-2xl font-bold">›</span>
-              </div>
-            </Link>
-          </div>
+          )}
 
-          {/* ⚙️ Section 3: General Menus */}
-          <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 overflow-hidden divide-y divide-gray-50">
-            
-            {/* 🌟 เมนูเข้าสู่โหมด Rider */}
-            <button onClick={handleRiderModeClick} className="w-full flex items-center justify-between p-5 hover:bg-orange-50/50 transition-colors active:bg-gray-50 group text-left">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-orange-50 text-2xl flex items-center justify-center group-hover:scale-110 transition-transform">🛵</div>
-                <div className="flex flex-col">
-                  <span className="font-bold text-gray-800 text-base">โหมดคนขับ (Win-Online)</span>
-                  <span className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">Rider Dashboard</span>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {!profile?.is_kyc_verified && (
-                  <span className="text-[9px] font-black text-red-500 bg-red-50 border border-red-100 px-2 py-1 rounded-md">🔒 ล็อก</span>
-                )}
-                <span className="text-gray-300 text-2xl font-bold group-hover:text-[#EE4D2D] transition-colors pr-2">›</span>
-              </div>
-            </button>
+          {/* 🛑 ถ้าออฟไลน์ */}
+          {!isOnline && !activeJob && (
+            <div className="flex flex-col items-center justify-center py-20 text-center opacity-60 grayscale">
+              <div className="text-6xl mb-4">😴</div>
+              <h3 className="text-lg font-black text-gray-800">คุณกำลังออฟไลน์</h3>
+              <p className="text-xs text-gray-500 font-bold mt-1">เปิดสวิตช์ด้านบนเพื่อเริ่มค้นหางานรอบตัวคุณ</p>
+            </div>
+          )}
 
-            <Link href="/my-jobs" className="flex items-center justify-between p-5 hover:bg-orange-50/50 transition-colors active:bg-gray-50 group">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-blue-50 text-2xl flex items-center justify-center group-hover:scale-110 transition-transform">💼</div>
-                <div className="flex flex-col">
-                  <span className="font-bold text-gray-800 text-base">งานของฉัน</span>
-                  <span className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">Track your works</span>
-                </div>
+          {/* 📍 ถ้ามีงานที่กำลังทำ (Active Job) */}
+          {activeJob && (
+            <div className="bg-white rounded-[2rem] shadow-xl border-2 border-[#0047FF] overflow-hidden animate-fade-in relative">
+              <div className="bg-[#0047FF] text-white px-5 py-3 flex items-center justify-between">
+                <span className="text-[11px] font-black uppercase tracking-widest flex items-center gap-2">
+                  <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
+                  งานกำลังดำเนินการ
+                </span>
+                <span className="text-sm font-black text-[#00C300] bg-white px-3 py-0.5 rounded-full shadow-sm">
+                  ฿{activeJob.budget}
+                </span>
               </div>
-              <span className="text-gray-300 text-2xl font-bold group-hover:text-[#EE4D2D] transition-colors pr-2">›</span>
-            </Link>
+              
+              <div className="p-6 space-y-5">
+                <h2 className="text-xl font-black text-gray-800">{activeJob.title}</h2>
+                
+                <div className="space-y-4 relative before:absolute before:inset-0 before:ml-3.5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-blue-400 before:to-gray-200 pl-8 md:pl-0">
+                  <div className="relative flex items-start md:justify-center">
+                    <div className="absolute left-[-2.3rem] md:left-1/2 md:-ml-4 flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 border-4 border-white shadow">📍</div>
+                    <div className="md:w-1/2 md:pr-10 md:text-right w-full">
+                      <p className="text-[10px] font-black text-blue-500 uppercase">จุดรับ (รับผู้โดยสาร)</p>
+                      <p className="text-sm font-bold text-gray-800 mt-0.5">{activeJob.pickup_location}</p>
+                      <button onClick={() => openNavigation(activeJob.pickup_location)} className="mt-2 text-[10px] font-black bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg active:scale-95 transition-all">นำทางไปจุดรับ ↗</button>
+                    </div>
+                  </div>
+                  
+                  {activeJob.dropoff_location && (
+                    <div className="relative flex items-start md:justify-center mt-6">
+                      <div className="absolute left-[-2.3rem] md:left-1/2 md:-ml-4 flex items-center justify-center w-8 h-8 rounded-full bg-red-100 border-4 border-white shadow">🚩</div>
+                      <div className="md:w-1/2 md:pl-10 md:ml-auto w-full mt-2 md:mt-0">
+                        <p className="text-[10px] font-black text-red-500 uppercase">จุดส่ง (ปลายทาง)</p>
+                        <p className="text-sm font-bold text-gray-800 mt-0.5">{activeJob.dropoff_location}</p>
+                        <button onClick={() => openNavigation(activeJob.dropoff_location)} className="mt-2 text-[10px] font-black bg-red-50 text-red-600 px-3 py-1.5 rounded-lg active:scale-95 transition-all">นำทางไปจุดส่ง ↗</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
 
-            <Link href="/profile/edit" className="flex items-center justify-between p-5 hover:bg-orange-50/50 transition-colors active:bg-gray-50 group">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-purple-50 text-2xl flex items-center justify-center group-hover:scale-110 transition-transform">⚙️</div>
-                <div className="flex flex-col">
-                  <span className="font-bold text-gray-800 text-base">จัดการข้อมูลส่วนตัว</span>
-                  <span className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">Profile Settings</span>
+                <div className="bg-gray-50 rounded-2xl p-4 flex items-center justify-between border border-gray-100">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center text-xl">👤</div>
+                    <div>
+                      <p className="text-[10px] text-gray-400 font-bold">ผู้เรียกใช้บริการ</p>
+                      <p className="text-sm font-black text-gray-800">{activeJob.employer?.full_name || 'ลูกค้าทั่วไป'}</p>
+                    </div>
+                  </div>
+                  <button onClick={() => router.push(`/chat/${activeJob.id}`)} className="w-10 h-10 bg-[#0047FF] text-white rounded-full flex items-center justify-center text-lg shadow-md active:scale-95">💬</button>
                 </div>
-              </div>
-              <span className="text-gray-300 text-2xl font-bold group-hover:text-[#EE4D2D] transition-colors pr-2">›</span>
-            </Link>
-            
-            <Link href="/support" className="flex items-center justify-between p-5 hover:bg-orange-50/50 transition-colors active:bg-gray-50 group">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-2xl flex items-center justify-center group-hover:scale-110 transition-transform">🎧</div>
-                <div className="flex flex-col">
-                  <span className="font-bold text-gray-800 text-base">ศูนย์ช่วยเหลือ (Help Center)</span>
-                  <span className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">Get Support</span>
-                </div>
-              </div>
-              <span className="text-gray-300 text-2xl font-bold group-hover:text-[#EE4D2D] transition-colors pr-2">›</span>
-            </Link>
 
-            <Link href="/about" className="flex items-center justify-between p-5 hover:bg-orange-50/50 transition-colors active:bg-gray-50 group">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-orange-50 text-2xl flex items-center justify-center group-hover:scale-110 transition-transform">ℹ️</div>
-                <div className="flex flex-col">
-                  <span className="font-bold text-gray-800 text-base">เกี่ยวกับจงเจริญ</span>
-                  <span className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">About App</span>
-                </div>
+                <button onClick={() => handleCompleteJob(activeJob.id)} className="w-full bg-[#00C300] hover:bg-green-600 text-white font-black py-4 rounded-2xl text-base shadow-lg shadow-green-200 active:scale-95 transition-all">
+                  ✅ เก็บเงินและจบงาน
+                </button>
               </div>
-              <span className="text-gray-300 text-2xl font-bold group-hover:text-[#EE4D2D] transition-colors pr-2">›</span>
-            </Link>
-          </div>
+            </div>
+          )}
+
+          {/* 📡 กระดานเรดาร์งาน (Job Radar) */}
+          {isOnline && !activeJob && (
+            <div>
+              <div className="flex items-center justify-between mb-4 px-1">
+                <h2 className="text-base font-black text-gray-800">📡 งานที่กำลังเรียก...</h2>
+                <span className="text-[10px] font-bold text-gray-400">อัปเดตแบบเรียลไทม์</span>
+              </div>
+
+              {availableJobs.length === 0 ? (
+                <div className="bg-white rounded-[2rem] p-10 text-center border border-gray-100 shadow-sm flex flex-col items-center">
+                  <div className="w-16 h-16 rounded-full border-4 border-blue-50 border-t-[#0047FF] animate-spin mb-4"></div>
+                  <p className="font-black text-gray-800 text-sm">กำลังค้นหางานรอบตัวคุณ...</p>
+                  <p className="text-[11px] text-gray-400 font-bold mt-1">รอสักครู่ ระบบจะแจ้งเตือนเมื่องานเข้า</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {availableJobs.map((job) => (
+                    <div key={job.id} className="bg-white rounded-3xl p-5 shadow-md border border-gray-100 flex flex-col gap-4 animate-fade-in group">
+                      <div className="flex justify-between items-start">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 bg-blue-50 text-blue-500 rounded-xl flex items-center justify-center text-2xl font-black">
+                            {job.job_type === 'buy' ? '🛒' : job.job_type === 'deliver' ? '📦' : '🛵'}
+                          </div>
+                          <div>
+                            <h3 className="text-sm font-black text-gray-900">{job.title || 'เรียกงานด่วน'}</h3>
+                            <p className="text-[10px] font-bold text-gray-400 mt-0.5">ระยะทางรวม {job.distance_km || '?'} กม.</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-lg font-black text-[#00C300]">฿{job.budget}</p>
+                        </div>
+                      </div>
+                      
+                      <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 text-[11px] font-bold text-gray-600 space-y-1">
+                        <div className="flex gap-2"><span className="text-blue-500 shrink-0">📍</span><span className="line-clamp-1">{job.pickup_location}</span></div>
+                        {job.dropoff_location && <div className="flex gap-2"><span className="text-red-500 shrink-0">🚩</span><span className="line-clamp-1">{job.dropoff_location}</span></div>}
+                      </div>
+
+                      <button onClick={() => handleAcceptJob(job.id)} className="w-full bg-[#EE4D2D] hover:bg-[#D43D1D] text-white font-black py-3 rounded-xl text-sm shadow-md active:scale-95 transition-all">
+                        รับงานนี้ ⚡
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
         </main>
-
-        <BottomNav />
       </div>
     </div>
   );
