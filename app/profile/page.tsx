@@ -55,6 +55,19 @@ export default function ProfilePage() {
     router.push('/auth/login');
   };
 
+  // 🌟 ฟังก์ชันจัดการปุ่มเข้าโหมดคนขับ
+  const handleRiderModeClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    // ดักจับสถานะ หากผ่านการยืนยันเอกสารรถ (สมมติใช้ is_kyc_verified)
+    if (profile?.is_kyc_verified) {
+      router.push('/win-online/rider'); // พุ่งไปหน้า Dashboard ของคนขับที่เราจะสร้างใหม่
+    } else {
+      if (confirm('🛑 สิทธิ์ถูกจำกัด!\nคุณต้องลงทะเบียนและผ่านการอนุมัติเอกสารรถ (KYC) ก่อนเปิดโหมดคนขับนะคะ ไปหน้าจัดการข้อมูลเลยไหมคะ?')) {
+        router.push('/profile/edit');
+      }
+    }
+  };
+
   if (loading) return (
     <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center">
       <div className="w-12 h-12 border-4 border-[#EE4D2D] border-t-transparent rounded-full animate-spin" />
@@ -130,7 +143,7 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* 📊 Section สถิติ Dashboard (เพิ่มใหม่ตามคำแนะนำ) */}
+        {/* 📊 Section สถิติ Dashboard */}
         <div className="px-5 md:px-20 mt-6 relative z-20 w-full max-w-4xl mx-auto">
           <div className="grid grid-cols-3 gap-3 md:gap-5">
             <div className="bg-white rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center hover:shadow-md transition-shadow">
@@ -185,6 +198,23 @@ export default function ProfilePage() {
           {/* ⚙️ Section 3: General Menus */}
           <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 overflow-hidden divide-y divide-gray-50">
             
+            {/* 🌟 เมนูเข้าสู่โหมด Rider */}
+            <button onClick={handleRiderModeClick} className="w-full flex items-center justify-between p-5 hover:bg-orange-50/50 transition-colors active:bg-gray-50 group text-left">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-orange-50 text-2xl flex items-center justify-center group-hover:scale-110 transition-transform">🛵</div>
+                <div className="flex flex-col">
+                  <span className="font-bold text-gray-800 text-base">โหมดคนขับ (Win-Online)</span>
+                  <span className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">Rider Dashboard</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {!profile?.is_kyc_verified && (
+                  <span className="text-[9px] font-black text-red-500 bg-red-50 border border-red-100 px-2 py-1 rounded-md">🔒 ล็อก</span>
+                )}
+                <span className="text-gray-300 text-2xl font-bold group-hover:text-[#EE4D2D] transition-colors pr-2">›</span>
+              </div>
+            </button>
+
             <Link href="/my-jobs" className="flex items-center justify-between p-5 hover:bg-orange-50/50 transition-colors active:bg-gray-50 group">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-2xl bg-blue-50 text-2xl flex items-center justify-center group-hover:scale-110 transition-transform">💼</div>
