@@ -64,15 +64,14 @@ export default function CheckoutPage({ params }: { params: { id: string } }) {
   );
 
   return (
-    <div className="min-h-screen bg-[#F4F6F8] font-sans relative">
-      {/* 🟢 Header */}
+    <div className="min-h-screen bg-[#F4F6F8] font-sans">
       <div className="bg-white p-4 sticky top-0 z-10 shadow-sm flex items-center gap-4">
-        <button onClick={() => router.back()} className="text-2xl text-gray-400 active:scale-95 transition-transform">←</button>
+        <button onClick={() => router.back()} className="text-2xl text-gray-400">←</button>
         <h1 className="font-black text-lg text-gray-800">สรุปการชำระเงิน</h1>
       </div>
 
-      {/* 🚀 ปรับ pb-32 เพื่อให้มีพื้นที่ด้านล่างปุ่มพอดีๆ */}
-      <main className="p-4 max-w-md mx-auto space-y-4 pb-32">
+      {/* 🚀 เพิ่ม pb-56 เพื่อให้เลื่อนดูเนื้อหาท้ายสุดได้พ้นระยะปุ่ม */}
+      <main className="p-4 max-w-md mx-auto space-y-4 pb-56">
         <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
           <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">งานที่คุณจ้าง</p>
           <h2 className="font-black text-gray-800 text-lg mb-4">{job?.title}</h2>
@@ -112,18 +111,14 @@ export default function CheckoutPage({ params }: { params: { id: string } }) {
         </div>
       </main>
 
-      {/* 🚀 ปุ่มชำระเงินที่วางทับตำแหน่งแถบ Navigate เดิม (Full Width) */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-100 z-50 shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
+      {/* 🚀 ปรับ pb-28 เพื่อดันปุ่มให้ลอยขึ้นเหนือแถบ Navigation หลัก */}
+      <div className="fixed bottom-0 left-0 right-0 px-5 pt-4 pb-28 bg-white/90 backdrop-blur-sm border-t border-gray-100 flex justify-center z-30">
         <button 
           onClick={handlePayment}
           disabled={isPaying}
-          className="w-full max-w-md mx-auto bg-[#0047FF] text-white py-4 rounded-2xl font-black text-lg shadow-lg shadow-blue-200 active:scale-95 disabled:opacity-50 transition-all flex justify-center items-center"
+          className="w-full max-w-md bg-[#0047FF] text-white py-4 rounded-2xl font-black text-lg shadow-lg shadow-blue-200 active:scale-95 disabled:opacity-50 transition-all"
         >
-          {isPaying ? (
-            <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-          ) : (
-            `ชำระเงิน ฿${job?.budget?.toLocaleString()}`
-          )}
+          {isPaying ? 'กำลังประมวลผล...' : `ชำระเงิน ฿${job?.budget?.toLocaleString()}`}
         </button>
       </div>
     </div>
