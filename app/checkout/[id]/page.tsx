@@ -70,8 +70,8 @@ export default function CheckoutPage({ params }: { params: { id: string } }) {
         <h1 className="font-black text-lg text-gray-800">สรุปการชำระเงิน</h1>
       </div>
 
-      {/* 🌟 เพิ่ม pb-32 เพื่อกันแถบ Navigate บัง */}
-      <main className="p-4 max-w-md mx-auto space-y-4 pb-32">
+      {/* 🚀 เพิ่ม pb-56 เพื่อให้เลื่อนดูเนื้อหาท้ายสุดได้พ้นระยะปุ่ม */}
+      <main className="p-4 max-w-md mx-auto space-y-4 pb-56">
         <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
           <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">งานที่คุณจ้าง</p>
           <h2 className="font-black text-gray-800 text-lg mb-4">{job?.title}</h2>
@@ -87,7 +87,6 @@ export default function CheckoutPage({ params }: { params: { id: string } }) {
             </div>
             <div className="flex justify-between text-xl pt-4 border-t border-gray-100">
               <span className="font-black text-gray-800">ยอดสุทธิ</span>
-              {/* 🌟 ปรับเป็นสีเขียว #00C300 ตามที่บีสามต้องการ */}
               <span className="font-black text-[#00C300]">฿{job?.budget?.toLocaleString()}</span>
             </div>
           </div>
@@ -105,15 +104,15 @@ export default function CheckoutPage({ params }: { params: { id: string } }) {
         </div>
 
         <div className="p-4 text-center">
-          <p className="text-[10px] text-gray-400 font-bold leading-relaxed">
+          <p className="text-[10px] text-gray-400 font-bold leading-relaxed mb-4">
             🛡️ เงินของคุณจะถูกพักไว้ในระบบ "จงเจริญ"<br/>
             ช่างจะได้รับเงินเมื่อคุณกดยืนยันการรับงานในหน้าแชทเท่านั้น
           </p>
         </div>
       </main>
 
-      {/* 🌟 ปรับ Padding Bottom ของ Container ปุ่ม เพื่อหลบแถบ Navigate */}
-      <div className="fixed bottom-0 left-0 right-0 p-5 pb-8 md:pb-5 bg-white border-t border-gray-100 flex justify-center z-20">
+      {/* 🚀 ปรับ pb-28 เพื่อดันปุ่มให้ลอยขึ้นเหนือแถบ Navigation หลัก */}
+      <div className="fixed bottom-0 left-0 right-0 px-5 pt-4 pb-28 bg-white/90 backdrop-blur-sm border-t border-gray-100 flex justify-center z-30">
         <button 
           onClick={handlePayment}
           disabled={isPaying}
