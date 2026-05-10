@@ -48,7 +48,6 @@ export default function WinOnlinePage() {
   const [jobs, setJobs] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [walletBalance, setWalletBalance] = useState<number>(0); // 🌟 ยอดเงินในวอลเล็ท
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -81,7 +80,7 @@ export default function WinOnlinePage() {
       .select(`*, worker:profiles!worker_id (full_name)`)
       .eq('employer_id', userId)
       .in('job_type', ['ride', 'buy', 'deliver']) 
-      .in('status', ['open', 'in_progress']) 
+      .in('status', ['open', 'in_progress', 'pending_payment']) // โชว์งานที่รอจ่ายเงินด้วย
       .order('created_at', { ascending: false });
     
     if (data) setJobs(data);
@@ -94,10 +93,6 @@ export default function WinOnlinePage() {
       if (session?.user) {
         setCurrentUser(session.user);
         fetchMyActiveJobs(session.user.id);
-        
-        // 🌟 ดึงยอดเงินวอลเล็ท
-        const { data: wallet } = await supabase.from('wallets').select('balance_satang').eq('owner_id', session.user.id).eq('kind', 'user').maybeSingle();
-        if (wallet) setWalletBalance(wallet.balance_satang / 100);
       } else {
         setIsLoading(false);
       }
@@ -145,11 +140,27 @@ export default function WinOnlinePage() {
     e.preventDefault();
     if (!currentUser) return router.push('/auth/login?next=/win-online');
     setIsSubmitting(true);
-    const { error } = await supabase.from('jobs').insert({
-      employer_id: currentUser.id, title, job_type: jobType, vehicle_type: vehicleType, pickup_location: pickup, dropoff_location: dropoff || null, distance_km: distanceKm, budget: fareBreakdown.totalFare, status: 'open'
-    });
-    if (!error) { setIsModalOpen(false); alert('โพสต์งานเรียบร้อยค่ะ! 🚀'); fetchMyActiveJobs(currentUser.id, true); }
-    setIsSubmitting(false);
+    
+    // 🌟 สร้างงานด้วยสถานะ pending_payment เพื่อให้ลูกค้าไปจ่ายเงินก่อน
+    const { data: newJob, error } = await supabase.from('jobs').insert({
+      employer_id: currentUser.id, 
+      title, 
+      job_type: jobType, 
+      vehicle_type: vehicleType, 
+      pickup_location: pickup, 
+      dropoff_location: dropoff || null, 
+      distance_km: distanceKm, 
+      budget: fareBreakdown.totalFare, 
+      status: 'pending_payment' // ไรเดอร์จะยังไม่เห็นงานนี้
+    }).select().single();
+
+    if (error) {
+      alert('เกิดข้อผิดพลาด: ' + error.message);
+      setIsSubmitting(false);
+    } else {
+      // 🌟 สร้างงานสำเร็จ พาไปหน้าจ่ายเงิน QR Code ทันที
+      router.push(`/checkout/${newJob.id}`);
+    }
   };
 
   const handleSelectLocation = async (address: string) => {
@@ -226,10 +237,23 @@ export default function WinOnlinePage() {
              ) : (
                <div className="space-y-3 max-h-[400px] overflow-y-auto no-scrollbar pr-1">
                  {jobs.map((job) => (
-                   <div key={job.id} onClick={() => router.push(`/chat/${job.id}`)} className="p-4 rounded-2xl border border-gray-200 hover:border-[#EE4D2D] transition-all cursor-pointer group">
-                     <div className="flex justify-between items-start mb-2"><span className="text-sm font-black text-gray-800 group-hover:text-[#EE4D2D]">{job.title || 'เรียกงานด่วน'}</span><span className={`text-[9px] font-bold px-2 py-0.5 rounded flex items-center gap-1 ${job.status === 'open' ? 'bg-yellow-50 text-yellow-600' : 'bg-blue-50 text-blue-600'}`}><span className={`w-1.5 h-1.5 rounded-full ${job.status === 'open' ? 'bg-yellow-400 animate-pulse' : 'bg-blue-500'}`}></span>{job.status === 'open' ? 'รอคนขับรับงาน' : 'คนขับกำลังไป'}</span></div>
+                   <div key={job.id} onClick={() => {
+                     // 🌟 ถ้างานยังไม่จ่ายเงิน ให้กดแล้วไปหน้าจ่ายเงิน
+                     if (job.status === 'pending_payment') {
+                       router.push(`/checkout/${job.id}`);
+                     } else {
+                       router.push(`/chat/${job.id}`);
+                     }
+                   }} className="p-4 rounded-2xl border border-gray-200 hover:border-[#EE4D2D] transition-all cursor-pointer group">
+                     <div className="flex justify-between items-start mb-2">
+                       <span className="text-sm font-black text-gray-800 group-hover:text-[#EE4D2D]">{job.title || 'เรียกงานด่วน'}</span>
+                       <span className={`text-[9px] font-bold px-2 py-0.5 rounded flex items-center gap-1 ${job.status === 'open' ? 'bg-yellow-50 text-yellow-600' : job.status === 'pending_payment' ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'}`}>
+                         <span className={`w-1.5 h-1.5 rounded-full ${job.status === 'open' ? 'bg-yellow-400 animate-pulse' : job.status === 'pending_payment' ? 'bg-red-500' : 'bg-blue-500'}`}></span>
+                         {job.status === 'open' ? 'รอคนขับรับงาน' : job.status === 'pending_payment' ? 'รอชำระเงิน' : 'คนขับกำลังไป'}
+                       </span>
+                     </div>
                      <p className="text-xs text-gray-500 font-medium line-clamp-1 mb-3">📍 {job.pickup_location}</p>
-                     <div className="flex justify-between items-end border-t border-gray-100 pt-3"><span className="text-[10px] font-bold text-gray-400">{job.worker ? `คนขับ: ${job.worker.full_name}` : 'กำลังหาคนขับ...'}</span><span className="text-base font-black text-[#00C300]">{job.budget} บาท</span></div>
+                     <div className="flex justify-between items-end border-t border-gray-100 pt-3"><span className="text-[10px] font-bold text-gray-400">{job.worker ? `คนขับ: ${job.worker.full_name}` : job.status === 'pending_payment' ? 'กรุณาชำระเงินก่อน' : 'กำลังหาคนขับ...'}</span><span className="text-base font-black text-[#00C300]">{job.budget} บาท</span></div>
                    </div>
                  ))}
                </div>
@@ -251,20 +275,11 @@ export default function WinOnlinePage() {
                 </div>
                 <div className="bg-orange-50 border border-orange-100 rounded-[1.5rem] p-5 shadow-sm">
                   {fareBreakdown.totalFare > 0 && ( <div className="space-y-2 mb-3 pb-3 border-b border-orange-200/50 text-[11px] font-bold text-gray-600"><div className="flex justify-between"><span>ค่าเริ่มต้น</span><span>{fareBreakdown.base} บาท</span></div><div className="flex justify-between"><span>ค่าระยะทาง ({distanceKm} กม.)</span><span>{Math.round(fareBreakdown.distanceFee)} บาท</span></div><div className="flex justify-between text-[#EE4D2D]"><span>ค่าพลังงาน</span><span>{Math.ceil(fareBreakdown.fuelSurge)} บาท</span></div></div> )}
-                  <div className="flex justify-between items-end"><div><p className="text-[11px] text-[#EE4D2D] font-black uppercase">ราคาประเมินสุทธิ</p><p className="text-[9px] text-orange-400 font-bold italic">หักเงินจากวอลเล็ทหลังจบงาน</p></div><div className="text-right"><div className="text-3xl font-black text-[#EE4D2D] tracking-tighter">{fareBreakdown.totalFare > 0 ? `${fareBreakdown.totalFare} บาท` : '-'}</div></div></div>
+                  <div className="flex justify-between items-end"><div><p className="text-[11px] text-[#EE4D2D] font-black uppercase">ราคาประเมินสุทธิ</p><p className="text-[9px] text-orange-400 font-bold italic">พักเงินไว้ที่ระบบจงเจริญ</p></div><div className="text-right"><div className="text-3xl font-black text-[#EE4D2D] tracking-tighter">{fareBreakdown.totalFare > 0 ? `${fareBreakdown.totalFare} บาท` : '-'}</div></div></div>
                 </div>
-
-                {/* 🌟 เช็คยอดเงินวอลเล็ทก่อนเรียกรถ */}
-                {walletBalance < fareBreakdown.totalFare && fareBreakdown.totalFare > 0 ? (
-                  <div className="w-full bg-red-50 text-red-600 p-4 rounded-2xl text-center border border-red-100 font-bold">
-                    <p className="text-sm">ยอดเงินไม่เพียงพอ (ขาด {(fareBreakdown.totalFare - walletBalance).toLocaleString()} บาท)</p>
-                    <button type="button" onClick={() => router.push('/wallet')} className="text-[10px] underline mt-1">ไปเติมเงินเข้าจงเจริญวอลเล็ท ›</button>
-                  </div>
-                ) : (
-                  <button type="submit" disabled={isSubmitting || fareBreakdown.totalFare <= 0} className="w-full bg-[#EE4D2D] text-white font-black py-5 rounded-[1.5rem] text-base shadow-lg active:scale-95 transition-all disabled:opacity-50">
-                    {isSubmitting ? 'กำลังส่งคำขอ...' : 'ยืนยันเรียกใช้บริการ 🚀'}
-                  </button>
-                )}
+                <button type="submit" disabled={isSubmitting || fareBreakdown.totalFare <= 0} className="w-full bg-[#EE4D2D] text-white font-black py-5 rounded-[1.5rem] text-base shadow-lg active:scale-95 transition-all disabled:opacity-50">
+                  {isSubmitting ? 'กำลังส่งคำขอ...' : 'ดำเนินการชำระเงิน 🚀'}
+                </button>
               </form>
             </div>
           </div>
@@ -298,7 +313,6 @@ export default function WinOnlinePage() {
           </div>
         )}
       </div>
-      <style dangerouslySetInnerHTML={{__html: `.no-scrollbar::-webkit-scrollbar { display: none; } .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }`}} />
     </div>
   );
 }
