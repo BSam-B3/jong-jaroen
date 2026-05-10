@@ -1,95 +1,85 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const supabase = createClient();
-  const router = useRouter();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const pathname = usePathname();
-  const [loading, setLoading] = useState(true);
-  const [adminData, setAdminData] = useState<any>(null);
 
-  const menus = [
-    { name: 'ภาพรวม (Dashboard)', path: '/admin', icon: '📊', key: 'all' },
-    { name: 'ยืนยันตัวตน (KYC)', path: '/admin/kyc', icon: '🪪', key: 'can_view_kyc' },
-    { name: 'จัดการสมาชิก (Users)', path: '/admin/users', icon: '👥', key: 'all' },
-    { name: 'จัดการงาน (Jobs)', path: '/admin/jobs', icon: '💼', key: 'can_view_jobs' },
-    { name: 'การเงิน (Finance)', path: '/admin/finance', icon: '💰', key: 'can_view_finance' },
-  ];
-
-  useEffect(() => { checkAdminAccess(); }, []);
-
-  async function checkAdminAccess() {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { router.push('/auth/login'); return; }
-    const { data: profile } = await supabase.from('profiles')
-      .select('full_name, role, admin_permissions')
-      .eq('id', user.id)
-      .single();
-    if (profile?.role !== 'super_admin' && profile?.role !== 'admin') {
-      alert('คุณไม่มีสิทธิ์เข้าถึงพื้นที่ของ Admin ค่ะ');
-      router.push('/');
-      return;
+  // ปิด Sidebar อัตโนมัติในมือถือ หรือเมื่อเปลี่ยนหน้า
+  useEffect(() => {
+    if (window.innerWidth < 768) {
+      setIsSidebarOpen(false);
     }
-    setAdminData(profile);
-    setLoading(false);
-  }
-
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="text-center">
-        <div className="w-12 h-12 border-4 border-[#EE4D2D] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-        <p className="font-black text-gray-400 italic tracking-widest">กำลังตรวจสอบสิทธิ์ ADMIN...</p>
-      </div>
-    </div>
-  );
+  }, [pathname]);
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] flex overflow-hidden">
-      <aside className="w-72 bg-white border-r border-gray-200 shadow-xl flex flex-col z-30 relative">
-        <div className="p-8 border-b border-gray-100">
-          <h1 className="text-2xl font-black text-[#EE4D2D] tracking-tighter leading-none">JONG-JAROEN</h1>
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mt-2">Central Control Panel</p>
-        </div>
-        <nav className="flex-1 p-6 space-y-2 overflow-y-auto">
-          {menus.map(menu => {
-            const isSuperAdmin = adminData.role === 'super_admin';
-            const hasPermission = adminData.admin_permissions?.[menu.key];
-            if (menu.key !== 'all' && !isSuperAdmin && !hasPermission) return null;
-            const isActive = pathname === menu.path || pathname.startsWith(`${menu.path}/`);
-            return (
-              <Link key={menu.path} href={menu.path}
-                className={`flex items-center gap-4 px-5 py-4 rounded-[1.5rem] font-bold transition-all duration-300 ${
-                  isActive
-                    ? 'bg-[#EE4D2D] text-white shadow-lg shadow-orange-500/30 translate-x-2'
-                    : 'text-gray-500 hover:bg-orange-50 hover:text-[#EE4D2D] hover:translate-x-1'
-                }`}>
-                <span className="text-2xl">{menu.icon}</span>
-                <span className="text-sm tracking-tight">{menu.name}</span>
-              </Link>
-            );
-          })}
-        </nav>
-        <div className="p-6 bg-gray-50 m-6 rounded-[2rem] border border-gray-100 shadow-inner">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-white rounded-2xl shadow-sm flex items-center justify-center text-lg font-black text-[#EE4D2D]">
-              {adminData.full_name?.charAt(0)}
-            </div>
-            <div className="flex-1 overflow-hidden">
-              <p className="text-xs font-black text-gray-800 truncate">{adminData.full_name}</p>
-              <span className="inline-block mt-1 bg-[#EE4D2D]/10 text-[#EE4D2D] text-[8px] px-2 py-0.5 rounded-full font-black uppercase tracking-widest border border-[#EE4D2D]/20">
-                {adminData.role?.replace('_', ' ')}
-              </span>
-            </div>
-          </div>
-        </div>
+    <div className="flex min-h-screen bg-[#F4F6F8] font-sans overflow-x-hidden relative">
+      
+      {/* 🌑 Overlay สีดำสำหรับมือถือ (คลิกเพื่อปิด) */}
+      {isSidebarOpen && (
+        <div 
+          onClick={() => setIsSidebarOpen(false)} 
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 md:hidden animate-in fade-in" 
+        />
+      )}
+
+      {/* ⬅️ Sidebar */}
+      <aside 
+        className={`fixed inset-y-0 left-0 z-50 bg-white shadow-2xl transition-all duration-300 ease-in-out border-r border-gray-100 flex flex-col
+        ${isSidebarOpen ? 'w-64 translate-x-0' : '-translate-x-full md:translate-x-0 md:w-20'}`}
+      >
+         {/* โลโก้ */}
+         <div className="p-6 h-24 flex items-center justify-center md:justify-start overflow-hidden whitespace-nowrap border-b border-gray-50">
+            <h2 className="text-[#EE4D2D] font-black text-xl tracking-tighter">
+              {isSidebarOpen ? 'JONG-JAROEN' : 'JJ'}
+            </h2>
+         </div>
+
+         {/* เมนูต่างๆ */}
+         <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto no-scrollbar">
+           {[
+             { icon: '📊', label: 'ภาพรวม', href: '/admin' },
+             { icon: '👥', label: 'สมาชิก', href: '/admin/users' },
+             { icon: '🛵', label: 'งานวิน', href: '/admin/jobs' },
+             { icon: '🛡️', label: 'ตรวจ KYC', href: '/admin/kyc' },
+           ].map((item) => (
+             <Link key={item.label} href={item.href} className="flex items-center gap-4 p-3 rounded-2xl hover:bg-orange-50 transition-colors group">
+               <span className="text-xl group-hover:scale-110 transition-transform">{item.icon}</span>
+               <span className={`font-bold text-gray-600 group-hover:text-[#EE4D2D] transition-opacity duration-200 ${!isSidebarOpen && 'opacity-0 md:hidden'}`}>
+                 {item.label}
+               </span>
+             </Link>
+           ))}
+         </nav>
+
+         {/* 🔘 ปุ่มลูกศรพับเก็บ Sidebar (Desktop) */}
+         <button
+           onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+           className="hidden md:flex absolute top-10 -right-4 w-8 h-8 bg-[#EE4D2D] text-white rounded-full items-center justify-center shadow-lg hover:scale-110 transition-transform z-50 text-lg font-bold"
+         >
+           <span className={`transform transition-transform duration-300 ${!isSidebarOpen ? 'rotate-180' : ''}`}>‹</span>
+         </button>
       </aside>
-      <main className="flex-1 h-screen overflow-y-auto p-10 relative bg-[#F8F9FA] text-black">
-        <div className="max-w-6xl mx-auto">{children}</div>
+
+      {/* 📄 พื้นที่เนื้อหาหลัก (ดันหลบ Sidebar ตามขนาด) */}
+      <main className={`flex-1 transition-all duration-300 ease-in-out w-full ${isSidebarOpen ? 'md:ml-64' : 'md:ml-20'}`}>
+        {children}
       </main>
+
+      {/* 📱 ปุ่มลูกศรเปิด Sidebar (Mobile Floating Button) */}
+      {!isSidebarOpen && (
+        <button
+          onClick={() => setIsSidebarOpen(true)}
+          className="md:hidden fixed bottom-6 left-6 w-12 h-12 bg-[#EE4D2D] text-white rounded-full shadow-2xl flex items-center justify-center text-2xl z-[60] font-black active:scale-95 transition-transform"
+        >
+          ›
+        </button>
+      )}
+
+      <style dangerouslySetInnerHTML={{__html: `.no-scrollbar::-webkit-scrollbar { display: none; } .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }`}} />
     </div>
   );
 }
