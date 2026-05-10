@@ -33,6 +33,15 @@ export default function RiderDashboardPage() {
   const [historyJobs, setHistoryJobs] = useState<any[]>([]);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
 
+  // 🌟 เพิ่ม State สำหรับนาฬิกาดิจิทัล
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    // 🌟 ให้เวลาเดินทุกๆ 1 วินาที
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   const getTimeElapsed = (dateString: string) => {
     const diff = Math.floor((new Date().getTime() - new Date(dateString).getTime()) / 60000);
     if (diff < 1) return 'เพิ่งเรียกเมื่อกี้';
@@ -67,8 +76,10 @@ export default function RiderDashboardPage() {
 
       setProfileData(profile);
       setCurrentUser(session.user);
+      
       const vType = profile?.vehicle_type || 'motorcycle';
       setRiderVehicle(vType);
+      
       fetchRiderData(session.user.id, vType);
     };
     initRider();
@@ -89,7 +100,7 @@ export default function RiderDashboardPage() {
         .from('jobs')
         .select('*, employer:profiles!employer_id(full_name)')
         .in('job_type', ['ride', 'buy', 'deliver'])
-        .eq('vehicle_type', vType) // 🎯 กรองตามรถที่ลงทะเบียน
+        .eq('vehicle_type', vType) 
         .eq('status', 'open')
         .order('created_at', { ascending: false });
       
@@ -128,7 +139,6 @@ export default function RiderDashboardPage() {
     if (!isOnline) { alert('กรุณาเปิดออนไลน์ก่อนรับงานค่ะ'); return; }
     if (activeJob) { alert('คุณมีงานที่กำลังดำเนินการอยู่ค่ะ'); return; }
     
-    // 📸 สมมติว่ามีการเปิดกล้อง Selfie ก่อนตรงนี้ (Logic UI สำหรับกล้องต้องสร้างแยก)
     const { error } = await supabase
       .from('jobs')
       .update({ status: 'in_progress', worker_id: currentUser.id })
@@ -146,7 +156,6 @@ export default function RiderDashboardPage() {
   const handleCompleteJob = async (jobId: string) => {
     if (!confirm('📸 ถ่ายรูปส่งงานในแชทเรียบร้อยแล้วใช่ไหมคะ?\n\nเมื่อยืนยัน ระบบจะหักเงินจากกระเป๋าลูกค้าโอนให้คุณทันทีค่ะ')) return;
     
-    // 🌟 เรียก RPC ตัดเงินอัตโนมัติ
     const { error } = await supabase.rpc('complete_ride_job', { p_job_id: jobId });
 
     if (error) {
@@ -169,7 +178,7 @@ export default function RiderDashboardPage() {
   };
 
   const openNavigation = (location: string) => {
-    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`;
+    const url = `http://googleusercontent.com/maps.google.com/8{encodeURIComponent(location)}`;
     window.open(url, '_blank');
   };
 
@@ -273,7 +282,14 @@ export default function RiderDashboardPage() {
             <div>
               <div className="flex justify-between mb-4 px-1"><h2 className="text-base font-black text-gray-800">📡 งานที่กำลังเรียก...</h2><span className="text-[10px] font-bold text-gray-400 animate-pulse">LIVE</span></div>
               {availableJobs.length === 0 ? (
-                <div className="bg-white rounded-[2rem] p-10 text-center border border-gray-100 flex flex-col items-center"><div className="w-16 h-16 rounded-full border-4 border-orange-50 border-t-[#EE4D2D] animate-spin mb-4"></div><p className="font-black text-gray-800 text-sm">กำลังค้นหางานประเภท {getVehicleLabel(riderVehicle)}</p></div>
+                // 🌟 เปลี่ยนไอคอนหมุนๆ เป็นนาฬิกาดิจิทัลสวยๆ
+                <div className="bg-gradient-to-b from-gray-50 to-white rounded-[2rem] p-10 text-center border border-gray-100 flex flex-col items-center shadow-inner">
+                  <div className="text-5xl font-black text-gray-800 mb-2 tabular-nums tracking-tight">
+                    {currentTime.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                  </div>
+                  <p className="font-black text-[#EE4D2D] text-sm">กำลังค้นหางานรอบตัวคุณ...</p>
+                  <p className="text-[11px] text-gray-400 font-bold mt-1">ประเภทรถ: {getVehicleLabel(riderVehicle)}</p>
+                </div>
               ) : (
                 <div className="space-y-4">
                   {availableJobs.map((job) => (
@@ -295,6 +311,31 @@ export default function RiderDashboardPage() {
             </div>
           )}
         </main>
+
+        {isHistoryModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/60 backdrop-blur-sm animate-fade-in">
+            <div className="bg-white w-full max-w-xl rounded-t-[2.5rem] p-6 md:p-8 max-h-[85vh] overflow-y-auto pb-10 shadow-2xl relative flex flex-col">
+              <div className="flex justify-between items-center mb-6 shrink-0 sticky top-0 bg-white z-10 py-2">
+                <div><h2 className="text-xl font-black text-gray-800">ประวัติงานวันนี้ 🗓️</h2><p className="text-[10px] text-gray-500 font-bold mt-0.5">เช็คบิลและตรวจสอบงานที่ทำเสร็จแล้ว</p></div>
+                <button onClick={() => setIsHistoryModalOpen(false)} className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-gray-600 hover:bg-gray-200 font-bold active:scale-95">✕</button>
+              </div>
+              {historyJobs.length === 0 ? (
+                <div className="text-center py-10 opacity-50 grayscale flex-1 flex flex-col justify-center"><div className="text-6xl mb-3">📭</div><p className="text-sm font-black text-gray-800">ยังไม่มีงานที่ทำสำเร็จในวันนี้</p></div>
+              ) : (
+                <div className="space-y-3 flex-1 overflow-y-auto pr-1">
+                  {historyJobs.map((job, idx) => (
+                    <div key={job.id} className="bg-gray-50 rounded-2xl p-4 border border-gray-100 flex flex-col gap-2 relative">
+                      <div className="absolute top-4 right-4 text-xs font-black text-[#00C300]">฿{job.budget}</div>
+                      <div className="flex items-center gap-2"><span className="text-[10px] font-black text-white bg-gray-800 px-2 py-0.5 rounded">#{idx + 1}</span><span className="text-xs font-black text-gray-800">{job.title}</span></div>
+                      <div className="text-[10px] font-bold text-gray-500 flex items-center gap-2"><span>👤 ลูกค้า: {job.employer?.full_name || 'ไม่ระบุ'}</span><span className="text-gray-300">|</span><span>เวลาจบงาน: {new Date(job.updated_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น.</span></div>
+                      <div className="mt-2 pt-2 border-t border-gray-200 text-[10px] text-gray-400 font-medium space-y-1"><p className="line-clamp-1"><span className="text-blue-400">📍</span> {job.pickup_location}</p>{job.dropoff_location && <p className="line-clamp-1"><span className="text-red-400">🚩</span> {job.dropoff_location}</p>}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
