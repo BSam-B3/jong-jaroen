@@ -24,6 +24,7 @@ export default function RiderDashboardPage() {
   // Rider States
   const [isOnline, setIsOnline] = useState(false);
   const [isAutoAccept, setIsAutoAccept] = useState(false);
+  const [riderVehicle, setRiderVehicle] = useState<string>('motorcycle'); // 🌟 เก็บประเภทรถของไรเดอร์
   
   // Data States
   const [availableJobs, setAvailableJobs] = useState<any[]>([]);
@@ -31,11 +32,11 @@ export default function RiderDashboardPage() {
   const [todaysEarnings, setTodaysEarnings] = useState(0);
   const [todaysTrips, setTodaysTrips] = useState(0);
   
-  // 🌟 State สำหรับประวัติงาน
+  // State สำหรับประวัติงาน
   const [historyJobs, setHistoryJobs] = useState<any[]>([]);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
 
-  // 🌟 Helper: คำนวณเวลาที่ผ่านไป
+  // Helper: คำนวณเวลาที่ผ่านไป
   const getTimeElapsed = (dateString: string) => {
     const diff = Math.floor((new Date().getTime() - new Date(dateString).getTime()) / 60000);
     if (diff < 1) return 'เพิ่งเรียกเมื่อกี้';
@@ -56,9 +57,10 @@ export default function RiderDashboardPage() {
         return;
       }
       
+      // 🌟 ดึงข้อมูล vehicle_type มาด้วย
       const { data: profile } = await supabase
         .from('profiles')
-        .select('is_kyc_verified, full_name, avatar_url')
+        .select('is_kyc_verified, full_name, avatar_url, vehicle_type')
         .eq('id', session.user.id)
         .single();
 
@@ -70,12 +72,17 @@ export default function RiderDashboardPage() {
 
       setProfileData(profile);
       setCurrentUser(session.user);
-      fetchRiderData(session.user.id);
+      
+      // ตั้งค่ารถของไรเดอร์ (ถ้าไม่มีค่าเริ่มต้นเป็น motorcycle)
+      const vType = profile?.vehicle_type || 'motorcycle';
+      setRiderVehicle(vType);
+      
+      fetchRiderData(session.user.id, vType);
     };
     initRider();
   }, [router, supabase]);
 
-  const fetchRiderData = useCallback(async (userId: string) => {
+  const fetchRiderData = useCallback(async (userId: string, vType: string = riderVehicle) => {
     // 1. งานที่กำลังทำ
     const { data: currentJob } = await supabase
       .from('jobs')
@@ -86,19 +93,20 @@ export default function RiderDashboardPage() {
     
     setActiveJob(currentJob);
 
-    // 2. งานเรดาร์รอบตัว
+    // 2. งานเรดาร์รอบตัว (🌟 กรองตามประเภทรถของไรเดอร์)
     if (!currentJob) {
       const { data: openJobs } = await supabase
         .from('jobs')
         .select('*, employer:profiles!employer_id(full_name)')
         .in('job_type', ['ride', 'buy', 'deliver'])
+        .eq('vehicle_type', vType) // 🎯 ตัวกรองรถ! จะเห็นแค่งานที่ตรงกับรถตัวเอง
         .eq('status', 'open')
         .order('created_at', { ascending: false });
       
       if (openJobs) setAvailableJobs(openJobs);
     }
 
-    // 🌟 3. ดึงประวัติงานวันนี้แบบละเอียด
+    // 3. ดึงประวัติงานวันนี้แบบละเอียด
     const today = new Date().toISOString().split('T')[0];
     const { data: completedJobs } = await supabase
       .from('jobs')
@@ -115,17 +123,17 @@ export default function RiderDashboardPage() {
     }
     
     setLoading(false);
-  }, [supabase]);
+  }, [supabase, riderVehicle]);
 
   useEffect(() => {
     if (!currentUser) return;
     const channel = supabase.channel('rider-dashboard')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, () => {
-        fetchRiderData(currentUser.id);
+        fetchRiderData(currentUser.id, riderVehicle);
       }).subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [currentUser, fetchRiderData, supabase]);
+  }, [currentUser, fetchRiderData, riderVehicle, supabase]);
 
   const handleAcceptJob = async (jobId: string) => {
     if (!isOnline) { alert('กรุณาเปิดออนไลน์ก่อนรับงานค่ะ'); return; }
@@ -140,7 +148,9 @@ export default function RiderDashboardPage() {
     if (error) {
       alert('ขออภัยค่ะ งานนี้ถูกรับไปแล้ว 🥲');
     } else {
-      fetchRiderData(currentUser.id);
+      // 🌟 รับงานสำเร็จ เด้งเข้าห้องแชททันที
+      alert('🎉 รับงานสำเร็จ! ระบบกำลังพาไปที่ห้องแชทค่ะ');
+      router.push(`/chat/${jobId}`);
     }
   };
 
@@ -156,7 +166,7 @@ export default function RiderDashboardPage() {
       alert('เกิดข้อผิดพลาด: ' + error.message);
     } else {
       alert('🎉 ปิดจ๊อบสำเร็จ! ลุยงานต่อไปกันเลยค่ะ');
-      fetchRiderData(currentUser.id);
+      fetchRiderData(currentUser.id, riderVehicle);
     }
   };
 
@@ -177,7 +187,7 @@ export default function RiderDashboardPage() {
         
         {/* 🟠 Header Section */}
         <header className="bg-gradient-to-br from-[#EE4D2D] via-[#FF6243] to-[#FF8A65] px-6 pt-12 pb-8 rounded-b-[2.5rem] md:rounded-b-[3.5rem] text-white shadow-xl relative z-20">
-          <div className="flex justify-between items-start max-w-2xl mx-auto mb-8">
+          <div className="flex justify-between items-start max-w-2xl mx-auto mb-6">
             <div className="flex items-center gap-3">
               <button onClick={() => router.push('/profile')} className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 active:scale-95 transition-all backdrop-blur-md shrink-0">
                 ←
@@ -207,6 +217,22 @@ export default function RiderDashboardPage() {
           </div>
 
           <div className="max-w-2xl mx-auto">
+            {/* 🌟 กล่องแสดงประเภทรถที่ลงทะเบียน */}
+            <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3 border border-white/20 flex items-center justify-between mb-5 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center text-xl shadow-inner">
+                  {VEHICLES_UI.find(x => x.key === riderVehicle)?.icon || '🛵'}
+                </div>
+                <div>
+                  <p className="text-[10px] text-white/80 font-bold uppercase tracking-widest">พาหนะที่ลงทะเบียน</p>
+                  <p className="text-sm font-black text-white">{VEHICLES_UI.find(x => x.key === riderVehicle)?.label || 'มอไซค์'}</p>
+                </div>
+              </div>
+              <span className="bg-[#00C300]/20 text-[#00C300] border border-[#00C300]/40 px-2.5 py-1 rounded-lg text-[9px] font-black">
+                ✔ ยืนยันแล้ว
+              </span>
+            </div>
+
             <p className="text-[10px] text-white/80 font-black uppercase tracking-widest mb-1">รายได้วันนี้</p>
             <div className="flex items-baseline gap-2">
               <span className="text-3xl font-bold text-white/90 drop-shadow-sm">฿</span>
@@ -215,7 +241,6 @@ export default function RiderDashboardPage() {
               </h1>
             </div>
             <div className="flex gap-4 mt-5">
-              {/* 🌟 ปุ่มเปิด Modal ประวัติงาน (Trip History) */}
               <button onClick={() => setIsHistoryModalOpen(true)} className="bg-white/20 hover:bg-white/30 active:scale-95 transition-all backdrop-blur-sm px-4 py-2.5 rounded-2xl flex items-center gap-2.5 border border-white/10 shadow-sm flex-1 text-left">
                 <span className="text-xl bg-white/20 p-1.5 rounded-xl">🎯</span>
                 <div>
@@ -313,8 +338,6 @@ export default function RiderDashboardPage() {
                       <p className="text-sm font-black text-gray-800">{activeJob.employer?.full_name || 'ลูกค้าทั่วไป'}</p>
                     </div>
                   </div>
-                  
-                  {/* 🌟 ปุ่มติดต่อลูกค้า */}
                   <div className="flex items-center gap-2">
                     {activeJob.employer?.phone && (
                       <a href={`tel:${activeJob.employer.phone}`} className="w-10 h-10 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-lg shadow-sm active:scale-95 transition-transform">📞</a>
@@ -348,8 +371,6 @@ export default function RiderDashboardPage() {
                 <div className="space-y-4">
                   {availableJobs.map((job) => (
                     <div key={job.id} className="bg-white rounded-3xl p-5 shadow-md border border-gray-100 flex flex-col gap-4 animate-fade-in group hover:border-[#EE4D2D] transition-colors relative overflow-hidden">
-                      
-                      {/* 🌟 แบดจ์แยกประเภทงาน */}
                       <div className={`absolute top-0 right-0 px-3 py-1 rounded-bl-xl text-[9px] font-black text-white ${job.job_type === 'buy' ? 'bg-pink-500' : job.job_type === 'deliver' ? 'bg-orange-500' : 'bg-blue-500'}`}>
                         {job.job_type === 'buy' ? 'ฝากซื้อ' : job.job_type === 'deliver' ? 'ส่งของ' : 'รับส่งคน'}
                       </div>
@@ -361,7 +382,6 @@ export default function RiderDashboardPage() {
                           </div>
                           <div>
                             <h3 className="text-sm font-black text-gray-900">{job.title || 'เรียกงานด่วน'}</h3>
-                            {/* 🌟 โชว์เวลาที่เรียก และ รูปรถ */}
                             <div className="flex flex-wrap items-center gap-2 mt-1">
                               <span className="text-[9px] bg-orange-50 text-[#EE4D2D] px-2 py-0.5 rounded-md font-black border border-orange-100">
                                 {getVehicleLabel(job.vehicle_type)}
@@ -399,7 +419,6 @@ export default function RiderDashboardPage() {
         {isHistoryModalOpen && (
           <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/60 backdrop-blur-sm animate-fade-in">
             <div className="bg-white w-full max-w-xl rounded-t-[2.5rem] p-6 md:p-8 max-h-[85vh] overflow-y-auto pb-10 shadow-2xl relative flex flex-col">
-              
               <div className="flex justify-between items-center mb-6 shrink-0 sticky top-0 bg-white z-10 py-2">
                 <div>
                   <h2 className="text-xl font-black text-gray-800">ประวัติงานวันนี้ 🗓️</h2>
@@ -418,18 +437,15 @@ export default function RiderDashboardPage() {
                   {historyJobs.map((job, idx) => (
                     <div key={job.id} className="bg-gray-50 rounded-2xl p-4 border border-gray-100 flex flex-col gap-2 relative">
                       <div className="absolute top-4 right-4 text-xs font-black text-[#00C300]">฿{job.budget}</div>
-                      
                       <div className="flex items-center gap-2">
                          <span className="text-[10px] font-black text-white bg-gray-800 px-2 py-0.5 rounded">#{idx + 1}</span>
                          <span className="text-xs font-black text-gray-800">{job.title}</span>
                       </div>
-                      
                       <div className="text-[10px] font-bold text-gray-500 flex items-center gap-2">
                         <span>👤 ลูกค้า: {job.employer?.full_name || 'ไม่ระบุ'}</span>
                         <span className="text-gray-300">|</span>
                         <span>เวลาจบงาน: {new Date(job.updated_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น.</span>
                       </div>
-
                       <div className="mt-2 pt-2 border-t border-gray-200 text-[10px] text-gray-400 font-medium space-y-1">
                         <p className="line-clamp-1"><span className="text-blue-400">📍</span> {job.pickup_location}</p>
                         {job.dropoff_location && <p className="line-clamp-1"><span className="text-red-400">🚩</span> {job.dropoff_location}</p>}
