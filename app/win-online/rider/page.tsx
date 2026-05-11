@@ -33,11 +33,9 @@ export default function RiderDashboardPage() {
   const [historyJobs, setHistoryJobs] = useState<any[]>([]);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
 
-  // 🌟 เพิ่ม State สำหรับนาฬิกาดิจิทัล
   const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
-    // 🌟 ให้เวลาเดินทุกๆ 1 วินาที
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
@@ -154,12 +152,12 @@ export default function RiderDashboardPage() {
   };
 
   const handleCompleteJob = async (jobId: string) => {
-    if (!confirm('📸 ถ่ายรูปส่งงานในแชทเรียบร้อยแล้วใช่ไหมคะ?\n\nเมื่อยืนยัน ระบบจะหักเงินจากกระเป๋าลูกค้าโอนให้คุณทันทีค่ะ')) return;
+    if (!confirm('ยืนยันว่าลูกค้าโอนเงินให้เรียบร้อยแล้วใช่ไหมคะ?\n\nเมื่อยืนยัน ระบบจะหักเครดิตของคุณ 10% จากราคาพื้นฐานอัตโนมัติค่ะ')) return;
     
     const { error } = await supabase.rpc('complete_ride_job', { p_job_id: jobId });
 
     if (error) {
-      alert('เกิดข้อผิดพลาดในการโอนเงิน: ' + error.message);
+      alert('เกิดข้อผิดพลาด: ' + error.message);
     } else {
       alert('🎉 ปิดจ๊อบสำเร็จ! ได้รับเงินเรียบร้อยค่ะ');
       fetchRiderData(currentUser.id, riderVehicle);
@@ -178,7 +176,7 @@ export default function RiderDashboardPage() {
   };
 
   const openNavigation = (location: string) => {
-    const url = `http://googleusercontent.com/maps.google.com/8{encodeURIComponent(location)}`;
+    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`;
     window.open(url, '_blank');
   };
 
@@ -189,7 +187,7 @@ export default function RiderDashboardPage() {
   );
 
   return (
-    <div className="min-h-screen bg-gray-100 flex justify-center font-sans pb-24 md:pb-10">
+    <div className="min-h-screen bg-gray-100 flex justify-center font-sans pb-24 md:pb-10 relative">
       <div className="w-full lg:max-w-4xl xl:max-w-5xl bg-[#F4F6F8] min-h-screen relative flex flex-col md:shadow-2xl overflow-x-hidden md:border-x border-gray-200">
         
         <header className="bg-gradient-to-br from-[#EE4D2D] via-[#FF6243] to-[#FF8A65] px-6 pt-12 pb-8 rounded-b-[2.5rem] md:rounded-b-[3.5rem] text-white shadow-xl relative z-20">
@@ -271,7 +269,7 @@ export default function RiderDashboardPage() {
                   <div className="flex gap-2">{activeJob.employer?.phone && <a href={`tel:${activeJob.employer.phone}`} className="w-10 h-10 bg-green-100 text-green-600 rounded-full flex items-center justify-center">📞</a>}<button onClick={() => router.push(`/chat/${activeJob.id}`)} className="w-10 h-10 bg-[#0047FF] text-white rounded-full flex items-center justify-center shadow-md">💬</button></div>
                 </div>
                 <div className="flex flex-col gap-2">
-                  <button onClick={() => handleCompleteJob(activeJob.id)} className="w-full bg-[#00C300] text-white font-black py-4 rounded-2xl shadow-lg active:scale-95 transition-all">✅ เก็บเงินและจบงาน</button>
+                  <button onClick={() => handleCompleteJob(activeJob.id)} className="w-full bg-[#00C300] text-white font-black py-4 rounded-2xl shadow-lg active:scale-95 transition-all">✅ ได้รับเงินแล้ว (จบงาน)</button>
                   <button onClick={() => handleCancelJob(activeJob.id)} className="w-full text-red-500 font-bold py-3 text-xs">ยกเลิกงานนี้</button>
                 </div>
               </div>
@@ -282,7 +280,6 @@ export default function RiderDashboardPage() {
             <div>
               <div className="flex justify-between mb-4 px-1"><h2 className="text-base font-black text-gray-800">📡 งานที่กำลังเรียก...</h2><span className="text-[10px] font-bold text-gray-400 animate-pulse">LIVE</span></div>
               {availableJobs.length === 0 ? (
-                // 🌟 เปลี่ยนไอคอนหมุนๆ เป็นนาฬิกาดิจิทัลสวยๆ
                 <div className="bg-gradient-to-b from-gray-50 to-white rounded-[2rem] p-10 text-center border border-gray-100 flex flex-col items-center shadow-inner">
                   <div className="text-5xl font-black text-gray-800 mb-2 tabular-nums tracking-tight">
                     {currentTime.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
@@ -337,6 +334,15 @@ export default function RiderDashboardPage() {
           </div>
         )}
       </div>
+
+      {/* 🌟 ปุ่มลอย สลับไปโหมดลูกค้า (สำหรับเทส) */}
+      <button 
+        onClick={() => router.push('/win-online')} 
+        className="fixed bottom-24 right-4 bg-gray-900 text-white px-5 py-3 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.3)] z-50 font-black flex items-center gap-2 hover:scale-105 active:scale-95 transition-all border-2 border-gray-700"
+      >
+        👤 สลับไปแอปลูกค้า
+      </button>
+
     </div>
   );
 }
