@@ -66,7 +66,9 @@ export default function WinOnlinePage() {
   const [pickup, setPickup] = useState('');
   const [dropoff, setDropoff] = useState('');
   const [distanceKm, setDistanceKm] = useState<number>(0);
-  const [fareBreakdown, setFareBreakdown] = useState({ base: 0, distanceFee: 0, fuelSurge: 0, totalFare: 0 });
+  
+  // 🌟 เพิ่ม customerFee สำหรับเก็บค่าแอป 5%
+  const [fareBreakdown, setFareBreakdown] = useState({ base: 0, distanceFee: 0, fuelSurge: 0, customerFee: 0, totalFare: 0 });
 
   const { ready, value, suggestions: { status, data }, setValue, clearSuggestions, init } = usePlacesAutocomplete({
     initOnMount: false, requestOptions: { componentRestrictions: { country: 'th' } }, debounce: 300,
@@ -80,7 +82,7 @@ export default function WinOnlinePage() {
       .select(`*, worker:profiles!worker_id (full_name)`)
       .eq('employer_id', userId)
       .in('job_type', ['ride', 'buy', 'deliver']) 
-      .in('status', ['open', 'in_progress', 'pending_payment']) // โชว์งานที่รอจ่ายเงินด้วย
+      .in('status', ['open', 'in_progress', 'pending_payment'])
       .order('created_at', { ascending: false });
     
     if (data) setJobs(data);
@@ -132,7 +134,13 @@ export default function WinOnlinePage() {
       }
       const distanceFee = distanceKm * ratePerKm;
       const fuelSurge = distanceKm > 0 ? (distanceKm * 1.5) : 0; 
-      setFareBreakdown({ base: baseFare, distanceFee, fuelSurge, totalFare: Math.ceil(baseFare + distanceFee + fuelSurge) });
+      
+      // 🌟 คำนวณยอด 5% สำหรับลูกค้า
+      const baseTotal = baseFare + distanceFee + fuelSurge;
+      const customerFee = baseTotal * 0.05;
+      const totalFare = Math.ceil(baseTotal + customerFee); // ปัดเศษขึ้น
+
+      setFareBreakdown({ base: baseFare, distanceFee, fuelSurge, customerFee, totalFare });
     }
   }, [pickupCoords, dropoffCoords, jobType, vehicleType, distanceKm, calculateRoute]);
 
@@ -141,7 +149,6 @@ export default function WinOnlinePage() {
     if (!currentUser) return router.push('/auth/login?next=/win-online');
     setIsSubmitting(true);
     
-    // 🌟 สร้างงานด้วยสถานะ pending_payment เพื่อให้ลูกค้าไปจ่ายเงินก่อน
     const { data: newJob, error } = await supabase.from('jobs').insert({
       employer_id: currentUser.id, 
       title, 
@@ -151,14 +158,13 @@ export default function WinOnlinePage() {
       dropoff_location: dropoff || null, 
       distance_km: distanceKm, 
       budget: fareBreakdown.totalFare, 
-      status: 'pending_payment' // ไรเดอร์จะยังไม่เห็นงานนี้
+      status: 'pending_payment'
     }).select().single();
 
     if (error) {
       alert('เกิดข้อผิดพลาด: ' + error.message);
       setIsSubmitting(false);
     } else {
-      // 🌟 สร้างงานสำเร็จ พาไปหน้าจ่ายเงิน QR Code ทันที
       router.push(`/checkout/${newJob.id}`);
     }
   };
@@ -204,12 +210,12 @@ export default function WinOnlinePage() {
   }, [pickingType]);
 
   return (
-    <div className="min-h-screen bg-[#F4F6F8] flex justify-center font-sans pb-24 md:pb-10">
+    <div className="min-h-screen bg-[#F4F6F8] flex justify-center font-sans pb-24 md:pb-10 relative">
       <div className="w-full lg:max-w-5xl xl:max-w-6xl bg-[#F8FAFC] min-h-screen relative flex flex-col md:shadow-2xl overflow-x-hidden md:border-x border-gray-200/50">
         
         <header className="bg-gradient-to-br from-[#EE4D2D] to-[#FF7337] px-6 pt-12 pb-16 md:pb-20 rounded-b-[2.5rem] md:rounded-b-[4rem] text-white shadow-lg relative z-20">
           <div className="flex items-center gap-4 max-w-3xl mx-auto">
-            <button onClick={() => router.back()} className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 active:scale-95 transition-all backdrop-blur-md">←</button>
+            <button onClick={() => router.push('/')} className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 active:scale-95 transition-all backdrop-blur-md">←</button>
             <div>
               <h1 className="text-2xl md:text-4xl font-black tracking-tight">จงเจริญ วินออนไลน์ 🛵</h1>
               <p className="text-xs md:text-sm font-bold text-orange-100 opacity-90 mt-1 md:mt-2">สนับสนุนไรเดอร์ในบ้านเรา ด้วยราคาที่โปร่งใส</p>
@@ -238,12 +244,8 @@ export default function WinOnlinePage() {
                <div className="space-y-3 max-h-[400px] overflow-y-auto no-scrollbar pr-1">
                  {jobs.map((job) => (
                    <div key={job.id} onClick={() => {
-                     // 🌟 ถ้างานยังไม่จ่ายเงิน ให้กดแล้วไปหน้าจ่ายเงิน
-                     if (job.status === 'pending_payment') {
-                       router.push(`/checkout/${job.id}`);
-                     } else {
-                       router.push(`/chat/${job.id}`);
-                     }
+                     if (job.status === 'pending_payment') { router.push(`/checkout/${job.id}`); } 
+                     else { router.push(`/chat/${job.id}`); }
                    }} className="p-4 rounded-2xl border border-gray-200 hover:border-[#EE4D2D] transition-all cursor-pointer group">
                      <div className="flex justify-between items-start mb-2">
                        <span className="text-sm font-black text-gray-800 group-hover:text-[#EE4D2D]">{job.title || 'เรียกงานด่วน'}</span>
@@ -273,10 +275,28 @@ export default function WinOnlinePage() {
                   <div onClick={() => { setPickingType('pickup'); setIsLocationPickerOpen(true); }} className="w-full bg-white border border-gray-200 rounded-[1rem] px-4 py-3.5 text-sm flex justify-between cursor-pointer"><div className="flex gap-3 items-center overflow-hidden font-bold text-gray-800"><span>📍</span><span className="truncate">{pickup || 'จุดรับต้นทาง'}</span></div><span>›</span></div>
                   <div onClick={() => { setPickingType('dropoff'); setIsLocationPickerOpen(true); }} className="w-full bg-white border border-gray-200 rounded-[1rem] px-4 py-3.5 text-sm flex justify-between cursor-pointer"><div className="flex gap-3 items-center overflow-hidden font-bold text-gray-800"><span>🚩</span><span className="truncate">{dropoff || 'จุดส่งปลายทาง'}</span></div><span>›</span></div>
                 </div>
+                
+                {/* 🌟 แสดงรายละเอียดการบวก 5% */}
                 <div className="bg-orange-50 border border-orange-100 rounded-[1.5rem] p-5 shadow-sm">
-                  {fareBreakdown.totalFare > 0 && ( <div className="space-y-2 mb-3 pb-3 border-b border-orange-200/50 text-[11px] font-bold text-gray-600"><div className="flex justify-between"><span>ค่าเริ่มต้น</span><span>{fareBreakdown.base} บาท</span></div><div className="flex justify-between"><span>ค่าระยะทาง ({distanceKm} กม.)</span><span>{Math.round(fareBreakdown.distanceFee)} บาท</span></div><div className="flex justify-between text-[#EE4D2D]"><span>ค่าพลังงาน</span><span>{Math.ceil(fareBreakdown.fuelSurge)} บาท</span></div></div> )}
-                  <div className="flex justify-between items-end"><div><p className="text-[11px] text-[#EE4D2D] font-black uppercase">ราคาประเมินสุทธิ</p><p className="text-[9px] text-orange-400 font-bold italic">พักเงินไว้ที่ระบบจงเจริญ</p></div><div className="text-right"><div className="text-3xl font-black text-[#EE4D2D] tracking-tighter">{fareBreakdown.totalFare > 0 ? `${fareBreakdown.totalFare} บาท` : '-'}</div></div></div>
+                  {fareBreakdown.totalFare > 0 && ( 
+                    <div className="space-y-2 mb-3 pb-3 border-b border-orange-200/50 text-[11px] font-bold text-gray-600">
+                      <div className="flex justify-between"><span>ค่าเริ่มต้น</span><span>{fareBreakdown.base} บาท</span></div>
+                      <div className="flex justify-between"><span>ค่าระยะทาง ({distanceKm} กม.)</span><span>{Math.round(fareBreakdown.distanceFee)} บาท</span></div>
+                      <div className="flex justify-between"><span>ค่าพลังงาน</span><span>{Math.ceil(fareBreakdown.fuelSurge)} บาท</span></div>
+                      <div className="flex justify-between text-[#EE4D2D]"><span>ค่าธรรมเนียมแอป (5%)</span><span>{Math.ceil(fareBreakdown.customerFee)} บาท</span></div>
+                    </div> 
+                  )}
+                  <div className="flex justify-between items-end">
+                    <div>
+                      <p className="text-[11px] text-[#EE4D2D] font-black uppercase">ราคาประเมินสุทธิ</p>
+                      <p className="text-[9px] text-orange-400 font-bold italic">จ่ายตรงให้คนขับ (โอน/สแกน)</p>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-3xl font-black text-[#EE4D2D] tracking-tighter">{fareBreakdown.totalFare > 0 ? `${fareBreakdown.totalFare} บาท` : '-'}</div>
+                    </div>
+                  </div>
                 </div>
+
                 <button type="submit" disabled={isSubmitting || fareBreakdown.totalFare <= 0} className="w-full bg-[#EE4D2D] text-white font-black py-5 rounded-[1.5rem] text-base shadow-lg active:scale-95 transition-all disabled:opacity-50">
                   {isSubmitting ? 'กำลังส่งคำขอ...' : 'ดำเนินการชำระเงิน 🚀'}
                 </button>
@@ -285,6 +305,7 @@ export default function WinOnlinePage() {
           </div>
         )}
 
+        {/* ... Modal Location Picker (เหมือนเดิม) ... */}
         {isLocationPickerOpen && (
           <div className="fixed inset-0 z-[110] bg-[#F4F6F8] flex flex-col animate-fade-in">
             <div className="p-4 border-b flex items-center gap-3 bg-white shadow-sm z-10 pt-safe">
@@ -313,6 +334,16 @@ export default function WinOnlinePage() {
           </div>
         )}
       </div>
+
+      {/* 🌟 ปุ่มลอย สลับไปโหมดไรเดอร์ (สำหรับเทส) */}
+      <button 
+        onClick={() => router.push('/win-online/rider')} 
+        className="fixed bottom-24 right-4 bg-gray-900 text-white px-5 py-3 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.3)] z-50 font-black flex items-center gap-2 hover:scale-105 active:scale-95 transition-all border-2 border-gray-700"
+      >
+        🛵 สลับไปแอปคนขับ
+      </button>
+
+      <style dangerouslySetInnerHTML={{__html: `.no-scrollbar::-webkit-scrollbar { display: none; } .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }`}} />
     </div>
   );
 }
