@@ -30,6 +30,9 @@ export default function RiderDashboardPage() {
   const [todaysEarnings, setTodaysEarnings] = useState(0);
   const [todaysTrips, setTodaysTrips] = useState(0);
   
+  // 🌟 เพิ่ม State สำหรับเก็บเครดิตคงเหลือ (JJWallet)
+  const [creditBalance, setCreditBalance] = useState<number>(0);
+
   const [historyJobs, setHistoryJobs] = useState<any[]>([]);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
 
@@ -84,6 +87,18 @@ export default function RiderDashboardPage() {
   }, [router, supabase]);
 
   const fetchRiderData = useCallback(async (userId: string, vType: string = riderVehicle) => {
+    // 🌟 ดึงข้อมูลกระเป๋าเงิน (เครดิต) ของคนขับ
+    const { data: walletData } = await supabase
+      .from('wallets')
+      .select('balance_satang')
+      .eq('owner_id', userId)
+      .eq('kind', 'user')
+      .maybeSingle();
+      
+    if (walletData) {
+      setCreditBalance(walletData.balance_satang / 100);
+    }
+
     const { data: currentJob } = await supabase
       .from('jobs')
       .select('*, employer:profiles!employer_id(full_name, phone)')
@@ -133,10 +148,27 @@ export default function RiderDashboardPage() {
     return () => { supabase.removeChannel(channel); };
   }, [currentUser, fetchRiderData, riderVehicle, supabase]);
 
+  // 🌟 ฟังก์ชันจัดการปุ่มออนไลน์ (ดักจับเครดิต)
+  const handleToggleOnline = (checked: boolean) => {
+    if (checked && creditBalance < 20) {
+      alert(`⚠️ ไม่สามารถออนไลน์ได้!\n\nเครดิต JJWallet ของคุณเหลือเพียง ${creditBalance} บาท (ขั้นต่ำ 20 บาท)\n\nกรุณาเติมเครดิตเข้าสู่ระบบก่อนเริ่มรับงานค่ะ`);
+      setIsOnline(false);
+      return;
+    }
+    setIsOnline(checked);
+  };
+
   const handleAcceptJob = async (jobId: string) => {
     if (!isOnline) { alert('กรุณาเปิดออนไลน์ก่อนรับงานค่ะ'); return; }
     if (activeJob) { alert('คุณมีงานที่กำลังดำเนินการอยู่ค่ะ'); return; }
     
+    // รีเช็คเครดิตอีกรอบก่อนรับงานเผื่อพลาด
+    if (creditBalance < 20) {
+      alert('เครดิตไม่เพียงพอ กรุณาเติมเครดิตก่อนรับงานค่ะ');
+      setIsOnline(false);
+      return;
+    }
+
     const { error } = await supabase
       .from('jobs')
       .update({ status: 'in_progress', worker_id: currentUser.id })
@@ -205,13 +237,40 @@ export default function RiderDashboardPage() {
             <div className="flex items-center gap-3">
               <a href="tel:191" className="w-10 h-10 bg-red-500 rounded-full flex items-center justify-center text-[10px] font-black border-2 border-white shadow-lg">SOS</a>
               <div className="flex flex-col items-end">
-                <input type="checkbox" className="sr-only peer" checked={isOnline} id="online-toggle" onChange={(e) => setIsOnline(e.target.checked)} />
+                <input 
+                  type="checkbox" 
+                  className="sr-only peer" 
+                  checked={isOnline} 
+                  id="online-toggle" 
+                  onChange={(e) => handleToggleOnline(e.target.checked)} 
+                />
                 <label htmlFor="online-toggle" className="w-14 h-8 bg-black/20 rounded-full cursor-pointer relative after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:after:translate-x-full peer-checked:bg-[#00C300]"></label>
               </div>
             </div>
           </div>
 
           <div className="max-w-2xl mx-auto">
+            {/* 🌟 แสดงยอดเงินสดที่รับวันนี้ และ เครดิตคงเหลือคู่กัน */}
+            <div className="grid grid-cols-2 gap-4 mb-5">
+              <div>
+                <p className="text-[10px] text-white/80 font-black uppercase tracking-widest mb-1">เงินสดที่รับวันนี้</p>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-xl font-bold text-white/90">฿</span>
+                  <h1 className="text-4xl md:text-5xl font-black text-white tracking-tighter">{todaysEarnings.toLocaleString('th-TH')}</h1>
+                </div>
+              </div>
+              <div className="border-l border-white/20 pl-4">
+                <p className="text-[10px] text-white/80 font-black uppercase tracking-widest mb-1">เครดิตค้ำประกัน (JJWallet)</p>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-xl font-bold text-white/90">฿</span>
+                  <h1 className={`text-4xl md:text-5xl font-black tracking-tighter ${creditBalance < 20 ? 'text-red-300' : 'text-[#00C300]'}`}>
+                    {creditBalance.toLocaleString('th-TH')}
+                  </h1>
+                </div>
+                {creditBalance < 20 && <p className="text-[9px] font-bold text-red-200 mt-1">⚠️ ยอดเครดิตต่ำกว่าเกณฑ์</p>}
+              </div>
+            </div>
+
             <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3 border border-white/20 flex items-center justify-between mb-5">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center text-xl">{VEHICLES_UI.find(x => x.key === riderVehicle)?.icon}</div>
@@ -222,20 +281,20 @@ export default function RiderDashboardPage() {
               </div>
               <span className="bg-[#00C300]/20 text-[#00C300] border border-[#00C300]/40 px-2.5 py-1 rounded-lg text-[9px] font-black">✔ ยืนยันแล้ว</span>
             </div>
-            <p className="text-[10px] text-white/80 font-black uppercase mb-1">รายได้วันนี้</p>
-            <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-bold text-white/90">฿</span>
-              <h1 className="text-5xl md:text-6xl font-black text-white tracking-tighter">{todaysEarnings.toLocaleString('th-TH')}</h1>
-            </div>
+
             <div className="flex gap-4 mt-5">
               <button onClick={() => setIsHistoryModalOpen(true)} className="bg-white/20 backdrop-blur-sm px-4 py-2.5 rounded-2xl flex-1 text-left border border-white/10">
                 <p className="text-[9px] text-white/80 font-bold">รอบวิ่งวันนี้ <span className="bg-white/30 px-1 rounded text-[8px]">ดูประวัติ ›</span></p>
                 <p className="text-sm font-black text-white">{todaysTrips} รอบ</p>
               </button>
-              <div className="bg-white/20 backdrop-blur-sm px-4 py-2.5 rounded-2xl flex-1 border border-white/10">
-                <p className="text-[9px] text-white/80 font-bold">คะแนนดาว</p>
-                <p className="text-sm font-black text-white">5.0</p>
-              </div>
+              {/* 🌟 เปลี่ยนปุ่มดาว เป็นปุ่มไปหน้าเติมเครดิต */}
+              <button onClick={() => router.push('/wallet')} className="bg-gradient-to-r from-orange-400 to-[#EE4D2D] shadow-lg active:scale-95 transition-transform px-4 py-2.5 rounded-2xl flex-1 border border-white/10 flex items-center justify-between">
+                <div>
+                  <p className="text-[9px] text-white/80 font-bold">จัดการกระเป๋าเงิน</p>
+                  <p className="text-sm font-black text-white">เติมเครดิต 💳</p>
+                </div>
+                <span className="text-xl">›</span>
+              </button>
             </div>
           </div>
         </header>
@@ -335,7 +394,6 @@ export default function RiderDashboardPage() {
         )}
       </div>
 
-      {/* 🌟 ปุ่มลอย สลับไปโหมดลูกค้า (สำหรับเทส) */}
       <button 
         onClick={() => router.push('/win-online')} 
         className="fixed bottom-24 right-4 bg-gray-900 text-white px-5 py-3 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.3)] z-50 font-black flex items-center gap-2 hover:scale-105 active:scale-95 transition-all border-2 border-gray-700"
