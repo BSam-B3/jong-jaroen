@@ -48,6 +48,8 @@ export default function JobBoardPage() {
             proposals:job_proposals(count)
           `)
           .eq('status', 'open')
+          // 🌟 ฟีเจอร์ที่เพิ่ม: กรองงานวินออนไลน์ (ride, buy, deliver) ออกจากบอร์ดฟรีแลนซ์
+          .not('job_type', 'in', '("ride","buy","deliver")') 
           .order('created_at', { ascending: false });
         
         if (data) {
