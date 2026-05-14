@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { useNotifications, Notification } from '@/lib/useNotifications';
+// 🌟 แก้ไขบรรทัดนี้: เติมคำว่า 'type' ลงไปหน้า Notification
+import { useNotifications, type Notification } from '@/lib/useNotifications';
 import { createClient } from '@/lib/supabase/client';
 
 const TYPE_EMOJI: Record<string, string> = {
@@ -72,7 +73,7 @@ export function NotificationBell({ userId }: { userId: string }) {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // 🌟 ระบบดักจับเสียงและแจ้งเตือนเบราว์เซอร์ (ฝังเข้ามาในกระดิ่งเลย)
+  // 🌟 ระบบดักจับเสียงและแจ้งเตือนเบราว์เซอร์
   useEffect(() => {
     if (typeof window !== 'undefined' && 'Notification' in window) {
       if (window.Notification.permission === 'default') {
@@ -93,7 +94,7 @@ export function NotificationBell({ userId }: { userId: string }) {
           table: 'notifications',
           filter: `user_id=eq.${userId}`
         }, (payload) => {
-          playSound(); // เล่นเสียง "ติ๊ง" ทันทีที่มีแถวใหม่ใน Database
+          playSound(); // เล่นเสียง "ติ๊ง"
           if (Notification.permission === 'granted') {
             new Notification('การแจ้งเตือนใหม่', {
               body: payload.new.title,
