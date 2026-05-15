@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-// แก้ระยะทางถอยหลังแค่ 2 ขั้น (ออกจาก shops -> ออกจาก marketplace -> เข้า services)
-import { shopService } from '../../services/shopService';
-import { Shop } from '../../types/shop'; // สมมติว่าบีสามสร้างโฟลเดอร์ types ไว้ใน app เหมือนกันนะคะ
+// ดึงทุกอย่างมาจาก shopService ที่เดียวจบ!
+import { shopService, Shop } from '../../services/shopService';
 
 export default function MarketplacePage() {
   const [shops, setShops] = useState<Shop[]>([]);
@@ -19,7 +18,6 @@ export default function MarketplacePage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {shops.map((shop) => (
           <div key={shop.id} className="bg-[#111] border border-[#333] rounded-3xl p-5 relative overflow-hidden">
-            {/* ป้าย Verified 100 บาท/เดือน */}
             {shop.is_verified && (
               <div className="absolute top-0 right-0 bg-[#deff9a] text-black px-3 py-1 rounded-bl-xl text-xs font-bold">
                 <i className="fa-solid fa-check-circle mr-1"></i> ยืนยันแล้ว
