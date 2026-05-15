@@ -2,16 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { shopService, Shop, Product } from '../../../../services/shopService';
-// 1. เพิ่ม Import ตะกร้า
-import { useCart } from '../../../../contexts/CartContext';
+// เปลี่ยนมาใช้ทางลัด @/app/ ทั้ง 2 ตัวเลยค่ะ
+import { shopService, Shop, Product } from '@/app/services/shopService';
+import { useCart } from '@/app/contexts/CartContext';
 
 export default function ShopDetailPage() {
   const { id } = useParams();
   const [shop, setShop] = useState<Shop | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
-  
-  // 2. เรียกใช้ฟังก์ชันตะกร้า
   const { addToCart, totalItems, totalPrice } = useCart();
 
   useEffect(() => {
@@ -41,7 +39,6 @@ export default function ShopDetailPage() {
                 <span className="text-[#deff9a] font-bold text-xl">{product.display_price} บาท</span>
               </div>
             </div>
-            {/* 3. สั่งให้ปุ่มทำงานเมื่อกด */}
             <button 
               onClick={() => addToCart(product)}
               className="bg-[#deff9a] text-black px-4 py-2 rounded-xl font-bold active:scale-95 transition-transform"
@@ -52,7 +49,6 @@ export default function ShopDetailPage() {
         ))}
       </div>
 
-      {/* 4. แถบสรุปตะกร้าลอยอยู่ด้านล่าง (โชว์เฉพาะตอนมีของ) */}
       {totalItems > 0 && (
         <div className="fixed bottom-0 left-0 w-full p-4 bg-gradient-to-t from-black to-transparent">
           <div className="bg-[#deff9a] text-black p-4 rounded-2xl flex justify-between items-center shadow-lg shadow-[#deff9a]/20">
