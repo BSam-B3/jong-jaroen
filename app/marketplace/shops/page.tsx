@@ -1,8 +1,9 @@
-"use client"; // เพิ่มบรรทัดนี้เข้ามาบรรทัดแรกสุดเลยค่ะ
+"use client";
 
 import { useEffect, useState } from 'react';
-import { shopService } from '@/services/shopService';
-import { Shop } from '@/types/shop';
+// ใช้ Relative Path ย้อนกลับไป 3 ขั้น เพื่อแก้ปัญหา Vercel หาไฟล์ไม่เจอ
+import { shopService } from '../../../services/shopService';
+import { Shop } from '../../../types/shop';
 
 export default function MarketplacePage() {
   const [shops, setShops] = useState<Shop[]>([]);
