@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useCart } from '@/app/contexts/CartContext';
-// ลองใช้ทางลัด @/ เพื่อวิ่งไปที่หน้าบ้านสุด ถ้าตั้งค่ามาตรฐานไว้ วิธีนี้จะจบปัญหาเรื่อง ../ 
+// ใช้ทางลัด @/ เพื่อวิ่งจากหน้าบ้านเข้าไปหา lib/supabase โดยตรง (แม่นยำ 100%)
 import { supabase } from '@/lib/supabase';
 
 export default function CheckoutPage() {
@@ -28,6 +28,7 @@ export default function CheckoutPage() {
     setIsOrdering(true);
 
     try {
+      // 1. บันทึกข้อมูลลงตาราง orders
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
         .insert({
@@ -42,6 +43,7 @@ export default function CheckoutPage() {
 
       if (orderError) throw orderError;
 
+      // 2. บันทึกรายการสินค้าลงตาราง order_items
       const orderItems = cart.map(item => ({
         order_id: orderData.id,
         product_id: item.id,
@@ -55,6 +57,7 @@ export default function CheckoutPage() {
 
       if (itemsError) throw itemsError;
 
+      // 3. เมื่อสำเร็จ ทำการเคลียร์ตะกร้าและเปลี่ยนสถานะหน้าจอ
       setOrderComplete(true);
       clearCart();
     } catch (error) {
