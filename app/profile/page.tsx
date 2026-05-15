@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
@@ -55,17 +55,10 @@ export default function ProfilePage() {
     router.push('/auth/login');
   };
 
-  // 🌟 ฟังก์ชันจัดการปุ่มเข้าโหมดคนขับ
   const handleRiderModeClick = (e: React.MouseEvent) => {
     e.preventDefault();
-    // ดักจับสถานะ หากผ่านการยืนยันเอกสารรถ (สมมติใช้ is_kyc_verified)
-    if (profile?.is_kyc_verified) {
-      router.push('/win-online/rider'); // พุ่งไปหน้า Dashboard ของคนขับที่เราจะสร้างใหม่
-    } else {
-      if (confirm('🛑 สิทธิ์ถูกจำกัด!\nคุณต้องลงทะเบียนและผ่านการอนุมัติเอกสารรถ (KYC) ก่อนเปิดโหมดคนขับนะคะ ไปหน้าจัดการข้อมูลเลยไหมคะ?')) {
-        router.push('/profile/edit');
-      }
-    }
+    // ✅ ลิงก์ไปยังหน้า Rider Board ที่เราทำเสร็จแล้ว
+    router.push('/marketplace/rider');
   };
 
   if (loading) return (
@@ -78,7 +71,7 @@ export default function ProfilePage() {
     <div className="min-h-screen bg-[#F4F6F8] flex justify-center font-sans pb-24 md:pb-10">
       <div className="w-full lg:max-w-5xl xl:max-w-6xl bg-[#F8FAFC] min-h-screen relative flex flex-col md:shadow-2xl overflow-x-hidden md:border-x border-gray-200/50">
         
-        {/* 🟠 Header ปรับขนาดให้เต็มตาขึ้นบนจอคอม */}
+        {/* Header ส่วนหัวโปรไฟล์ */}
         <div className="bg-gradient-to-br from-[#EE4D2D] via-[#FF6243] to-[#FF8A65] rounded-b-[3rem] md:rounded-b-[4rem] px-6 pt-12 pb-24 md:pb-32 shadow-lg relative z-10 flex flex-col items-center text-center">
           
           <button 
@@ -113,7 +106,7 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* 💳 การ์ดกระเป๋าเงิน (Responsive Max-width) */}
+        {/* การ์ดกระเป๋าเงิน */}
         <div className="px-5 md:px-20 -mt-16 md:-mt-20 relative z-20 w-full max-w-4xl mx-auto">
           <div 
             onClick={() => router.push('/wallet')}
@@ -143,20 +136,20 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* 📊 Section สถิติ Dashboard */}
+        {/* Section สถิติ */}
         <div className="px-5 md:px-20 mt-6 relative z-20 w-full max-w-4xl mx-auto">
           <div className="grid grid-cols-3 gap-3 md:gap-5">
-            <div className="bg-white rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center hover:shadow-md transition-shadow">
+            <div className="bg-white rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center">
               <span className="text-2xl md:text-3xl mb-1 md:mb-2">⭐</span>
               <span className="font-black text-gray-800 text-lg md:text-2xl">5.0</span>
               <span className="text-[9px] md:text-xs font-bold text-gray-400 uppercase tracking-wider">คะแนนรีวิว</span>
             </div>
-            <div className="bg-white rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center hover:shadow-md transition-shadow">
+            <div className="bg-white rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center">
               <span className="text-2xl md:text-3xl mb-1 md:mb-2">🏆</span>
               <span className="font-black text-[#00C300] text-lg md:text-2xl">12</span>
               <span className="text-[9px] md:text-xs font-bold text-gray-400 uppercase tracking-wider">งานสำเร็จ</span>
             </div>
-            <div className="bg-white rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center hover:shadow-md transition-shadow">
+            <div className="bg-white rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center">
               <span className="text-2xl md:text-3xl mb-1 md:mb-2">⚡</span>
               <span className="font-black text-[#EE4D2D] text-lg md:text-2xl">100%</span>
               <span className="text-[9px] md:text-xs font-bold text-gray-400 uppercase tracking-wider">ตอบกลับ</span>
@@ -164,15 +157,14 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* ✅ Main Menu */}
+        {/* เมนูหลัก */}
         <main className="flex-1 relative z-10 px-5 md:px-20 mt-6 pb-32 space-y-6 w-full max-w-4xl mx-auto">
           
-          {/* 🔔 Section 1: Notifications */}
           <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 p-2 md:p-4">
             <PushToggle />
           </div>
 
-          {/* 📇 Section 2: กระเป๋า Jobs-Card */}
+          {/* Section: กระเป๋า Jobs-Card */}
           <div className="bg-white rounded-[2rem] shadow-md border-2 border-emerald-50 overflow-hidden">
             <div className="bg-emerald-50 px-6 py-3 border-b border-emerald-100 flex items-center justify-between">
               <span className="text-[11px] font-black text-emerald-700 uppercase tracking-widest">การนำเสนอของฉัน</span>
@@ -195,32 +187,26 @@ export default function ProfilePage() {
             </Link>
           </div>
 
-          {/* ⚙️ Section 3: General Menus */}
+          {/* Section: เมนูทั่วไป */}
           <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 overflow-hidden divide-y divide-gray-50">
             
-            {/* 🌟 เมนูเข้าสู่โหมด Rider */}
             <button onClick={handleRiderModeClick} className="w-full flex items-center justify-between p-5 hover:bg-orange-50/50 transition-colors active:bg-gray-50 group text-left">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-2xl bg-orange-50 text-2xl flex items-center justify-center group-hover:scale-110 transition-transform">🛵</div>
                 <div className="flex flex-col">
-                  <span className="font-bold text-gray-800 text-base">โหมดคนขับ (Win-Online)</span>
-                  <span className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">Rider Dashboard</span>
+                  <span className="font-bold text-gray-800 text-base">โหมดคนขับ (Rider Board)</span>
+                  <span className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">รับงานจัดส่งสินค้า</span>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                {!profile?.is_kyc_verified && (
-                  <span className="text-[9px] font-black text-red-500 bg-red-50 border border-red-100 px-2 py-1 rounded-md">🔒 ล็อก</span>
-                )}
-                <span className="text-gray-300 text-2xl font-bold group-hover:text-[#EE4D2D] transition-colors pr-2">›</span>
-              </div>
+              <span className="text-gray-300 text-2xl font-bold group-hover:text-[#EE4D2D] transition-colors pr-2">›</span>
             </button>
 
-            <Link href="/my-jobs" className="flex items-center justify-between p-5 hover:bg-orange-50/50 transition-colors active:bg-gray-50 group">
+            <Link href="/marketplace/orders" className="flex items-center justify-between p-5 hover:bg-orange-50/50 transition-colors active:bg-gray-50 group">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-2xl bg-blue-50 text-2xl flex items-center justify-center group-hover:scale-110 transition-transform">💼</div>
                 <div className="flex flex-col">
-                  <span className="font-bold text-gray-800 text-base">งานของฉัน</span>
-                  <span className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">Track your works</span>
+                  <span className="font-bold text-gray-800 text-base">ประวัติคำสั่งซื้อ</span>
+                  <span className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">Track your orders</span>
                 </div>
               </div>
               <span className="text-gray-300 text-2xl font-bold group-hover:text-[#EE4D2D] transition-colors pr-2">›</span>
@@ -237,17 +223,6 @@ export default function ProfilePage() {
               <span className="text-gray-300 text-2xl font-bold group-hover:text-[#EE4D2D] transition-colors pr-2">›</span>
             </Link>
             
-            <Link href="/support" className="flex items-center justify-between p-5 hover:bg-orange-50/50 transition-colors active:bg-gray-50 group">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-2xl flex items-center justify-center group-hover:scale-110 transition-transform">🎧</div>
-                <div className="flex flex-col">
-                  <span className="font-bold text-gray-800 text-base">ศูนย์ช่วยเหลือ (Help Center)</span>
-                  <span className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">Get Support</span>
-                </div>
-              </div>
-              <span className="text-gray-300 text-2xl font-bold group-hover:text-[#EE4D2D] transition-colors pr-2">›</span>
-            </Link>
-
             <Link href="/about" className="flex items-center justify-between p-5 hover:bg-orange-50/50 transition-colors active:bg-gray-50 group">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-2xl bg-orange-50 text-2xl flex items-center justify-center group-hover:scale-110 transition-transform">ℹ️</div>
