@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-// ใช้ Relative Path ย้อนกลับไป 3 ขั้น เพื่อแก้ปัญหา Vercel หาไฟล์ไม่เจอ
-import { shopService } from '../../../services/shopService';
-import { Shop } from '../../../types/shop';
+// แก้ระยะทางถอยหลังแค่ 2 ขั้น (ออกจาก shops -> ออกจาก marketplace -> เข้า services)
+import { shopService } from '../../services/shopService';
+import { Shop } from '../../types/shop'; // สมมติว่าบีสามสร้างโฟลเดอร์ types ไว้ใน app เหมือนกันนะคะ
 
 export default function MarketplacePage() {
   const [shops, setShops] = useState<Shop[]>([]);
