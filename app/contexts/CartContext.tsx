@@ -1,7 +1,8 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Product } from '../services/shopService';
+// ใช้ทางลัด @/app/ วิ่งตรงไปหาไฟล์เลย
+import { Product } from '@/app/services/shopService';
 
 export interface CartItem extends Product {
   quantity: number;
@@ -21,13 +22,11 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 export function CartProvider({ children }: { children: ReactNode }) {
   const [cart, setCart] = useState<CartItem[]>([]);
 
-  // โหลดตะกร้าเก่าจาก LocalStorage ตอนเปิดแอป
   useEffect(() => {
     const savedCart = localStorage.getItem('jong_jaroen_cart');
     if (savedCart) setCart(JSON.parse(savedCart));
   }, []);
 
-  // บันทึกตะกร้าลง LocalStorage ทุกครั้งที่มีการเปลี่ยนแปลง
   useEffect(() => {
     localStorage.setItem('jong_jaroen_cart', JSON.stringify(cart));
   }, [cart]);
