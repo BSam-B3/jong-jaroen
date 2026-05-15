@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useCart } from '@/app/contexts/CartContext';
-import { supabase } from '@/app/lib/supabase';
+import { supabase } from '../../../lib/supabase'; // แก้ไขตรงนี้ให้ชี้ไปที่ lib ชั้นนอกสุด
 
 export default function CheckoutPage() {
   const { cart, totalPrice, clearCart } = useCart();
@@ -22,11 +22,12 @@ export default function CheckoutPage() {
     setIsOrdering(true);
 
     try {
-      // 1. บันทึกลงตาราง orders
+      if (cart.length === 0) return;
+
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
         .insert({
-          shop_id: cart[0].shop_id, // ดึงจากสินค้าชิ้นแรกในตะกร้า
+          shop_id: cart[0].shop_id,
           total_price: finalTotal,
           delivery_fee: deliveryFee,
           delivery_address: address,
@@ -37,7 +38,6 @@ export default function CheckoutPage() {
 
       if (orderError) throw orderError;
 
-      // 2. บันทึกลงตาราง order_items (แตกรายการสินค้า)
       const orderItems = cart.map(item => ({
         order_id: orderData.id,
         product_id: item.id,
@@ -51,7 +51,6 @@ export default function CheckoutPage() {
 
       if (itemsError) throw itemsError;
 
-      // สั่งซื้อสำเร็จ
       setOrderComplete(true);
       clearCart();
     } catch (error) {
@@ -78,7 +77,7 @@ export default function CheckoutPage() {
   return (
     <div className="bg-black min-h-screen text-white p-4 pb-32">
       <h1 className="text-2xl font-bold mb-6 text-[#deff9a]">สรุปคำสั่งซื้อ</h1>
-      {/* รายการสินค้า (เหมือนเดิม) */}
+      
       <div className="bg-[#111] p-4 rounded-2xl border border-[#333] mb-6">
         <h2 className="font-bold text-lg mb-4 border-b border-[#333] pb-2 text-gray-300">รายการอาหาร</h2>
         {cart.map((item) => (
