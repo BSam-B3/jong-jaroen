@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { useCart } from '@/app/contexts/CartContext';
-// แก้ไขจาก ../../../../ เป็น ../../../ เพื่อให้ชี้ไปที่ Root/lib/supabase ได้ถูกต้อง
-import { supabase } from '../../../lib/supabase';
+// ลองใช้ทางลัด @/ เพื่อวิ่งไปที่หน้าบ้านสุด ถ้าตั้งค่ามาตรฐานไว้ วิธีนี้จะจบปัญหาเรื่อง ../ 
+import { supabase } from '@/lib/supabase';
 
 export default function CheckoutPage() {
   const { cart, totalPrice, clearCart } = useCart();
@@ -28,7 +28,6 @@ export default function CheckoutPage() {
     setIsOrdering(true);
 
     try {
-      // 1. บันทึกข้อมูลลงตาราง orders
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
         .insert({
@@ -43,7 +42,6 @@ export default function CheckoutPage() {
 
       if (orderError) throw orderError;
 
-      // 2. บันทึกรายการสินค้าลงตาราง order_items
       const orderItems = cart.map(item => ({
         order_id: orderData.id,
         product_id: item.id,
