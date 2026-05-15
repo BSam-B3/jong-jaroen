@@ -18,8 +18,8 @@ export interface Product {
   category_id: string | null;
   name: string;
   description: string | null;
-  base_price: number; // ราคาหน้าร้าน
-  display_price: number; // ราคาที่บวก Markup แล้ว (3-5%)
+  base_price: number;
+  display_price: number;
   image_url: string | null;
   is_available: boolean;
 }
