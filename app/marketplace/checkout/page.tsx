@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { useCart } from '@/app/contexts/CartContext';
-// แก้ไข Path ให้ถอยกลับไปหาโฟลเดอร์ lib ที่อยู่ชั้นนอกสุด (Root)
-import { supabase } from '../../../lib/supabase';
+// แก้ไข Path ให้ถอยหลัง 2 ขั้น เพื่อออกจาก marketplace/checkout ไปเจอ lib หน้าบ้าน
+import { supabase } from '../../../../lib/supabase';
 
 export default function CheckoutPage() {
   const { cart, totalPrice, clearCart } = useCart();
@@ -32,7 +32,7 @@ export default function CheckoutPage() {
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
         .insert({
-          shop_id: cart[0].shop_id, // อ้างอิงจากร้านค้าของสินค้าชิ้นแรก
+          shop_id: cart[0].shop_id,
           total_price: finalTotal,
           delivery_fee: deliveryFee,
           delivery_address: address,
@@ -57,7 +57,6 @@ export default function CheckoutPage() {
 
       if (itemsError) throw itemsError;
 
-      // 3. เมื่อสำเร็จ ทำการเคลียร์ตะกร้าและเปลี่ยนสถานะหน้าจอ
       setOrderComplete(true);
       clearCart();
     } catch (error) {
@@ -68,7 +67,6 @@ export default function CheckoutPage() {
     }
   };
 
-  // หน้าจอเมื่อสั่งซื้อสำเร็จ
   if (orderComplete) {
     return (
       <div className="bg-black min-h-screen text-white flex flex-col items-center justify-center p-6 text-center pb-24">
@@ -87,12 +85,10 @@ export default function CheckoutPage() {
     );
   }
 
-  // หน้าจอปกติ
   return (
     <div className="bg-black min-h-screen text-white p-4 pb-32">
       <h1 className="text-2xl font-bold mb-6 text-[#deff9a]">สรุปคำสั่งซื้อ</h1>
 
-      {/* รายการสินค้าในตะกร้า */}
       <div className="bg-[#111] p-4 rounded-2xl border border-[#333] mb-6">
         <h2 className="font-bold text-lg mb-4 border-b border-[#333] pb-2 text-gray-300">รายการอาหาร</h2>
         {cart.map((item) => (
@@ -108,7 +104,6 @@ export default function CheckoutPage() {
         ))}
       </div>
 
-      {/* ช่องกรอกที่อยู่จัดส่ง */}
       <div className="bg-[#111] p-4 rounded-2xl border border-[#333] mb-6">
         <h2 className="font-bold text-lg mb-4 border-b border-[#333] pb-2 text-gray-300">ที่อยู่จัดส่งในตำบลแกลง</h2>
         <textarea 
@@ -120,7 +115,6 @@ export default function CheckoutPage() {
         ></textarea>
       </div>
 
-      {/* ส่วนสรุปยอดเงินด้านล่าง */}
       <div className="fixed bottom-0 left-0 w-full p-4 bg-black border-t border-[#333]">
         <div className="flex justify-between mb-4 px-2">
           <div className="text-gray-400 text-sm">
@@ -141,13 +135,7 @@ export default function CheckoutPage() {
             : 'bg-[#deff9a] text-black hover:bg-white active:scale-95 shadow-lg shadow-[#deff9a]/20'
           }`}
         >
-          {isOrdering ? (
-            <>
-              <i className="fa-solid fa-circle-notch fa-spin"></i> กำลังบันทึกออเดอร์...
-            </>
-          ) : (
-            'ยืนยันสั่งซื้อ'
-          )}
+          {isOrdering ? 'กำลังบันทึกออเดอร์...' : 'ยืนยันสั่งซื้อ'}
         </button>
       </div>
     </div>
