@@ -22,6 +22,8 @@ export default function CheckoutPage() {
     setIsOrdering(true);
 
     try {
+      if (cart.length === 0) return;
+
       // 1. บันทึกออเดอร์
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
@@ -37,14 +39,16 @@ export default function CheckoutPage() {
       if (orderError) throw orderError;
 
       // 2. สร้างการแจ้งเตือนให้ไรเดอร์ (In-app Notification)
+      // แก้ไข: ใช้ข้อความกลางๆ หรือดึงข้อมูลที่ชัวร์ว่ามี
       await supabase.from('notifications').insert({
         title: 'มีงานใหม่ในตำบลแกลง!',
-        message: `ร้าน ${cart[0].shop_name || 'ร้านค้า'} มีออเดอร์ใหม่ รอไรเดอร์มารับด่วนค่ะ`
+        message: `มีออเดอร์ใหม่รอไรเดอร์มารับด่วนค่ะ ยอดรวม ${finalTotal} บาท`
       });
 
       setOrderComplete(true);
       clearCart();
     } catch (error) {
+      console.error(error);
       alert('เกิดข้อผิดพลาดในการสั่งซื้อค่ะ');
     } finally {
       setIsOrdering(false);
@@ -67,7 +71,6 @@ export default function CheckoutPage() {
   return (
     <div className="bg-black min-h-screen text-white p-4 pb-32">
       <h1 className="text-2xl font-bold mb-6 text-[#deff9a]">สรุปคำสั่งซื้อ</h1>
-      {/* ส่วนแสดงรายการสินค้าและที่อยู่ (เหมือนเดิม) */}
       <div className="bg-[#111] p-5 rounded-[28px] border border-[#333] mb-6">
         <textarea 
           className="w-full bg-[#222] border border-[#333] rounded-2xl p-4 text-white outline-none"
