@@ -87,17 +87,18 @@ export default function MarketplacePage() {
                   className="min-w-[200px] bg-white rounded-3xl p-4 shadow-sm border border-orange-100 relative group cursor-pointer"
                 >
                   <div className="w-full h-28 bg-gray-100 rounded-2xl mb-3 overflow-hidden">
-                    <img src={shop.logo_url} className="w-full h-full object-cover group-hover:scale-110 transition-transform" alt={shop.name} />
+                    {/* ✅ แก้ไข Error ตรงนี้โดยใช้ || '' เพื่อกันค่า null */}
+                    <img src={shop.logo_url || ''} className="w-full h-full object-cover group-hover:scale-110 transition-transform" alt={shop.name} />
                   </div>
                   <h3 className="font-black text-gray-800 text-sm truncate">{shop.name}</h3>
-                  <p className="text-[10px] text-gray-400 font-bold mt-1 line-clamp-1">{shop.description}</p>
+                  <p className="text-[10px] text-gray-400 font-bold mt-1 line-clamp-1">{shop.description || ''}</p>
                   <div className="mt-2 text-[#EE4D2D] text-[10px] font-black uppercase">ยืนยันแล้ว ✅</div>
                 </div>
               ))}
             </div>
           </section>
 
-          {/* 🍱 ส่วนที่ 2: สินค้าในชุมชน (Product Grid - ลูกค้าเลือกดูได้) */}
+          {/* 🍱 ส่วนที่ 2: สินค้าในชุมชน (Product Grid) */}
           <section>
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-black text-gray-800 text-lg flex items-center gap-2">
@@ -105,11 +106,10 @@ export default function MarketplacePage() {
               </h2>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              {/* ตัวอย่างสินค้า (ในงานจริงควรดึงจาก products table) */}
               {shops.slice(0, 4).map((shop) => (
                 <div key={shop.id} className="bg-white rounded-3xl overflow-hidden shadow-sm border border-gray-100 flex flex-col">
                   <div className="relative h-32 bg-gray-200">
-                    <img src={shop.logo_url} className="w-full h-full object-cover" alt="product" />
+                    <img src={shop.logo_url || ''} className="w-full h-full object-cover" alt="product" />
                     <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-md text-white text-[9px] px-2 py-1 rounded-md">
                       ส่งจาก {shop.name}
                     </div>
@@ -139,14 +139,14 @@ export default function MarketplacePage() {
                     className="bg-white p-4 rounded-3xl border border-gray-100 flex items-center gap-4 hover:border-orange-200 transition-colors cursor-pointer"
                   >
                     <div className="w-16 h-16 rounded-2xl overflow-hidden bg-gray-50 flex-shrink-0">
-                      <img src={shop.logo_url} className="w-full h-full object-cover" alt={shop.name} />
+                      <img src={shop.logo_url || ''} className="w-full h-full object-cover" alt={shop.name} />
                     </div>
                     <div className="flex-grow">
                       <div className="flex items-center gap-1">
                         <h4 className="font-black text-gray-800 text-base">{shop.name}</h4>
                         {shop.is_verified && <span className="text-[10px]">✅</span>}
                       </div>
-                      <p className="text-[11px] text-gray-400 font-bold line-clamp-1">{shop.description}</p>
+                      <p className="text-[11px] text-gray-400 font-bold line-clamp-1">{shop.description || ''}</p>
                     </div>
                     <div className="text-gray-300">
                       <i className="fa-solid fa-chevron-right text-xs"></i>
