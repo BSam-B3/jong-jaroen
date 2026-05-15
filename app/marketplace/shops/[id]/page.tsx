@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-// เปลี่ยนมาใช้ทางลัด @/app/ ทั้ง 2 ตัวเลยค่ะ
 import { shopService, Shop, Product } from '@/app/services/shopService';
 import { useCart } from '@/app/contexts/CartContext';
 
@@ -56,7 +55,10 @@ export default function ShopDetailPage() {
               <p className="font-bold">ตะกร้าของคุณ ({totalItems} รายการ)</p>
               <p className="text-sm">รวม {totalPrice} บาท</p>
             </div>
-            <button className="bg-black text-[#deff9a] px-6 py-2 rounded-xl font-bold">
+            <button 
+              onClick={() => window.location.href = '/marketplace/checkout'}
+              className="bg-black text-[#deff9a] px-6 py-2 rounded-xl font-bold hover:bg-[#222] transition-colors"
+            >
               ชำระเงิน
             </button>
           </div>
