@@ -5,92 +5,64 @@ import { supabase } from '@/lib/supabase';
 
 export default function RiderBoardPage() {
   const [orders, setOrders] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [inputCode, setInputCode] = useState('');
 
-  // 1. ดึงออเดอร์ที่ยังไม่มีไรเดอร์รับ (สถานะ pending_rider)
-  const fetchAvailableOrders = async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('orders')
-      .select('*, shops(name)')
-      .eq('status', 'pending_rider')
-      .order('created_at', { ascending: false });
-
-    if (!error) setOrders(data || []);
-    setLoading(false);
+  const fetchOrders = async () => {
+    const { data } = await supabase.from('orders').select('*, shops(name)').order('created_at', { ascending: false });
+    setOrders(data || []);
   };
 
-  useEffect(() => {
-    fetchAvailableOrders();
-  }, []);
+  useEffect(() => { fetchOrders(); }, []);
 
-  // 2. ฟังก์ชันกดรับงาน
-  const handleAcceptJob = async (orderId: string) => {
-    const { error } = await supabase
-      .from('orders')
-      .update({ status: 'accepted' }) // เปลี่ยนสถานะเป็นรับงานแล้ว
-      .eq('id', orderId);
+  const handleAcceptJob = async (id: string) => {
+    await supabase.from('orders').update({ status: 'accepted' }).eq('id', id);
+    fetchOrders();
+  };
 
-    if (error) {
-      alert('ไม่สามารถรับงานได้ กรุณาลองใหม่อีกครั้ง');
+  const handleCompleteJob = async (order: any) => {
+    if (inputCode === order.receive_code) {
+      await supabase.from('orders').update({ status: 'delivered' }).eq('id', order.id);
+      alert('ปิดงานสำเร็จ! รับเงินค่าส่งเข้า Wallet เรียบร้อยค่ะ');
+      setInputCode('');
+      fetchOrders();
     } else {
-      alert('รับงานสำเร็จ! กรุณาไปรับสินค้าที่ร้านค้า');
-      fetchAvailableOrders(); // รีเฟรชรายการงานที่เหลือ
+      alert('รหัสรับของไม่ถูกต้อง กรุณาเช็คกับลูกค้าอีกครั้งค่ะ');
     }
   };
 
   return (
-    <div className="bg-[#0f172a] min-h-screen text-white p-4 pb-24">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-[#deff9a]">บอร์ดงานไรเดอร์</h1>
-        <button onClick={fetchAvailableOrders} className="text-sm bg-[#1e293b] px-3 py-1 rounded-lg border border-[#334155]">
-          <i className="fa-solid fa-rotate"></i> รีเฟรช
-        </button>
-      </div>
-
-      {loading ? (
-        <p className="text-center text-gray-500 mt-10">กำลังควานหางานในตำบลแกลง...</p>
-      ) : orders.length === 0 ? (
-        <div className="text-center mt-20">
-          <i className="fa-solid fa-mug-hot text-4xl text-gray-700 mb-4"></i>
-          <p className="text-gray-500">ตอนนี้ยังไม่มีออเดอร์ใหม่เข้ามาค่ะ</p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {orders.map((order) => (
-            <div key={order.id} className="bg-[#1e293b] border border-[#334155] rounded-2xl p-5 shadow-xl">
-              <div className="flex justify-between items-start mb-3">
-                <div>
-                  <p className="text-[#deff9a] text-xs font-bold uppercase tracking-wider">งานใหม่เข้ามา!</p>
-                  <h2 className="text-xl font-bold mt-1">{order.shops?.name || 'ไม่ระบุชื่อร้าน'}</h2>
-                </div>
-                <div className="text-right">
-                  <p className="text-2xl font-black text-white">฿{order.delivery_fee}</p>
-                  <p className="text-[10px] text-gray-400">ค่าส่งที่คุณจะได้รับ</p>
-                </div>
-              </div>
-
-              <div className="bg-[#0f172a]/50 rounded-xl p-3 mb-4 border border-[#334155]">
-                <div className="flex gap-2 text-sm mb-2">
-                  <i className="fa-solid fa-location-dot text-red-400 mt-1"></i>
-                  <p><span className="text-gray-400">ส่งที่:</span> {order.delivery_address}</p>
-                </div>
-                <div className="flex gap-2 text-sm">
-                  <i className="fa-solid fa-money-bill-1 text-green-400 mt-1"></i>
-                  <p><span className="text-gray-400">ยอดเงินรวม:</span> {order.total_price} บาท</p>
-                </div>
-              </div>
-
-              <button 
-                onClick={() => handleAcceptJob(order.id)}
-                className="w-full bg-[#deff9a] text-black py-3 rounded-xl font-bold hover:bg-white active:scale-95 transition-all"
-              >
-                กดรับงานนี้
-              </button>
+    <div className="bg-[#0f172a] min-h-screen text-white p-4">
+      <h1 className="text-2xl font-bold mb-6 text-[#deff9a]">บอร์ดงานไรเดอร์</h1>
+      <div className="space-y-4">
+        {orders.map((order) => (
+          <div key={order.id} className="bg-[#1e293b] p-5 rounded-3xl border border-[#334155]">
+            <div className="flex justify-between mb-2">
+              <h2 className="font-bold">{order.shops?.name}</h2>
+              <span className="text-[#deff9a]">฿{order.delivery_fee}</span>
             </div>
-          ))}
-        </div>
-      )}
+            <p className="text-sm text-gray-400 mb-4 italic">📍 {order.delivery_address}</p>
+
+            {order.status === 'pending_rider' && (
+              <button onClick={() => handleAcceptJob(order.id)} className="w-full bg-[#deff9a] text-black py-3 rounded-xl font-bold">รับงานนี้</button>
+            )}
+
+            {order.status === 'accepted' && (
+              <div className="space-y-3">
+                <input 
+                  type="text" placeholder="ใส่รหัสรับของจากลูกค้า" 
+                  className="w-full bg-black border border-[#deff9a]/30 rounded-xl p-3 text-center text-xl tracking-widest"
+                  value={inputCode} onChange={(e) => setInputCode(e.target.value)}
+                />
+                <button onClick={() => handleCompleteJob(order)} className="w-full bg-white text-black py-3 rounded-xl font-bold">ยืนยันการส่งของ</button>
+              </div>
+            )}
+
+            {order.status === 'delivered' && (
+              <div className="text-center py-2 text-gray-500 font-bold border border-dashed border-gray-700 rounded-xl">ส่งสำเร็จแล้ว ✅</div>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
