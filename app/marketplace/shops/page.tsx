@@ -1,3 +1,5 @@
+"use client"; // เพิ่มบรรทัดนี้เข้ามาบรรทัดแรกสุดเลยค่ะ
+
 import { useEffect, useState } from 'react';
 import { shopService } from '@/services/shopService';
 import { Shop } from '@/types/shop';
