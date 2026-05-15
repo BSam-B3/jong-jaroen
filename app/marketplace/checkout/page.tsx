@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { useCart } from '@/app/contexts/CartContext';
-// แก้ไข Path ให้ถอยหลัง 2 ขั้น เพื่อออกจาก marketplace/checkout ไปเจอ lib หน้าบ้าน
-import { supabase } from '../../../../lib/supabase';
+// แก้ไขจาก ../../../../ เป็น ../../../ เพื่อให้ชี้ไปที่ Root/lib/supabase ได้ถูกต้อง
+import { supabase } from '../../../lib/supabase';
 
 export default function CheckoutPage() {
   const { cart, totalPrice, clearCart } = useCart();
