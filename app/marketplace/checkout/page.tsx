@@ -5,17 +5,18 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import Link from 'next/link';
 import BottomNav from '@/app/components/BottomNav';
+import { createClient } from '@/lib/supabase/client'; // ใช้ Client ตัวเดียวกับหน้า Rider ค่ะ
 
 export default function CheckoutPage() {
   const router = useRouter();
+  const supabase = createClient();
   const { cart, subtotalPrice, deliveryFee, totalPrice, uniqueShopsCount, clearCart } = useCart();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // แบ่งกลุ่มสินค้าตามร้านค้า เพื่อแสดงผลแยกเป็นบล็อกๆ
   const groupedCart = cart.reduce((acc, item) => {
     if (!acc[item.shop_id]) {
       acc[item.shop_id] = {
-        name: item.name.split('จาก ')[1] || 'ร้านค้าสมาชิก', // ดึงชื่อร้านถ้ามี
+        name: item.name.split('จาก ')[1] || 'ร้านค้าสมาชิก',
         items: []
       };
     }
@@ -23,16 +24,81 @@ export default function CheckoutPage() {
     return acc;
   }, {} as Record<string, { name: string, items: any[] }>);
 
+  // --- ส่วนที่แก้ไข: ฟังก์ชันส่งออเดอร์ของจริง ---
   const handlePlaceOrder = async () => {
+    if (isSubmitting) return;
     setIsSubmitting(true);
-    // TODO: เชื่อมต่อ API บันทึก Order ลง Supabase
-    setTimeout(() => {
-      alert('สั่งซื้อสำเร็จ! ไรเดอร์กำลังเตรียมตัวไปรับสินค้าจากทั้ง ' + uniqueShopsCount + ' ร้านให้คุณค่ะ');
+
+    try {
+      // 1. เช็ค User ก่อนสั่ง
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        alert('กรุณาเข้าสู่ระบบก่อนสั่งซื้อค่ะ');
+        router.push('/auth/login');
+        return;
+      }
+
+      // 2. บันทึกข้อมูลลงตาราง orders (ออเดอร์หลัก)
+      const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .insert([{
+          user_id: user.id,
+          total_price: totalPrice,
+          delivery_fee: deliveryFee,
+          status: 'pending',
+          delivery_address: "123/4 ตำบลแกลง อำเภอเมือง ระยอง", // ในอนาคตใช้พิกัดจริง
+          shops_count: uniqueShopsCount
+        }])
+        .select()
+        .single();
+
+      if (orderError) throw orderError;
+
+      // 3. บันทึกรายการสินค้าลง order_items (วนลูปจากตะกร้า)
+      const orderItems = cart.map(item => ({
+        order_id: order.id,
+        product_id: item.id,
+        shop_id: item.shop_id,
+        quantity: item.quantity,
+        price_at_time: item.base_price
+      }));
+
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .insert(orderItems);
+
+      if (itemsError) throw itemsError;
+
+      // 4. 🔥 สร้างงานให้ไรเดอร์ (ลงตาราง jobs เพื่อให้ไปโชว์ที่หน้า Rider Dashboard)
+      const { error: jobError } = await supabase
+        .from('jobs')
+        .insert([{
+          title: `🛍️ ตลาดสดแกลง (แวะ ${uniqueShopsCount} ร้าน)`,
+          job_type: 'buy',
+          status: 'open',
+          budget: deliveryFee, // รายได้ไรเดอร์
+          pickup_location: `${uniqueShopsCount} ร้านในตลาด`,
+          dropoff_location: "ที่อยู่ลูกค้าในแกลง",
+          vehicle_type: 'motorcycle',
+          employer_id: user.id,
+          metadata: { order_id: order.id } // ผูกไอดีออเดอร์ไว้ดูรายละเอียด
+        }]);
+
+      if (jobError) throw jobError;
+
+      // 5. จบงาน
+      alert('สั่งซื้อสำเร็จ! งานของคุณถูกส่งไปที่บอร์ดไรเดอร์แล้วค่ะ 🛵');
       clearCart();
-      router.push('/marketplace/orders');
+      router.push('/marketplace/orders'); // ไปหน้าประวัติการสั่งซื้อ
+
+    } catch (error: any) {
+      console.error('Checkout Error:', error);
+      alert('เกิดข้อผิดพลาด: ' + error.message);
+    } finally {
       setIsSubmitting(false);
-    }, 2000);
+    }
   };
+  // ------------------------------------------
 
   if (cart.length === 0) {
     return (
@@ -49,15 +115,12 @@ export default function CheckoutPage() {
     <div className="min-h-screen bg-[#F4F6F8] flex justify-center font-sans pb-40">
       <div className="w-full lg:max-w-4xl bg-[#F8FAFC] min-h-screen relative flex flex-col md:shadow-2xl overflow-x-hidden md:border-x border-gray-200/50">
         
-        {/* Header ส่วนหัว */}
         <header className="bg-white p-6 pt-12 border-b border-gray-100 flex items-center gap-4 sticky top-0 z-30">
           <button onClick={() => router.back()} className="text-xl">←</button>
           <h1 className="text-xl font-black text-gray-800">ยืนยันการสั่งซื้อ</h1>
         </header>
 
         <main className="p-5 space-y-6">
-          
-          {/* 📍 ที่อยู่จัดส่ง (จำลอง) */}
           <section className="bg-white p-5 rounded-[2rem] shadow-sm border border-gray-100 flex items-start gap-4">
             <div className="text-2xl mt-1">📍</div>
             <div className="flex-1">
@@ -67,7 +130,6 @@ export default function CheckoutPage() {
             <button className="text-[#EE4D2D] text-xs font-black">แก้ไข</button>
           </section>
 
-          {/* 🍱 รายการสินค้าแยกตามร้านค้า (Multi-Shop Display) */}
           <div className="space-y-4">
             <h2 className="px-2 font-black text-gray-400 text-xs uppercase tracking-widest">รายการสินค้าของคุณ</h2>
             {Object.entries(groupedCart).map(([shopId, shopData]) => (
@@ -96,7 +158,6 @@ export default function CheckoutPage() {
             ))}
           </div>
 
-          {/* 💰 สรุปยอดเงิน (Multi-Stop Calculation) */}
           <section className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-100 space-y-4">
             <h3 className="font-black text-gray-800 mb-2">สรุปค่าใช้จ่าย</h3>
             <div className="flex justify-between text-sm font-bold text-gray-500">
@@ -116,7 +177,6 @@ export default function CheckoutPage() {
             </div>
           </section>
 
-          {/* วิธีชำระเงิน */}
           <section className="bg-white p-5 rounded-[2.5rem] shadow-sm border border-gray-100 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="text-xl">💵</div>
@@ -124,10 +184,8 @@ export default function CheckoutPage() {
             </div>
             <span className="text-[#EE4D2D]">✓</span>
           </section>
-
         </main>
 
-        {/* 🚀 ปุ่มยืนยันสั่งซื้อ (Sticky Bottom) */}
         <div className="fixed bottom-0 w-full lg:max-w-4xl bg-white/80 backdrop-blur-md border-t border-gray-100 p-6 z-40">
           <button 
             onClick={handlePlaceOrder}
