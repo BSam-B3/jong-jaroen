@@ -26,12 +26,16 @@ export default function PublicShopCardPage() {
   }, [id]);
 
   const handleAddToCart = (product: any) => {
-    // ✅ แก้ไขแล้ว: ตัด quantity ออกเพื่อให้ตรงกับ Type Product ในระบบของคุณ
+    // ✅ แก้ไข: ส่งข้อมูลให้ครบตามที่ Type 'Product' ใน Context ของคุณบังคับไว้
     addToCart({
       id: product.id,
       shop_id: shop.id,
       name: product.name,
-      base_price: product.base_price
+      base_price: product.base_price,
+      category_id: product.category_id || '', // ต้องมี
+      description: product.description || '', // ต้องมี
+      image_url: product.image_url || '',    // ต้องมี
+      is_available: product.is_available ?? true // ต้องมี
     });
     alert(`เพิ่ม ${product.name} ลงตะกร้าแล้วค่ะ!`);
   };
@@ -44,7 +48,7 @@ export default function PublicShopCardPage() {
       <div className="w-full max-w-2xl bg-[#F8FAFC] min-h-screen relative flex flex-col shadow-2xl">
         
         <div className="relative h-56 bg-gray-900 rounded-b-[3rem] overflow-hidden">
-          <img src={shop.logo_url} className="w-full h-full object-cover opacity-60" alt="" />
+          <img src={shop.logo_url || ''} className="w-full h-full object-cover opacity-60" alt="" />
           <button onClick={() => router.back()} className="absolute top-6 left-6 w-10 h-10 bg-white/20 rounded-full flex items-center justify-center text-white font-bold">←</button>
           <div className="absolute bottom-6 left-6 text-white">
             <h1 className="text-3xl font-black">{shop.name}</h1>
@@ -66,7 +70,7 @@ export default function PublicShopCardPage() {
           <div className="space-y-4">
             {products.map(product => (
               <div key={product.id} className={`bg-white p-4 rounded-[2rem] border border-gray-100 flex gap-4 ${(!shop.is_open || !product.is_available) ? 'opacity-50 grayscale' : ''}`}>
-                <img src={product.image_url} className="w-20 h-20 rounded-2xl object-cover" alt="" />
+                <img src={product.image_url || ''} className="w-20 h-20 rounded-2xl object-cover" alt="" />
                 <div className="flex-1 flex flex-col justify-between">
                   <p className="font-black text-gray-800">{product.name}</p>
                   <div className="flex justify-between items-end">
@@ -94,6 +98,7 @@ export default function PublicShopCardPage() {
           </div>
         )}
       </div>
+      <BottomNav />
     </div>
   );
 }
