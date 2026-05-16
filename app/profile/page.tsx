@@ -187,6 +187,29 @@ export default function ProfilePage() {
             </Link>
           </div>
 
+          {/* 🆕 Section: กระเป๋า Shop-Card (ร้านค้าชุมชน) */}
+          <div className="bg-white rounded-[2rem] shadow-md border-2 border-orange-50 overflow-hidden">
+            <div className="bg-orange-50 px-6 py-3 border-b border-orange-100 flex items-center justify-between">
+              <span className="text-[11px] font-black text-[#EE4D2D] uppercase tracking-widest">ร้านค้าของฉัน</span>
+              <span className="bg-[#EE4D2D] text-white text-[10px] font-black px-2 py-0.5 rounded-md animate-pulse">SHOP</span>
+            </div>
+            
+            <Link href="/profile/shop-cards" className="flex items-center justify-between p-6 hover:bg-orange-50/50 transition-all active:bg-orange-50 group">
+              <div className="flex items-center gap-5">
+                <div className="w-14 h-14 rounded-2xl bg-[#EE4D2D] text-white flex items-center justify-center text-3xl shadow-lg shadow-[#EE4D2D]/20 group-hover:-rotate-6 transition-transform">
+                  🏪
+                </div>
+                <div className="flex flex-col">
+                  <span className="font-black text-gray-800 text-lg">กระเป๋า Shop-Card</span>
+                  <span className="text-xs font-bold text-gray-400 mt-0.5">ลงทะเบียนร้าน เปิด/ปิดร้าน และจัดการสินค้า</span>
+                </div>
+              </div>
+              <div className="w-10 h-10 rounded-full bg-orange-50 flex items-center justify-center group-hover:bg-[#EE4D2D] group-hover:text-white transition-all text-[#EE4D2D]">
+                <span className="text-2xl font-bold">›</span>
+              </div>
+            </Link>
+          </div>
+
           {/* Section: เมนูทั่วไป */}
           <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 overflow-hidden divide-y divide-gray-50">
             
