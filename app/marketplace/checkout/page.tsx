@@ -1,86 +1,150 @@
 "use client";
 
-import { useState } from 'react';
 import { useCart } from '@/app/contexts/CartContext';
-import { supabase } from '@/lib/supabase';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import Link from 'next/link';
+import BottomNav from '@/app/components/BottomNav';
 
 export default function CheckoutPage() {
-  const { cart, totalPrice, clearCart } = useCart();
-  const [address, setAddress] = useState('');
-  const [isOrdering, setIsOrdering] = useState(false);
-  const [orderComplete, setOrderComplete] = useState(false);
+  const router = useRouter();
+  const { cart, subtotalPrice, deliveryFee, totalPrice, uniqueShopsCount, clearCart } = useCart();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const deliveryFee = 20;
-  const finalTotal = totalPrice + deliveryFee;
-
-  const handleConfirmOrder = async () => {
-    if (!address.trim()) {
-      alert('กรุณากรอกที่อยู่จัดส่งด้วยนะคะ!');
-      return;
+  // แบ่งกลุ่มสินค้าตามร้านค้า เพื่อแสดงผลแยกเป็นบล็อกๆ
+  const groupedCart = cart.reduce((acc, item) => {
+    if (!acc[item.shop_id]) {
+      acc[item.shop_id] = {
+        name: item.name.split('จาก ')[1] || 'ร้านค้าสมาชิก', // ดึงชื่อร้านถ้ามี
+        items: []
+      };
     }
-    
-    setIsOrdering(true);
+    acc[item.shop_id].items.push(item);
+    return acc;
+  }, {} as Record<string, { name: string, items: any[] }>);
 
-    try {
-      if (cart.length === 0) return;
-
-      // 1. บันทึกออเดอร์
-      const { data: orderData, error: orderError } = await supabase
-        .from('orders')
-        .insert({
-          shop_id: cart[0].shop_id,
-          total_price: finalTotal,
-          delivery_fee: deliveryFee,
-          delivery_address: address,
-          status: 'pending_rider'
-        })
-        .select().single();
-
-      if (orderError) throw orderError;
-
-      // 2. สร้างการแจ้งเตือนให้ไรเดอร์ (In-app Notification)
-      // แก้ไข: ใช้ข้อความกลางๆ หรือดึงข้อมูลที่ชัวร์ว่ามี
-      await supabase.from('notifications').insert({
-        title: 'มีงานใหม่ในตำบลแกลง!',
-        message: `มีออเดอร์ใหม่รอไรเดอร์มารับด่วนค่ะ ยอดรวม ${finalTotal} บาท`
-      });
-
-      setOrderComplete(true);
+  const handlePlaceOrder = async () => {
+    setIsSubmitting(true);
+    // TODO: เชื่อมต่อ API บันทึก Order ลง Supabase
+    setTimeout(() => {
+      alert('สั่งซื้อสำเร็จ! ไรเดอร์กำลังเตรียมตัวไปรับสินค้าจากทั้ง ' + uniqueShopsCount + ' ร้านให้คุณค่ะ');
       clearCart();
-    } catch (error) {
-      console.error(error);
-      alert('เกิดข้อผิดพลาดในการสั่งซื้อค่ะ');
-    } finally {
-      setIsOrdering(false);
-    }
+      router.push('/marketplace/orders');
+      setIsSubmitting(false);
+    }, 2000);
   };
 
-  if (orderComplete) {
+  if (cart.length === 0) {
     return (
-      <div className="bg-black min-h-screen text-white flex flex-col items-center justify-center p-6 text-center pb-24">
-        <div className="w-24 h-24 bg-[#deff9a] rounded-full flex items-center justify-center mb-6 shadow-lg">
-          <i className="fa-solid fa-check text-5xl text-black"></i>
-        </div>
-        <h1 className="text-3xl font-bold text-[#deff9a] mb-2">สั่งซื้อสำเร็จ!</h1>
-        <p className="text-gray-400 mb-8">งานถูกส่งไปที่บอร์ดไรเดอร์แล้วค่ะ</p>
-        <button onClick={() => window.location.href = '/marketplace/shops'} className="bg-[#222] text-white px-8 py-3 rounded-2xl font-bold border border-[#333]">กลับหน้าหลัก</button>
+      <div className="min-h-screen bg-[#F4F6F8] flex flex-col items-center justify-center p-5">
+        <div className="text-6xl mb-4">🛒</div>
+        <h2 className="text-xl font-black text-gray-800">ตะกร้าว่างเปล่าค่ะ</h2>
+        <Link href="/marketplace/shops" className="mt-4 bg-[#EE4D2D] text-white px-8 py-3 rounded-full font-black shadow-lg">ไปช้อปปิ้งกันเลย</Link>
+        <BottomNav />
       </div>
     );
   }
 
   return (
-    <div className="bg-black min-h-screen text-white p-4 pb-32">
-      <h1 className="text-2xl font-bold mb-6 text-[#deff9a]">สรุปคำสั่งซื้อ</h1>
-      <div className="bg-[#111] p-5 rounded-[28px] border border-[#333] mb-6">
-        <textarea 
-          className="w-full bg-[#222] border border-[#333] rounded-2xl p-4 text-white outline-none"
-          rows={3} placeholder="ระบุที่อยู่จัดส่ง..." value={address} onChange={(e) => setAddress(e.target.value)}
-        />
-      </div>
-      <div className="fixed bottom-0 left-0 w-full p-4 bg-black border-t border-[#333]">
-        <button onClick={handleConfirmOrder} disabled={isOrdering || cart.length === 0} className="w-full bg-[#deff9a] text-black py-4 rounded-2xl font-bold">
-          {isOrdering ? 'กำลังบันทึก...' : 'ยืนยันสั่งซื้อ'}
-        </button>
+    <div className="min-h-screen bg-[#F4F6F8] flex justify-center font-sans pb-40">
+      <div className="w-full lg:max-w-4xl bg-[#F8FAFC] min-h-screen relative flex flex-col md:shadow-2xl overflow-x-hidden md:border-x border-gray-200/50">
+        
+        {/* Header ส่วนหัว */}
+        <header className="bg-white p-6 pt-12 border-b border-gray-100 flex items-center gap-4 sticky top-0 z-30">
+          <button onClick={() => router.back()} className="text-xl">←</button>
+          <h1 className="text-xl font-black text-gray-800">ยืนยันการสั่งซื้อ</h1>
+        </header>
+
+        <main className="p-5 space-y-6">
+          
+          {/* 📍 ที่อยู่จัดส่ง (จำลอง) */}
+          <section className="bg-white p-5 rounded-[2rem] shadow-sm border border-gray-100 flex items-start gap-4">
+            <div className="text-2xl mt-1">📍</div>
+            <div className="flex-1">
+              <h3 className="font-black text-gray-800">ที่อยู่จัดส่ง</h3>
+              <p className="text-sm text-gray-500 font-bold mt-1">บ้านเลขที่ 123/4 ตำบลแกลง อำเภอเมือง ระยอง...</p>
+            </div>
+            <button className="text-[#EE4D2D] text-xs font-black">แก้ไข</button>
+          </section>
+
+          {/* 🍱 รายการสินค้าแยกตามร้านค้า (Multi-Shop Display) */}
+          <div className="space-y-4">
+            <h2 className="px-2 font-black text-gray-400 text-xs uppercase tracking-widest">รายการสินค้าของคุณ</h2>
+            {Object.entries(groupedCart).map(([shopId, shopData]) => (
+              <div key={shopId} className="bg-white rounded-[2.5rem] overflow-hidden shadow-sm border border-gray-100">
+                <div className="bg-orange-50/50 px-6 py-3 border-b border-orange-100 flex items-center gap-2">
+                  <span className="text-lg">🏪</span>
+                  <span className="font-black text-gray-700 text-sm">{shopData.name}</span>
+                </div>
+                <div className="p-4 space-y-4">
+                  {shopData.items.map((item) => (
+                    <div key={item.id} className="flex gap-4">
+                      <div className="w-16 h-16 bg-gray-100 rounded-2xl overflow-hidden shrink-0">
+                        <img src={item.image_url || ''} className="w-full h-full object-cover" alt="" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-bold text-gray-800 text-sm line-clamp-1">{item.name}</p>
+                        <div className="flex justify-between items-center mt-2">
+                          <span className="text-xs font-bold text-gray-400">จำนวน {item.quantity} ชิ้น</span>
+                          <span className="font-black text-gray-800">฿{item.base_price * item.quantity}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* 💰 สรุปยอดเงิน (Multi-Stop Calculation) */}
+          <section className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-100 space-y-4">
+            <h3 className="font-black text-gray-800 mb-2">สรุปค่าใช้จ่าย</h3>
+            <div className="flex justify-between text-sm font-bold text-gray-500">
+              <span>รวมค่าสินค้า</span>
+              <span>฿{subtotalPrice}</span>
+            </div>
+            <div className="flex justify-between text-sm font-bold text-blue-600">
+              <div className="flex flex-col">
+                <span>ค่าส่งแวะ {uniqueShopsCount} ร้าน</span>
+                <span className="text-[10px] opacity-70">(เริ่มต้น 20 + แวะเพิ่มร้านละ 10)</span>
+              </div>
+              <span>฿{deliveryFee}</span>
+            </div>
+            <div className="pt-4 border-t border-gray-50 flex justify-between items-center">
+              <span className="font-black text-gray-800 text-lg">ยอดรวมสุทธิ</span>
+              <span className="font-black text-[#EE4D2D] text-2xl">฿{totalPrice}</span>
+            </div>
+          </section>
+
+          {/* วิธีชำระเงิน */}
+          <section className="bg-white p-5 rounded-[2.5rem] shadow-sm border border-gray-100 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="text-xl">💵</div>
+              <span className="font-bold text-gray-700">เงินสดเมื่อส่งถึง (COD)</span>
+            </div>
+            <span className="text-[#EE4D2D]">✓</span>
+          </section>
+
+        </main>
+
+        {/* 🚀 ปุ่มยืนยันสั่งซื้อ (Sticky Bottom) */}
+        <div className="fixed bottom-0 w-full lg:max-w-4xl bg-white/80 backdrop-blur-md border-t border-gray-100 p-6 z-40">
+          <button 
+            onClick={handlePlaceOrder}
+            disabled={isSubmitting}
+            className={`w-full py-4 rounded-2xl font-black text-lg shadow-xl shadow-[#EE4D2D]/20 transition-all active:scale-95 flex items-center justify-center gap-2 ${
+              isSubmitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#EE4D2D] text-white'
+            }`}
+          >
+            {isSubmitting ? (
+              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : (
+              'ยืนยันการสั่งซื้อ ฿' + totalPrice
+            )}
+          </button>
+        </div>
+
+        <BottomNav />
       </div>
     </div>
   );
