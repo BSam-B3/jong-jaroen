@@ -26,14 +26,12 @@ export default function PublicShopCardPage() {
   }, [id]);
 
   const handleAddToCart = (product: any) => {
-    // ✅ Fix Error: นำ shop_name ออกเพื่อให้ตรงกับ Type ของระบบตะกร้า
+    // ✅ แก้ไขแล้ว: ตัด quantity ออกเพื่อให้ตรงกับ Type Product ในระบบของคุณ
     addToCart({
       id: product.id,
       shop_id: shop.id,
       name: product.name,
-      base_price: product.base_price,
-      display_price: product.base_price,
-      quantity: 1
+      base_price: product.base_price
     });
     alert(`เพิ่ม ${product.name} ลงตะกร้าแล้วค่ะ!`);
   };
@@ -46,7 +44,7 @@ export default function PublicShopCardPage() {
       <div className="w-full max-w-2xl bg-[#F8FAFC] min-h-screen relative flex flex-col shadow-2xl">
         
         <div className="relative h-56 bg-gray-900 rounded-b-[3rem] overflow-hidden">
-          <img src={shop.logo_url} className="w-full h-full object-cover opacity-60" />
+          <img src={shop.logo_url} className="w-full h-full object-cover opacity-60" alt="" />
           <button onClick={() => router.back()} className="absolute top-6 left-6 w-10 h-10 bg-white/20 rounded-full flex items-center justify-center text-white font-bold">←</button>
           <div className="absolute bottom-6 left-6 text-white">
             <h1 className="text-3xl font-black">{shop.name}</h1>
@@ -59,7 +57,6 @@ export default function PublicShopCardPage() {
         </div>
 
         <main className="p-5">
-          {/* ระบบเช็คสถานะร้าน */}
           {!shop.is_open && (
             <div className="bg-gray-100 p-4 rounded-2xl mb-6 text-center border-2 border-dashed border-gray-300 font-black text-gray-500">
                😴 ร้านปิดพักผ่อนอยู่ค่ะ ไว้มาใหม่นะจ๊ะ
@@ -69,7 +66,7 @@ export default function PublicShopCardPage() {
           <div className="space-y-4">
             {products.map(product => (
               <div key={product.id} className={`bg-white p-4 rounded-[2rem] border border-gray-100 flex gap-4 ${(!shop.is_open || !product.is_available) ? 'opacity-50 grayscale' : ''}`}>
-                <img src={product.image_url} className="w-20 h-20 rounded-2xl object-cover" />
+                <img src={product.image_url} className="w-20 h-20 rounded-2xl object-cover" alt="" />
                 <div className="flex-1 flex flex-col justify-between">
                   <p className="font-black text-gray-800">{product.name}</p>
                   <div className="flex justify-between items-end">
@@ -77,7 +74,7 @@ export default function PublicShopCardPage() {
                     <button 
                       onClick={() => handleAddToCart(product)}
                       disabled={!shop.is_open || !product.is_available}
-                      className={`px-4 py-1.5 rounded-xl text-xs font-black transition-all ${(!shop.is_open || !product.is_available) ? 'bg-gray-200 text-gray-400' : 'bg-[#EE4D2D] text-white shadow-lg shadow-orange-200'}`}
+                      className={`px-4 py-1.5 rounded-xl text-xs font-black transition-all ${(!shop.is_open || !product.is_available) ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-[#EE4D2D] text-white shadow-lg shadow-orange-200 active:scale-95'}`}
                     >
                       {product.is_available ? '+ ใส่ตะกร้า' : 'สินค้าหมด'}
                     </button>
@@ -90,9 +87,9 @@ export default function PublicShopCardPage() {
         
         {cart.length > 0 && (
           <div className="fixed bottom-24 left-1/2 -translate-x-1/2 w-full max-w-lg px-6 z-40">
-            <button onClick={() => router.push('/marketplace/checkout')} className="w-full bg-gray-900 text-white py-4 rounded-2xl font-black shadow-xl flex justify-between px-6">
+            <button onClick={() => router.push('/marketplace/checkout')} className="w-full bg-gray-900 text-white py-4 rounded-2xl font-black shadow-xl flex justify-between px-6 items-center">
               <span>ดูตะกร้าของคุณ</span>
-              <span>{cart.reduce((acc, item) => acc + (item.base_price * item.quantity), 0)}.-</span>
+              <span className="bg-white/20 px-3 py-1 rounded-lg text-sm">{cart.reduce((acc, item) => acc + (item.base_price * item.quantity), 0)}.-</span>
             </button>
           </div>
         )}
