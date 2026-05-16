@@ -13,7 +13,6 @@ export default function ManageShopCardPage() {
   const [shop, setShop] = useState<any>(null);
   const [products, setProducts] = useState<any[]>([]);
 
-  // State สำหรับฟอร์มลงทะเบียนร้าน
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -43,7 +42,6 @@ export default function ManageShopCardPage() {
     setLoading(false);
   };
 
-  // จัดการติ๊ก Checkbox
   const handleCategoryChange = (cat: string) => {
     setFormData(prev => ({
       ...prev,
@@ -53,7 +51,6 @@ export default function ManageShopCardPage() {
     }));
   };
 
-  // บันทึกการเปิดร้านใหม่
   const handleRegisterShop = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -65,36 +62,30 @@ export default function ManageShopCardPage() {
       description: formData.description,
       logo_url: formData.logo_url,
       categories: formData.categories,
-      is_open: true, // เปิดร้านทันที
+      is_open: true,
       is_verified: false
     });
 
     if (!error) {
-      alert('ลงทะเบียน Shop-Card สำเร็จค่ะ!');
-      fetchShopData(); // รีเฟรชข้อมูล
-    } else {
-      alert('เกิดข้อผิดพลาด ลองอีกครั้งนะคะ');
+      alert('ลงทะเบียนร้านค้าสำเร็จแล้วค่ะ!');
+      fetchShopData();
     }
     setLoading(false);
   };
 
-  // สลับสถานะเปิด/ปิดร้าน (Shop Status)
   const toggleShopStatus = async () => {
     const newStatus = !shop.is_open;
-    const { error } = await supabase.from('shops').update({ is_open: newStatus }).eq('id', shop.id);
-    if (!error) setShop({ ...shop, is_open: newStatus });
+    await supabase.from('shops').update({ is_open: newStatus }).eq('id', shop.id);
+    setShop({ ...shop, is_open: newStatus });
   };
 
-  // สลับสถานะสินค้าหมดชั่วคราว (Out of Stock)
   const toggleProductStatus = async (productId: string, currentStatus: boolean) => {
     const newStatus = !currentStatus;
-    const { error } = await supabase.from('products').update({ is_available: newStatus }).eq('id', productId);
-    if (!error) {
-      setProducts(products.map(p => p.id === productId ? { ...p, is_available: newStatus } : p));
-    }
+    await supabase.from('products').update({ is_available: newStatus }).eq('id', productId);
+    setProducts(products.map(p => p.id === productId ? { ...p, is_available: newStatus } : p));
   };
 
-  if (loading) return <div className="min-h-screen bg-[#F4F6F8] flex items-center justify-center"><div className="w-12 h-12 border-4 border-[#EE4D2D] border-t-transparent rounded-full animate-spin" /></div>;
+  if (loading) return <div className="min-h-screen bg-[#F4F6F8] flex items-center justify-center font-black">กำลังโหลดข้อมูลร้านค้า...</div>;
 
   return (
     <div className="min-h-screen bg-[#F4F6F8] pb-32 flex justify-center font-sans">
@@ -102,106 +93,58 @@ export default function ManageShopCardPage() {
         
         <header className="bg-[#EE4D2D] p-6 pt-12 pb-8 rounded-b-[2rem] shadow-md flex items-center gap-4 text-white">
           <button onClick={() => router.back()} className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center font-bold">←</button>
-          <div>
-            <h1 className="text-2xl font-black">{shop ? 'จัดการ Shop-Card' : 'เปิดร้านค้าใหม่'}</h1>
-            <p className="text-xs font-bold opacity-80">พื้นที่สำหรับเจ้าของร้าน</p>
-          </div>
+          <h1 className="text-2xl font-black">{shop ? 'จัดการร้านค้าของคุณ' : 'ลงทะเบียนร้านค้า'}</h1>
         </header>
 
         <main className="p-5 -mt-4 relative z-10">
-          
           {!shop ? (
-            /* ================= ฟอร์มลงทะเบียนร้านค้า (ยังไม่มีร้าน) ================= */
             <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
-              <h2 className="text-lg font-black text-gray-800 mb-4">สร้างโปรไฟล์ร้านค้าของคุณ</h2>
               <form onSubmit={handleRegisterShop} className="space-y-4">
                 <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">ชื่อร้านค้า</label>
-                  <input required className="w-full p-3 bg-gray-50 rounded-xl outline-none focus:border-[#EE4D2D] border border-transparent" placeholder="เช่น ร้านป้าแจ๋ว ของชำ" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
+                  <label className="text-xs font-black text-gray-400 uppercase mb-1 block">ชื่อร้านค้า</label>
+                  <input required className="w-full p-3 bg-gray-50 rounded-xl outline-none border border-gray-100" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">รายละเอียด / คำแนะนำร้าน</label>
-                  <textarea className="w-full p-3 bg-gray-50 rounded-xl outline-none focus:border-[#EE4D2D] border border-transparent" placeholder="บอกจุดเด่นของร้านคุณ..." value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} />
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase mb-2 block">ประเภทร้านค้า (เลือกได้หลายข้อ)</label>
+                  <label className="text-xs font-black text-gray-400 uppercase mb-2 block">หมวดหมู่ร้านค้า</label>
                   <div className="grid grid-cols-2 gap-2">
                     {CATEGORY_OPTIONS.map(cat => (
-                      <label key={cat} className={`flex items-center gap-2 p-3 rounded-xl border cursor-pointer transition-all ${formData.categories.includes(cat) ? 'border-[#EE4D2D] bg-orange-50 text-[#EE4D2D]' : 'border-gray-100 bg-white text-gray-600'}`}>
-                        <input type="checkbox" className="hidden" checked={formData.categories.includes(cat)} onChange={() => handleCategoryChange(cat)} />
-                        <div className={`w-4 h-4 rounded-sm border flex items-center justify-center ${formData.categories.includes(cat) ? 'bg-[#EE4D2D] border-[#EE4D2D]' : 'border-gray-300'}`}>
-                          {formData.categories.includes(cat) && <span className="text-white text-[10px]">✓</span>}
-                        </div>
-                        <span className="text-sm font-bold">{cat}</span>
-                      </label>
+                      <button type="button" key={cat} onClick={() => handleCategoryChange(cat)} className={`p-3 rounded-xl border text-sm font-bold ${formData.categories.includes(cat) ? 'bg-orange-50 border-[#EE4D2D] text-[#EE4D2D]' : 'bg-white border-gray-100'}`}>
+                        {cat}
+                      </button>
                     ))}
                   </div>
                 </div>
-                <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">ลิงก์รูปร้าน (URL)</label>
-                  <input className="w-full p-3 bg-gray-50 rounded-xl outline-none focus:border-[#EE4D2D] border border-transparent" placeholder="https://..." value={formData.logo_url} onChange={e => setFormData({...formData, logo_url: e.target.value})} />
-                </div>
-                <button className="w-full py-4 bg-[#EE4D2D] text-white rounded-2xl font-black text-lg mt-4 active:scale-95 transition-transform shadow-lg shadow-[#EE4D2D]/20">ลงทะเบียนเปิดร้านเลย!</button>
+                <button className="w-full py-4 bg-[#EE4D2D] text-white rounded-2xl font-black">เปิดร้านค้าเลย!</button>
               </form>
             </div>
           ) : (
-            /* ================= แดชบอร์ดจัดการร้าน (มีร้านแล้ว) ================= */
             <div className="space-y-6">
-              
-              {/* ระบบเปิด/ปิดร้าน */}
-              <div className={`p-6 rounded-3xl border-2 transition-all ${shop.is_open ? 'bg-white border-[#EE4D2D]' : 'bg-gray-100 border-gray-300'} flex items-center justify-between shadow-sm`}>
+              <div className={`p-6 rounded-3xl border-2 flex items-center justify-between ${shop.is_open ? 'bg-white border-[#EE4D2D]' : 'bg-gray-100 border-gray-300'}`}>
                 <div>
-                  <h2 className="text-lg font-black text-gray-800">สถานะร้านค้า</h2>
-                  <p className={`text-sm font-bold ${shop.is_open ? 'text-[#EE4D2D]' : 'text-gray-500'}`}>
-                    {shop.is_open ? '🟢 ร้านเปิด รับออเดอร์อยู่' : '⚫ ร้านปิดพักผ่อน'}
-                  </p>
+                  <h2 className="text-lg font-black">{shop.is_open ? '🟢 ร้านกำลังเปิด' : '⚫ ร้านปิดอยู่'}</h2>
+                  <p className="text-xs font-bold text-gray-400 italic">ลูกค้าจะเห็นสถานะนี้ในหน้าตลาด</p>
                 </div>
-                <button 
-                  onClick={toggleShopStatus}
-                  className={`relative w-16 h-8 rounded-full transition-colors duration-300 ${shop.is_open ? 'bg-[#EE4D2D]' : 'bg-gray-300'}`}
-                >
-                  <div className={`absolute top-1 w-6 h-6 rounded-full bg-white transition-transform duration-300 ${shop.is_open ? 'left-9' : 'left-1'}`}></div>
+                <button onClick={toggleShopStatus} className={`w-14 h-7 rounded-full relative transition-colors ${shop.is_open ? 'bg-[#EE4D2D]' : 'bg-gray-400'}`}>
+                  <div className={`absolute top-1 w-5 h-5 bg-white rounded-full transition-all ${shop.is_open ? 'left-8' : 'left-1'}`}></div>
                 </button>
               </div>
 
-              {/* หมวดหมู่ร้านค้าของฉัน */}
               <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100">
-                <p className="text-xs font-bold text-gray-400 uppercase mb-3">หมวดหมู่ที่ขาย</p>
-                <div className="flex flex-wrap gap-2">
-                  {shop.categories?.map((cat: string) => (
-                    <span key={cat} className="bg-orange-50 text-[#EE4D2D] px-3 py-1 rounded-full text-xs font-black border border-orange-100">{cat}</span>
-                  ))}
-                  {(!shop.categories || shop.categories.length === 0) && <span className="text-sm text-gray-400 font-bold">ยังไม่ได้เลือกหมวดหมู่</span>}
-                </div>
-              </div>
-
-              {/* ระบบจัดการสินค้า */}
-              <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100">
-                <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-lg font-black text-gray-800">เมนู / สินค้าในร้าน</h2>
-                  <button onClick={() => router.push('/marketplace/manage-shop/products/add')} className="text-xs bg-gray-900 text-white px-3 py-1.5 rounded-lg font-bold">+ เพิ่ม</button>
-                </div>
-                
+                <h2 className="font-black mb-4 flex justify-between">
+                  เมนูในร้าน <span>{products.length}</span>
+                </h2>
                 <div className="space-y-3">
-                  {products.map(product => (
-                    <div key={product.id} className={`flex items-center gap-3 p-3 rounded-2xl border ${product.is_available ? 'bg-white border-gray-100' : 'bg-gray-50 border-gray-200 grayscale opacity-60'}`}>
-                      <img src={product.image_url} className="w-12 h-12 rounded-xl object-cover" alt="" />
-                      <div className="flex-1">
-                        <p className="font-black text-sm text-gray-800 line-clamp-1">{product.name}</p>
-                        <p className="text-[#EE4D2D] font-black text-xs">{product.base_price} บาท</p>
-                      </div>
-                      <button 
-                        onClick={() => toggleProductStatus(product.id, product.is_available)}
-                        className={`text-[10px] font-black px-3 py-1.5 rounded-lg ${product.is_available ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600'}`}
-                      >
-                        {product.is_available ? 'มีของ' : 'หมดชั่วคราว'}
+                  {products.map(p => (
+                    <div key={p.id} className="flex items-center gap-3 p-2 border-b border-gray-50 last:border-0">
+                      <img src={p.image_url} className="w-10 h-10 rounded-lg object-cover" />
+                      <div className="flex-1 font-bold text-sm">{p.name}</div>
+                      <button onClick={() => toggleProductStatus(p.id, p.is_available)} className={`text-[10px] px-3 py-1 rounded-full font-black ${p.is_available ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-500'}`}>
+                        {p.is_available ? 'มีของ' : 'หมด'}
                       </button>
                     </div>
                   ))}
-                  {products.length === 0 && <p className="text-center text-sm text-gray-400 py-4 font-bold">ยังไม่มีสินค้า กดปุ่มเพิ่มได้เลยค่ะ</p>}
                 </div>
               </div>
-
             </div>
           )}
         </main>
